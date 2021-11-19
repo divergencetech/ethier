@@ -1,0 +1,18 @@
+{
+  "name": "ethier",
+  "version": "0.1.0",
+  "description": "Golang and Solidity code to make Ethereum work ethier",
+  "main": "\"\"",
+  "scripts": {
+    "test": "go generate ./... && go test ./..."
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/divergencetech/ethier"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.3.3"
+  }
+}
