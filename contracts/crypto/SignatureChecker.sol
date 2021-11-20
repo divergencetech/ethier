@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
-pragma solidity ^0.8.0;
+pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
