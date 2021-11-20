@@ -35,9 +35,12 @@ contract TestableDutchAuction is LinearDutchAuction {
     mapping(address => uint256) public purchased;
 
     /// @dev Public API for testing of managePurchase().
-    function buy(uint256 n) public payable managePurchase(n) {
-        total += PurchaseManager._numPurchasing;
-        purchased[tx.origin] += _numPurchasing;
+    function buy(uint256 requested) public payable managePurchase(requested) {
+        // The number requested may have been capped by the modifier. The actual
+        // amount allowed is communicated via the _getNumPurchasing() method.
+        uint256 n = PurchaseManager._getNumPurchasing();
+        total += n;
+        purchased[tx.origin] += n;
     }
 }
 

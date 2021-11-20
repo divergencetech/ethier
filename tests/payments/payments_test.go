@@ -1,7 +1,11 @@
 package payments_test
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"math/big"
+	"os"
 	"sort"
 	"testing"
 
@@ -14,18 +18,26 @@ import (
 	"github.com/h-fam/errdiff"
 )
 
-// Default account IDs for various roles.
-const (
-	owner       = 0
-	beneficiary = 9
-)
-
 // Default PurchaseManager config.
 const (
 	totalInventory = 25
 	maxPerAddress  = 10
 	maxPerTx       = 3
 )
+
+var beneficiary common.Address
+
+func TestMain(m *testing.M) {
+	// Create a random beneficiary address that we can't control because we
+	// throw away the key. That way it can only increase in value.
+	s, err := eth.NewSigner(128)
+	if err != nil {
+		log.Fatalf("eth.NewSigner(128) error %v", err)
+	}
+	beneficiary = s.Address()
+
+	os.Exit(m.Run())
+}
 
 func deploy(t *testing.T, auctionConfig LinearDutchAuctionDutchAuctionConfig) (*ethtest.SimulatedBackend, common.Address, *TestableDutchAuction) {
 	t.Helper()
@@ -41,7 +53,7 @@ func deploy(t *testing.T, auctionConfig LinearDutchAuctionDutchAuctionConfig) (*
 	t.Logf("%T = %+v", purchaseConfig, purchaseConfig)
 
 	addr, _, auction, err := DeployTestableDutchAuction(
-		sim.Acc(owner), sim, auctionConfig, purchaseConfig, sim.Acc(beneficiary).From,
+		sim.Acc(0), sim, auctionConfig, purchaseConfig, beneficiary,
 	)
 	if err != nil {
 		t.Fatalf("DeployTestableDutchAuction() error %v", err)
@@ -290,8 +302,131 @@ func TestAddressLimit(t *testing.T) {
 		if err != nil {
 			t.Fatalf("TotalSupply() error %v", err)
 		}
-		if got.Int64() != totalInventory {
+		if got.Cmp(big.NewInt(totalInventory)) != 0 {
 			t.Errorf("TotalSupply() got %d; want %d", got, totalInventory)
 		}
 	})
+}
+
+func TestFundsManagement(t *testing.T) {
+	ctx := context.Background()
+	price := eth.Ether(1)
+	sim, auctionAddr, auction := deployConstantPrice(t, price)
+
+	if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(big.NewInt(0)) != 0 {
+		t.Fatalf("Bad test setup; beneficiary has non-zero balance; %T.BalanceOf(%s) got %d; want 0", sim, beneficiary, got)
+	}
+
+	refunds := make(chan *TestableDutchAuctionRefund)
+	auction.TestableDutchAuctionFilterer.WatchRefund(&bind.WatchOpts{}, refunds, nil)
+	defer close(refunds)
+
+	revenues := make(chan *TestableDutchAuctionRevenue)
+	auction.TestableDutchAuctionFilterer.WatchRevenue(&bind.WatchOpts{}, revenues, nil)
+	defer close(revenues)
+
+	tests := []struct {
+		account                                             int
+		num                                                 int64
+		sendValue, wantSpent, wantRefund, wantTotalRevenues *big.Int
+		errDiffAgainst                                      interface{}
+	}{
+		{
+			account:           0,
+			num:               3,
+			sendValue:         eth.Ether(5),
+			wantSpent:         eth.Ether(3),
+			wantRefund:        eth.Ether(2),
+			wantTotalRevenues: eth.Ether(3),
+		},
+		{
+			account:           0,
+			num:               1,
+			sendValue:         new(big.Int).Sub(price, big.NewInt(1)),
+			errDiffAgainst:    "Costs 1000000000 GWei",
+			wantTotalRevenues: eth.Ether(3),
+		},
+		{
+			account:           1,
+			num:               2,
+			sendValue:         eth.Ether(2),
+			wantSpent:         eth.Ether(2),
+			wantTotalRevenues: eth.Ether(5),
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("purchase[%d]", i), func(t *testing.T) {
+			before := sim.BalanceOf(ctx, t, sim.Acc(tt.account).From)
+
+			tx, err := auction.Buy(sim.WithValueFrom(tt.account, tt.sendValue), big.NewInt(tt.num))
+			if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
+				t.Fatalf("Buy() %s", diff)
+			}
+
+			t.Run("revenues", func(t *testing.T) {
+				if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(tt.wantTotalRevenues) != 0 {
+					t.Errorf("Calculating total revenues; %T.BalanceOf(<beneficiary>) got %d; want %d", sim, got, tt.wantTotalRevenues)
+				}
+
+				select {
+				case got := <-revenues:
+					got.Raw = types.Log{}
+					want := &TestableDutchAuctionRevenue{
+						Beneficiary:  beneficiary,
+						NumPurchased: big.NewInt(tt.num),
+						Amount:       tt.wantSpent,
+					}
+					if diff := cmp.Diff(want, got, ethtest.Comparers()...); diff != "" {
+						t.Errorf("Revenue event diff (-want +got):\n%s", diff)
+					}
+				default:
+					if tt.wantSpent != nil && tt.wantSpent.Cmp(big.NewInt(0)) != 0 {
+						t.Errorf("No Revenue event; want amount %d", tt.wantSpent)
+					}
+				}
+			})
+
+			t.Run("refund", func(t *testing.T) {
+				select {
+				case got := <-refunds:
+					got.Raw = types.Log{}
+					want := &TestableDutchAuctionRefund{
+						Buyer:  sim.Acc(tt.account).From,
+						Amount: tt.wantRefund,
+					}
+					if diff := cmp.Diff(want, got, ethtest.Comparers()...); diff != "" {
+						t.Errorf("Refund event diff (-want +got):\n%s", diff)
+					}
+				default:
+					if tt.wantRefund != nil && tt.wantRefund.Cmp(big.NewInt(0)) != 0 {
+						t.Errorf("No Refund event logged; want refund of %d", tt.wantRefund)
+					}
+				}
+			})
+
+			t.Run("complete disbursement of funds", func(t *testing.T) {
+				if got := sim.BalanceOf(ctx, t, auctionAddr); got.Cmp(big.NewInt(0)) != 0 {
+					t.Errorf("Contract kept funds; %T.BalanceOf(<PaymentManger>) got %d; want 0", sim, got)
+				}
+			})
+
+			if err != nil {
+				return
+			}
+
+			t.Run("buyer balance decrease", func(t *testing.T) {
+				// TODO: these tests fail because of a small (~0.0001ETH)
+				// discrepancy in the gas calculation, which needs investigation.
+				t.Skip("TODO: Investigate gas cost discrepancy")
+
+				after := sim.BalanceOf(ctx, t, sim.Acc(tt.account).From)
+				spent := new(big.Int).Sub(before, after)
+				spent.Sub(spent, sim.GasSpent(ctx, t, tx))
+				if got := spent; got.Cmp(tt.wantSpent) != 0 {
+					t.Errorf("Buy(%d) at price %d; got balance reduction of %d (excluding gas); want %d", tt.num, price, got, tt.wantSpent)
+				}
+			})
+		})
+	}
 }

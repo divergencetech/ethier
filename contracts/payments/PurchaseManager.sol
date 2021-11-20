@@ -93,7 +93,12 @@ abstract contract PurchaseManager is Ownable {
     managePurchase() modifier whilst also enforcing the checks, effects,
     interactions pattern.
      */
-    uint256 internal _numPurchasing;
+    function _getNumPurchasing() internal view returns (uint256) {
+        return _numPurchasing;
+    }
+
+    /// @dev Set by managePurchase(); see _getNumPurchasing().
+    uint256 private _numPurchasing;
 
     /// @notice Emitted when a buyer is refunded.
     event Refund(address indexed buyer, uint256 amount);
@@ -111,13 +116,14 @@ abstract contract PurchaseManager is Ownable {
     reimbursed for any excess payment.
     @dev This uses the checks, effects, interactions pattern but the SHOULD
     ideally also be modified as nonReentrant.
-    @param n The number of items being purchased.
+    @param requested The number of items requested for purchase, which MAY be
+    reduced; see _getNumPurchasing().
      */
-    modifier managePurchase(uint256 n) {
+    modifier managePurchase(uint256 requested) {
         /**
          * ##### CHECKS
          */
-        n = Math.min(n, purchaseConfig.maxPerTx);
+        uint256 n = Math.min(requested, purchaseConfig.maxPerTx);
 
         n = _capExtra(n, msg.sender, "Sender limit");
         // Enforce the limit even if proxying through a contract.

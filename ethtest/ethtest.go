@@ -160,6 +160,15 @@ func (sb *SimulatedBackend) FastForward(blockNumber *big.Int) bool {
 	return done
 }
 
+// GasSpent returns the gas spent (i.e. used*cost) by the transaction.
+func (sb *SimulatedBackend) GasSpent(ctx context.Context, tb testing.TB, tx *types.Transaction) *big.Int {
+	rcpt, err := bind.WaitMined(ctx, sb, tx)
+	if err != nil {
+		tb.Fatalf("bind.WaitMined(<simulated backend>, %s) error %v", tx.Hash(), err)
+	}
+	return new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(rcpt.GasUsed))
+}
+
 // ExecutionErrData checks if err is both an rpc.Error and rpc.DataError, and
 // returns err.ErrorData() iff err.ErrorCode()==3 (i.e. an Execution error under
 // the JSON RPC error codes IP).

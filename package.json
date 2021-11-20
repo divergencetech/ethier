@@ -1,10 +1,11 @@
 {
-  "name": "ethier",
-  "version": "0.1.0",
+  "name": "@divergencetech/ethier",
+  "version": "0.2.0",
   "description": "Golang and Solidity code to make Ethereum work ethier",
   "main": "\"\"",
   "scripts": {
-    "test": "go generate ./... && go test ./..."
+    "test": "go generate ./... && go test ./...",
+    "testverbose": "go generate ./... && go test ./... -test.v"
   },
   "repository": {
     "type": "git",
