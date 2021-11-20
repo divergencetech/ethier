@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/google/go-cmp/cmp"
 	"github.com/h-fam/errdiff"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -63,7 +64,7 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 		sb.accounts = append(sb.accounts, txOpts)
 
 		alloc[txOpts.From] = core.GenesisAccount{
-			Balance: eth.Ether(100, 1),
+			Balance: eth.Ether(100),
 		}
 	}
 
@@ -140,6 +141,25 @@ func (sb *SimulatedBackend) BalanceOf(ctx context.Context, tb testing.TB, addr c
 	return bal
 }
 
+// BlockNumber returns the current block number.
+func (sb *SimulatedBackend) BlockNumber() *big.Int {
+	return sb.Blockchain().CurrentBlock().Number()
+}
+
+// FastForward calls sb.Commit() until sb.BlockNumber() >= blockNumber. It
+// returns whether fast-forwarding was required; i.e. false if the requested
+// block number is current or in the past.
+//
+// NOTE: FastForward is O(curr - requested).
+func (sb *SimulatedBackend) FastForward(blockNumber *big.Int) bool {
+	done := false
+	for ; blockNumber.Cmp(sb.BlockNumber()) == 1; done = true {
+		// TODO: is there a more efficient way to do this?
+		sb.Commit()
+	}
+	return done
+}
+
 // ExecutionErrData checks if err is both an rpc.Error and rpc.DataError, and
 // returns err.ErrorData() iff err.ErrorCode()==3 (i.e. an Execution error under
 // the JSON RPC error codes IP).
@@ -175,4 +195,13 @@ func LogGas(tb testing.TB, tx *types.Transaction, prefix string) {
 
 	cost := big.NewRat(int64(tx.Gas()*GasPrice), 1e9)
 	tb.Logf("[%s] %s = %s%s @ %d gwei", prefix, humanize.Comma(int64(tx.Gas())), cost.FloatString(4), eth.Symbol, GasPrice)
+}
+
+// Comparers returns common comparison Options for cmp.Diff(); e.g. for big.Int.
+func Comparers() []cmp.Option {
+	return []cmp.Option{
+		cmp.Comparer(func(a, b *big.Int) bool {
+			return a.Cmp(b) == 0
+		}),
+	}
 }
