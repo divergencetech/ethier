@@ -12,7 +12,7 @@ _ethier_ (pronounced "easier" with a lisp) intends to:
 ## Versioning, stability, and production readiness
 
 ethier uses [Semantic Versioning 2.0.0](https://semver.org). As the major
-version is zero, the _API is open to hange without warning_.
+version is currently zero, the _API is open to change without warning_.
 
 Contracts are very thoroughly tested but have not been subject to audit nor
 widespread use. Early adopters are not only welcome, but will be greatly
