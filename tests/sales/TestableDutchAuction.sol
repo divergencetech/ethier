@@ -2,7 +2,7 @@
 // Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "../../contracts/payments/LinearDutchAuction.sol";
+import "../../contracts/sales/LinearDutchAuction.sol";
 
 /**
 @notice Exposes a buy() function to allow testing of DutchAuction and, by proxy,

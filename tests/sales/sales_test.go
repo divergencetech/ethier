@@ -1,4 +1,4 @@
-package payments_test
+package sales_test
 
 import (
 	"context"
