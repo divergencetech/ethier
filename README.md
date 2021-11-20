@@ -9,6 +9,15 @@ _ethier_ (pronounced "easier" with a lisp) intends to:
 2. Provide reusable Solidity functionality not covered by OpenZeppelin and,
    where appropriate, provide respective Go bindings with round-trip testing.
 
+## Versioning, stability, and production readiness
+
+ethier uses [Semantic Versioning 2.0.0](https://semver.org). As the major
+version is zero, the _API is open to hange without warning_.
+
+Contracts are very thoroughly tested but have not been subject to audit nor
+widespread use. Early adopters are not only welcome, but will be greatly
+appreciated.
+
 ## Why NPM if we're moving away from JavaScript?
 
 Although ethier intends to use Go as much as possible, users may not, and NPM
