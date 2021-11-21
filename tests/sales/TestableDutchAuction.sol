@@ -6,21 +6,21 @@ import "../../contracts/sales/LinearDutchAuction.sol";
 
 /**
 @notice Exposes a buy() function to allow testing of DutchAuction and, by proxy,
-PurchaseManager.
+Seller.
 @dev Setting the price decrease of the DutchAuction to zero is identical to a
-constant PurchaseManager. Creating only a single Testable contract is simpler.
+constant Seller. Creating only a single Testable contract is simpler.
  */
 contract TestableDutchAuction is LinearDutchAuction {
     constructor(
         LinearDutchAuction.DutchAuctionConfig memory auctionConfig,
-        PurchaseManager.PurchaseConfig memory purchaseConfig,
+        Seller.SellerConfig memory sellerConfig,
         address payable beneficiary
-    ) LinearDutchAuction(auctionConfig, purchaseConfig, beneficiary) {}
+    ) LinearDutchAuction(auctionConfig, sellerConfig, beneficiary) {}
 
     uint256 private total;
 
     /**
-    @dev Override of PurchaseManager.totalSupply(). Usually this would be
+    @dev Override of Seller.totalSupply(). Usually this would be
     fulfilled by ERC721Enumerable.
      */
     function totalSupply() public view override returns (uint256) {
@@ -28,7 +28,7 @@ contract TestableDutchAuction is LinearDutchAuction {
     }
 
     /**
-    @dev Although this mirrors PurchaseManager.bought, it is used to test the
+    @dev Although this mirrors Seller.bought, it is used to test the
     _numPurchasing value used to communicate with the modified function. This
     mapping also only counts per tx.origin.
      */
@@ -38,7 +38,7 @@ contract TestableDutchAuction is LinearDutchAuction {
     function buy(uint256 requested) public payable managePurchase(requested) {
         // The number requested may have been capped by the modifier. The actual
         // amount allowed is communicated via the _getNumPurchasing() method.
-        uint256 n = PurchaseManager._getNumPurchasing();
+        uint256 n = Seller._getNumPurchasing();
         total += n;
         purchased[tx.origin] += n;
     }

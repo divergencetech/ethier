@@ -3,15 +3,16 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
-@notice An abstract contract providing the managePurchase() modifier to:
+@notice An abstract contract providing the _purchase() function to:
  - Enforce per-wallet / per-transaction limits
  - Calculate required cost, forwarding to a beneficiary, and refunding extra
  */
-abstract contract PurchaseManager is Ownable {
+abstract contract Seller is Ownable, ReentrancyGuard {
     using Strings for uint256;
 
     /**
@@ -20,24 +21,24 @@ abstract contract PurchaseManager is Ownable {
     if different to msg.sender. This stops minting via a contract to get around
     limits, but doesn't protect against wallet farming.
     */
-    struct PurchaseConfig {
+    struct SellerConfig {
         uint256 totalInventory;
         uint256 maxPerAddress;
         uint256 maxPerTx;
         bool alsoLimitOrigin;
     }
 
-    constructor(PurchaseConfig memory config, address payable _beneficiary) {
-        setPurchaseConfig(config);
+    constructor(SellerConfig memory config, address payable _beneficiary) {
+        setSellerConfig(config);
         setBeneficiary(_beneficiary);
     }
 
     /// @notice Configuration of purchase limits.
-    PurchaseConfig public purchaseConfig;
+    SellerConfig public sellerConfig;
 
     /// @notice Sets the purchase config.
-    function setPurchaseConfig(PurchaseConfig memory config) public onlyOwner {
-        purchaseConfig = config;
+    function setSellerConfig(SellerConfig memory config) public onlyOwner {
+        sellerConfig = config;
     }
 
     /// @notice Recipient of revenues.
@@ -77,8 +78,10 @@ abstract contract PurchaseManager is Ownable {
         address addr,
         string memory zeroMsg
     ) internal view returns (uint256) {
-        uint256 extra = purchaseConfig.maxPerAddress - bought[addr];
-        require(extra > 0, zeroMsg);
+        uint256 extra = sellerConfig.maxPerAddress - bought[addr];
+        if (extra == 0) {
+            revert(string(abi.encodePacked("Seller: ", zeroMsg)));
+        }
         return Math.min(n, extra);
     }
 
@@ -123,15 +126,15 @@ abstract contract PurchaseManager is Ownable {
         /**
          * ##### CHECKS
          */
-        uint256 n = Math.min(requested, purchaseConfig.maxPerTx);
+        uint256 n = Math.min(requested, sellerConfig.maxPerTx);
 
         n = _capExtra(n, msg.sender, "Sender limit");
         // Enforce the limit even if proxying through a contract.
-        if (purchaseConfig.alsoLimitOrigin && msg.sender != tx.origin) {
+        if (sellerConfig.alsoLimitOrigin && msg.sender != tx.origin) {
             n = _capExtra(n, tx.origin, "Origin limit");
         }
 
-        n = Math.min(n, purchaseConfig.totalInventory - totalSupply());
+        n = Math.min(n, sellerConfig.totalInventory - totalSupply());
         require(n > 0, "Sold out");
 
         uint256 _cost = cost(n);
@@ -151,7 +154,7 @@ abstract contract PurchaseManager is Ownable {
          * ##### EFFECTS
          */
         bought[msg.sender] += n;
-        if (purchaseConfig.alsoLimitOrigin && msg.sender != tx.origin) {
+        if (sellerConfig.alsoLimitOrigin && msg.sender != tx.origin) {
             bought[tx.origin] += n;
         }
 

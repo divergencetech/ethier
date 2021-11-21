@@ -2,11 +2,11 @@
 // Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "./PurchaseManager.sol";
+import "./Seller.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @notice A PurchaseManager with a linearly decreasing price.
-abstract contract LinearDutchAuction is PurchaseManager {
+/// @notice A Seller with a linearly decreasing price.
+abstract contract LinearDutchAuction is Seller {
     /**
     @param startBlock The first block in which purchases are allowed.
     @param endBlock Last block for which cost(n) < cost(n) in the previous
@@ -24,9 +24,9 @@ abstract contract LinearDutchAuction is PurchaseManager {
 
     constructor(
         DutchAuctionConfig memory config,
-        PurchaseManager.PurchaseConfig memory purchaseConfig,
+        Seller.SellerConfig memory sellerConfig,
         address payable _beneficiary
-    ) PurchaseManager(purchaseConfig, _beneficiary) {
+    ) Seller(sellerConfig, _beneficiary) {
         setAuctionConfig(config);
     }
 

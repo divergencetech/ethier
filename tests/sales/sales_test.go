@@ -18,7 +18,7 @@ import (
 	"github.com/h-fam/errdiff"
 )
 
-// Default PurchaseManager config.
+// Default Seller config.
 const (
 	totalInventory = 25
 	maxPerAddress  = 10
@@ -44,16 +44,16 @@ func deploy(t *testing.T, auctionConfig LinearDutchAuctionDutchAuctionConfig) (*
 	sim := ethtest.NewSimulatedBackendTB(t, 10)
 
 	t.Logf("%T = %+v", auctionConfig, auctionConfig)
-	purchaseConfig := PurchaseManagerPurchaseConfig{
+	sellerConfig := SellerSellerConfig{
 		TotalInventory:  big.NewInt(totalInventory),
 		MaxPerAddress:   big.NewInt(maxPerAddress),
 		MaxPerTx:        big.NewInt(maxPerTx),
 		AlsoLimitOrigin: true,
 	}
-	t.Logf("%T = %+v", purchaseConfig, purchaseConfig)
+	t.Logf("%T = %+v", sellerConfig, sellerConfig)
 
 	addr, _, auction, err := DeployTestableDutchAuction(
-		sim.Acc(0), sim, auctionConfig, purchaseConfig, beneficiary,
+		sim.Acc(0), sim, auctionConfig, sellerConfig, beneficiary,
 	)
 	if err != nil {
 		t.Fatalf("DeployTestableDutchAuction() error %v", err)
@@ -231,9 +231,9 @@ func TestAddressLimit(t *testing.T) {
 	// This test is primarily to demonstrate to readers of this code that config
 	// values are as expected.
 	t.Run("confirm config values", func(t *testing.T) {
-		got, err := auction.PurchaseConfig(nil)
+		got, err := auction.SellerConfig(nil)
 		if err != nil {
-			t.Fatalf("PurchaseConfig() error %v", err)
+			t.Fatalf("SellerConfig() error %v", err)
 		}
 
 		// TODO: submit a PR so geth/accounts/abi/bind returns named structs.
@@ -245,7 +245,7 @@ func TestAddressLimit(t *testing.T) {
 		}
 
 		if diff := cmp.Diff(want, got, ethtest.Comparers()...); diff != "" {
-			t.Errorf("PurchaseConfig() diff (-want +got): \n%s", diff)
+			t.Errorf("SellerConfig() diff (-want +got): \n%s", diff)
 		}
 	})
 
