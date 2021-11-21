@@ -210,7 +210,14 @@ func LogGas(tb testing.TB, tx *types.Transaction, prefix string) {
 func Comparers() []cmp.Option {
 	return []cmp.Option{
 		cmp.Comparer(func(a, b *big.Int) bool {
-			return a.Cmp(b) == 0
+			switch {
+			case a == nil && b == nil:
+				return true
+			case (a == nil) != (b == nil):
+				return false
+			default:
+				return a.Cmp(b) == 0
+			}
 		}),
 	}
 }
