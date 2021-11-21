@@ -4,12 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "../../contracts/erc721/ERC721Common.sol";
 
-/**
-@notice Exposes a buy() function to allow testing of DutchAuction and, by proxy,
-Seller.
-@dev Setting the price decrease of the DutchAuction to zero is identical to a
-constant Seller. Creating only a single Testable contract is simpler.
- */
+/// @notice Exposes a functions modified with the modifiers under test.
 contract TestableERC721Common is ERC721Common {
     constructor() ERC721Common("Token", "JRR", address(0)) {}
 
