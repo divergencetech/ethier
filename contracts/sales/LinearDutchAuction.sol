@@ -33,7 +33,7 @@ abstract contract LinearDutchAuction is Seller {
     /// @notice Configuration of price changes.
     DutchAuctionConfig public dutchAuctionConfig;
 
-    /// @notice Sets the purchase config.
+    /// @notice Sets the auction config.
     function setAuctionConfig(DutchAuctionConfig memory config)
         public
         onlyOwner
@@ -41,7 +41,7 @@ abstract contract LinearDutchAuction is Seller {
         dutchAuctionConfig = config;
     }
 
-    /// @notice Override of PurchaseManager.cost() with Dutch-auction logic.
+    /// @notice Override of Seller.cost() with Dutch-auction logic.
     function cost(uint256 n) public view override returns (uint256) {
         DutchAuctionConfig storage cfg = dutchAuctionConfig;
         require(

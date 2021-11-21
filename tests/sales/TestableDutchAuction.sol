@@ -18,6 +18,17 @@ contract TestableDutchAuction is LinearDutchAuction {
     ) LinearDutchAuction(auctionConfig, sellerConfig, beneficiary) {}
 
     uint256 private total;
+    mapping(address => uint256) public purchased;
+
+    /**
+    @dev Override of Seller._handlePurchase(), called by Seller._purchase()
+    after enforcing any caps, iff n > 0. This is where the primary logic of a
+    sale is handled, e.g. ERC721 minting.
+     */
+    function _handlePurchase(uint256 n) internal override {
+        total += n;
+        purchased[tx.origin] += n;
+    }
 
     /**
     @dev Override of Seller.totalSupply(). Usually this would be
@@ -27,20 +38,9 @@ contract TestableDutchAuction is LinearDutchAuction {
         return total;
     }
 
-    /**
-    @dev Although this mirrors Seller.bought, it is used to test the
-    _numPurchasing value used to communicate with the modified function. This
-    mapping also only counts per tx.origin.
-     */
-    mapping(address => uint256) public purchased;
-
-    /// @dev Public API for testing of managePurchase().
-    function buy(uint256 requested) public payable managePurchase(requested) {
-        // The number requested may have been capped by the modifier. The actual
-        // amount allowed is communicated via the _getNumPurchasing() method.
-        uint256 n = Seller._getNumPurchasing();
-        total += n;
-        purchased[tx.origin] += n;
+    /// @dev Public API for testing of _purchase().
+    function buy(uint256 n) public payable {
+        Seller._purchase(n);
     }
 }
 

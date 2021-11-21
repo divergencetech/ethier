@@ -36,7 +36,7 @@ abstract contract Seller is Ownable, ReentrancyGuard {
     /// @notice Configuration of purchase limits.
     SellerConfig public sellerConfig;
 
-    /// @notice Sets the purchase config.
+    /// @notice Sets the seller config.
     function setSellerConfig(SellerConfig memory config) public onlyOwner {
         sellerConfig = config;
     }
@@ -64,10 +64,21 @@ abstract contract Seller is Ownable, ReentrancyGuard {
     function totalSupply() public view virtual returns (uint256);
 
     /**
+    @dev Called by _purchase() after all limits have been put in place; must
+    perform all contract-specific sale logic, e.g. ERC721 minting.
+    @param n The number of items allowed to be purchased, which MAY be less than
+    to the number passed to _purchase() but SHALL be greater than zero.
+     */
+    function _handlePurchase(uint256 n) internal virtual;
+
+    /**
     @notice Tracks the number of items already bought by an address, regardless
     of transferring out (in the case of ERC721).
+    @dev This isn't public as it may be skewed due to differences in msg.sender
+    and tx.origin, which it treats in the same way such that
+    sum(_bought)>=totalSupply().
      */
-    mapping(address => uint256) public bought;
+    mapping(address => uint256) private _bought;
 
     /**
     @notice Returns min(n, max(extra items addr can purchase)) and reverts if 0.
@@ -78,35 +89,17 @@ abstract contract Seller is Ownable, ReentrancyGuard {
         address addr,
         string memory zeroMsg
     ) internal view returns (uint256) {
-        uint256 extra = sellerConfig.maxPerAddress - bought[addr];
+        uint256 extra = sellerConfig.maxPerAddress - _bought[addr];
         if (extra == 0) {
             revert(string(abi.encodePacked("Seller: ", zeroMsg)));
         }
         return Math.min(n, extra);
     }
 
-    /**
-    @dev The managePurchase() modifier may adjust the number of items being
-    purchased due to per-address limits or to avoid inventory being sold out. To
-    communicate this to the modified function, _numPurchasing is set to the
-    adjusted number.
-
-    Although this approach isn't ideal because of the additional gas of writing
-    and then reading the value, it greatly improves usability of the
-    managePurchase() modifier whilst also enforcing the checks, effects,
-    interactions pattern.
-     */
-    function _getNumPurchasing() internal view returns (uint256) {
-        return _numPurchasing;
-    }
-
-    /// @dev Set by managePurchase(); see _getNumPurchasing().
-    uint256 private _numPurchasing;
-
     /// @notice Emitted when a buyer is refunded.
     event Refund(address indexed buyer, uint256 amount);
 
-    /// @notice Emitted on all purchases.
+    /// @notice Emitted on all purchases of non-zero amount.
     event Revenue(
         address indexed beneficiary,
         uint256 numPurchased,
@@ -114,15 +107,13 @@ abstract contract Seller is Ownable, ReentrancyGuard {
     );
 
     /**
-    @notice Enforces all purchase limits (counts and costs) before executing the
-    modified function. After the function is run, the message sender is
-    reimbursed for any excess payment.
-    @dev This uses the checks, effects, interactions pattern but the SHOULD
-    ideally also be modified as nonReentrant.
+    @notice Enforces all purchase limits (counts and costs) before calling
+    _handlePurchase(), after which the received funds are disbursed to the
+    beneficiary, less any required refunds.
     @param requested The number of items requested for purchase, which MAY be
-    reduced; see _getNumPurchasing().
+    reduced when passed to _handlePurchase().
      */
-    modifier managePurchase(uint256 requested) {
+    function _purchase(uint256 requested) internal nonReentrant {
         /**
          * ##### CHECKS
          */
@@ -153,13 +144,12 @@ abstract contract Seller is Ownable, ReentrancyGuard {
         /**
          * ##### EFFECTS
          */
-        bought[msg.sender] += n;
+        _bought[msg.sender] += n;
         if (sellerConfig.alsoLimitOrigin && msg.sender != tx.origin) {
-            bought[tx.origin] += n;
+            _bought[tx.origin] += n;
         }
 
-        _numPurchasing = n;
-        _;
+        _handlePurchase(n);
 
         /**
          * ##### INTERACTIONS
@@ -167,12 +157,13 @@ abstract contract Seller is Ownable, ReentrancyGuard {
 
         // Ideally we'd be using a PullPayment here, but the user experience is
         // poor when there's a variable cost or the number of items purchased
-        // has been capped. We've addressed reentrancy with checks, effects,
-        // interactions and also noted in the @dev comment that functions SHOULD
-        // also be marked as nonReentrant.
+        // has been capped. We've addressed reentrancy with both a nonReentrant
+        // modifier and the checks, effects, interactions pattern.
 
-        beneficiary.transfer(_cost);
-        emit Revenue(beneficiary, n, _cost);
+        if (_cost > 0) {
+            beneficiary.transfer(_cost);
+            emit Revenue(beneficiary, n, _cost);
+        }
 
         if (msg.value > _cost) {
             address payable reimburse = payable(msg.sender);
