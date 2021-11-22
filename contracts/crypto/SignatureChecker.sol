@@ -7,73 +7,67 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
 @title SignatureChecker
-@notice Modifiers to require that a function has received a valid ECDSA
-signature, signed by one of a set of addresses.
+@notice Additional functions for EnumerableSet.Addresset that require a valid
+ECDSA signature, signed by any member of the set.
  */
-contract SignatureChecker {
+library SignatureChecker {
     using EnumerableSet for EnumerableSet.AddressSet;
-
-    /// @notice Addresses from which a signature is considered valid.
-    EnumerableSet.AddressSet internal _signers;
-
-    /**
-    @param signers Initial set of signers from which signatures are considered
-    valid.
-     */
-    constructor(address[] memory signers) {
-        for (uint256 i = 0; i < signers.length; i++) {
-            _signers.add(signers[i]);
-        }
-    }
-
-    /**
-    @notice Set of signature nonces already seen and no longer considered valid.
-    */
-    mapping(bytes32 => bool) internal _usedNonces;
 
     /**
     @notice Requires that the nonce has not been used previously and that the
-    recovered signer is contained in the _signers AddressSet.
+    recovered signer is contained in the signers AddressSet.
+    @param signers Set of addresses from which signatures are accepted.
+    @param usedNonces Set of already-used nonces.
     @param signature ECDSA signature of keccak256(abi.encodePacked(data,nonce)).
      */
-    modifier validSignature(
+    function validateSignature(
+        EnumerableSet.AddressSet storage signers,
         bytes memory data,
         bytes32 nonce,
-        bytes calldata signature
-    ) {
-        require(!_usedNonces[nonce], "SignatureChecker: Nonce already used");
-        _usedNonces[nonce] = true;
-        _validate(keccak256(abi.encodePacked(data, nonce)), signature);
-
-        _;
+        bytes calldata signature,
+        mapping(bytes32 => bool) storage usedNonces
+    ) internal {
+        require(!usedNonces[nonce], "SignatureChecker: Nonce already used");
+        usedNonces[nonce] = true;
+        _validate(signers, keccak256(abi.encodePacked(data, nonce)), signature);
     }
 
     /**
-    @notice Requires that the recovered signer is contained in the _signers
+    @notice Requires that the recovered signer is contained in the signers
     AddressSet.
     */
-    modifier validReusableSignature(bytes32 hash, bytes calldata signature) {
-        _validate(hash, signature);
-        _;
+    function validateSignature(
+        EnumerableSet.AddressSet storage signers,
+        bytes32 hash,
+        bytes calldata signature
+    ) internal view {
+        _validate(signers, hash, signature);
     }
 
     /**
     @notice Hashes addr and requires that the recovered signer is contained in
-    the _signers AddressSet.
-    @dev Equivalent to validReusableSignature(sha3(addr), signature);
+    the signers AddressSet.
+    @dev Equivalent to validate(sha3(addr), signature);
      */
-    modifier allowedAddress(address addr, bytes calldata signature) {
-        _validate(keccak256(abi.encodePacked(addr)), signature);
-        _;
+    function validateSignature(
+        EnumerableSet.AddressSet storage signers,
+        address addr,
+        bytes calldata signature
+    ) internal view {
+        _validate(signers, keccak256(abi.encodePacked(addr)), signature);
     }
 
     /**
     @notice Common validator logic, requiring that the recovered signer is
     contained in the _signers AddressSet.
      */
-    function _validate(bytes32 hash, bytes calldata signature) private view {
+    function _validate(
+        EnumerableSet.AddressSet storage signers,
+        bytes32 hash,
+        bytes calldata signature
+    ) private view {
         require(
-            _signers.contains(ECDSA.recover(hash, signature)),
+            signers.contains(ECDSA.recover(hash, signature)),
             "SignatureChecker: Invalid signature"
         );
     }
