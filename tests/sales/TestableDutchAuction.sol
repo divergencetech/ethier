@@ -18,16 +18,16 @@ contract TestableDutchAuction is LinearDutchAuction {
     ) LinearDutchAuction(auctionConfig, sellerConfig, beneficiary) {}
 
     uint256 private total;
-    mapping(address => uint256) public purchased;
+    mapping(address => uint256) public own;
 
     /**
     @dev Override of Seller._handlePurchase(), called by Seller._purchase()
     after enforcing any caps, iff n > 0. This is where the primary logic of a
     sale is handled, e.g. ERC721 minting.
      */
-    function _handlePurchase(uint256 n) internal override {
+    function _handlePurchase(address to, uint256 n) internal override {
         total += n;
-        purchased[tx.origin] += n;
+        own[to] += n;
     }
 
     /**
@@ -39,8 +39,8 @@ contract TestableDutchAuction is LinearDutchAuction {
     }
 
     /// @dev Public API for testing of _purchase().
-    function buy(uint256 n) public payable {
-        Seller._purchase(n);
+    function buy(address to, uint256 n) public payable {
+        Seller._purchase(to, n);
     }
 }
 
@@ -52,7 +52,7 @@ contract ProxyPurchaser {
         auction = TestableDutchAuction(_auction);
     }
 
-    function buy(uint256 n) public payable {
-        auction.buy(n);
+    function buy(address to, uint256 n) public payable {
+        auction.buy(to, n);
     }
 }

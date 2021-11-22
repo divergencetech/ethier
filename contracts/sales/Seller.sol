@@ -15,17 +15,11 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 abstract contract Seller is Ownable, ReentrancyGuard {
     using Strings for uint256;
 
-    /**
-    @dev Note that the address limits are vulnerable to wallet farming.
-    @param alsoLimitOrigin Whether to also limit the maxPerAddress by tx.origin
-    if different to msg.sender. This stops minting via a contract to get around
-    limits, but doesn't protect against wallet farming.
-    */
+    /// @dev Note that the address limits are vulnerable to wallet farming.
     struct SellerConfig {
         uint256 totalInventory;
         uint256 maxPerAddress;
         uint256 maxPerTx;
-        bool alsoLimitOrigin;
     }
 
     constructor(SellerConfig memory config, address payable _beneficiary) {
@@ -66,10 +60,11 @@ abstract contract Seller is Ownable, ReentrancyGuard {
     /**
     @dev Called by _purchase() after all limits have been put in place; must
     perform all contract-specific sale logic, e.g. ERC721 minting.
+    @param to The recipient of the item(s).
     @param n The number of items allowed to be purchased, which MAY be less than
     to the number passed to _purchase() but SHALL be greater than zero.
      */
-    function _handlePurchase(uint256 n) internal virtual;
+    function _handlePurchase(address to, uint256 n) internal virtual;
 
     /**
     @notice Tracks the number of items already bought by an address, regardless
@@ -110,18 +105,24 @@ abstract contract Seller is Ownable, ReentrancyGuard {
     @notice Enforces all purchase limits (counts and costs) before calling
     _handlePurchase(), after which the received funds are disbursed to the
     beneficiary, less any required refunds.
+    @param to The final recipient of the item(s).
     @param requested The number of items requested for purchase, which MAY be
     reduced when passed to _handlePurchase().
      */
-    function _purchase(uint256 requested) internal nonReentrant {
+    function _purchase(address to, uint256 requested) internal nonReentrant {
         /**
          * ##### CHECKS
          */
         uint256 n = Math.min(requested, sellerConfig.maxPerTx);
 
-        n = _capExtra(n, msg.sender, "Sender limit");
-        // Enforce the limit even if proxying through a contract.
-        if (sellerConfig.alsoLimitOrigin && msg.sender != tx.origin) {
+        n = _capExtra(n, to, "Buyer limit");
+
+        bool alsoLimitSender = msg.sender != to;
+        bool alsoLimitOrigin = tx.origin != msg.sender && tx.origin != to;
+        if (alsoLimitSender) {
+            n = _capExtra(n, msg.sender, "Sender limit");
+        }
+        if (alsoLimitOrigin) {
             n = _capExtra(n, tx.origin, "Origin limit");
         }
 
@@ -144,12 +145,15 @@ abstract contract Seller is Ownable, ReentrancyGuard {
         /**
          * ##### EFFECTS
          */
-        _bought[msg.sender] += n;
-        if (sellerConfig.alsoLimitOrigin && msg.sender != tx.origin) {
+        _bought[to] += n;
+        if (alsoLimitSender) {
+            _bought[msg.sender] += n;
+        }
+        if (alsoLimitOrigin) {
             _bought[tx.origin] += n;
         }
 
-        _handlePurchase(n);
+        _handlePurchase(to, n);
 
         /**
          * ##### INTERACTIONS

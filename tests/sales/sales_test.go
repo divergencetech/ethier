@@ -45,10 +45,9 @@ func deploy(t *testing.T, auctionConfig LinearDutchAuctionDutchAuctionConfig) (*
 
 	t.Logf("%T = %+v", auctionConfig, auctionConfig)
 	sellerConfig := SellerSellerConfig{
-		TotalInventory:  big.NewInt(totalInventory),
-		MaxPerAddress:   big.NewInt(maxPerAddress),
-		MaxPerTx:        big.NewInt(maxPerTx),
-		AlsoLimitOrigin: true,
+		TotalInventory: big.NewInt(totalInventory),
+		MaxPerAddress:  big.NewInt(maxPerAddress),
+		MaxPerTx:       big.NewInt(maxPerTx),
 	}
 	t.Logf("%T = %+v", sellerConfig, sellerConfig)
 
@@ -210,16 +209,16 @@ func TestTxLimit(t *testing.T) {
 			sim, _, auction := deployConstantPrice(t, eth.Ether(0))
 			acc := sim.Acc(0)
 
-			if _, err := auction.Buy(acc, big.NewInt(tt.buy)); err != nil {
+			if _, err := auction.Buy(acc, acc.From, big.NewInt(tt.buy)); err != nil {
 				t.Fatalf("Buy(%d) error %v", tt.buy, err)
 			}
 
-			got, err := auction.Purchased(nil, acc.From)
+			got, err := auction.Own(nil, acc.From)
 			if err != nil {
-				t.Fatalf("Purchased(%s) after Buy() error %v", acc.From, err)
+				t.Fatalf("Own(%s) after Buy() error %v", acc.From, err)
 			}
 			if got.Cmp(big.NewInt(tt.wantPurchased)) != 0 {
-				t.Errorf("Purchased(%s) after Buy(%d) with max per tx = %d; got %d; want %d", acc.From, tt.buy, maxPerTx, got, tt.wantPurchased)
+				t.Errorf("Own(%s) after Buy(%d) with max per tx = %d; got %d; want %d", acc.From, tt.buy, maxPerTx, got, tt.wantPurchased)
 			}
 		})
 	}
@@ -239,9 +238,8 @@ func TestAddressLimit(t *testing.T) {
 		// TODO: submit a PR so geth/accounts/abi/bind returns named structs.
 		want := struct {
 			TotalInventory, MaxPerAddress, MaxPerTx *big.Int
-			AlsoLimitOrigin                         bool
 		}{
-			big.NewInt(25), big.NewInt(10), big.NewInt(3), true,
+			big.NewInt(25), big.NewInt(10), big.NewInt(3),
 		}
 
 		if diff := cmp.Diff(want, got, ethtest.Comparers()...); diff != "" {
@@ -259,41 +257,154 @@ func TestAddressLimit(t *testing.T) {
 	// spillover between addresses. Therefore, all errors MUST use t.Fatal.
 	tests := []struct {
 		purchaseVia interface { // auction or proxy
-			Buy(*bind.TransactOpts, *big.Int) (*types.Transaction, error)
+			Buy(*bind.TransactOpts, common.Address, *big.Int) (*types.Transaction, error)
 		}
-		account            int
+		payer, recipient   int
 		buy, wantPurchased int64
 		errDiffAgainst     interface{}
 	}{
-		{auction, 0, 3, 3, nil},
-		{auction, 0, 3, 6, nil},
-		{auction, 0, 3, 9, nil},
-		{auction, 0, 3, 10, nil}, // capped
-		{auction, 0, 1, 10, "Sender limit"},
-		{proxy, 0, 1, 10, "Origin limit"},
-		{auction, 1, 3, 3, nil}, // not capped because different address
-		{auction, 1, 3, 6, nil},
-		{auction, 1, 3, 9, nil},
-		{auction, 1, 3, 10, nil}, // capped again
-		{auction, 2, 3, 3, nil},
-		{auction, 2, 3, 5, nil}, // capped by total inventory
-		{auction, 2, 1, 5, "Sold out"},
+		{
+			purchaseVia:    auction,
+			payer:          0,
+			recipient:      0,
+			buy:            3,
+			wantPurchased:  3,
+			errDiffAgainst: nil,
+		},
+		{
+			purchaseVia:    auction,
+			payer:          0,
+			recipient:      0,
+			buy:            3,
+			wantPurchased:  3,
+			errDiffAgainst: nil,
+		},
+		{
+			purchaseVia:    auction,
+			payer:          0,
+			recipient:      0,
+			buy:            3,
+			wantPurchased:  3,
+			errDiffAgainst: nil,
+		},
+		{
+			purchaseVia:    auction,
+			payer:          0,
+			recipient:      0,
+			buy:            3,
+			wantPurchased:  1, // capped by address limit
+			errDiffAgainst: nil,
+		},
+		{
+			purchaseVia:    auction,
+			payer:          0,
+			recipient:      0,
+			buy:            1,
+			wantPurchased:  0,
+			errDiffAgainst: "Buyer limit",
+		},
+		{
+			purchaseVia:    auction,
+			payer:          0,
+			recipient:      1, // can't buy for someone else either
+			buy:            1,
+			wantPurchased:  0,
+			errDiffAgainst: "Sender limit",
+		},
+		{
+			purchaseVia:    auction,
+			payer:          1,
+			recipient:      0, // can't be bought for by someone else
+			buy:            1,
+			wantPurchased:  0,
+			errDiffAgainst: "Buyer limit",
+		},
+		{
+			purchaseVia:    proxy,
+			payer:          0,
+			recipient:      1,
+			buy:            1,
+			wantPurchased:  0,
+			errDiffAgainst: "Origin limit",
+		},
+		{
+			purchaseVia:    auction,
+			payer:          1,
+			recipient:      1,
+			buy:            3,
+			wantPurchased:  3, // not capped because different address
+			errDiffAgainst: nil,
+		},
+		{
+			purchaseVia:    auction,
+			payer:          1,
+			recipient:      1,
+			buy:            3,
+			wantPurchased:  3,
+			errDiffAgainst: nil,
+		},
+		{
+			purchaseVia:    auction,
+			payer:          1,
+			recipient:      1,
+			buy:            3,
+			wantPurchased:  3,
+			errDiffAgainst: nil,
+		},
+		{
+			purchaseVia:    auction,
+			payer:          1,
+			recipient:      1,
+			buy:            3,
+			wantPurchased:  1, // capped again by wallet limit
+			errDiffAgainst: nil,
+		},
+		{
+			purchaseVia:    auction,
+			payer:          2,
+			recipient:      2,
+			buy:            3,
+			wantPurchased:  3,
+			errDiffAgainst: nil,
+		},
+		{
+			purchaseVia:    auction,
+			payer:          2,
+			recipient:      2,
+			buy:            3,
+			wantPurchased:  2, // capped by total inventory
+			errDiffAgainst: nil,
+		},
+		{
+			purchaseVia:    auction,
+			payer:          2,
+			recipient:      2,
+			buy:            1,
+			wantPurchased:  0,
+			errDiffAgainst: "Sold out",
+		},
 	}
 
 	for _, tt := range tests {
-		acc := sim.Acc(tt.account)
+		payer := sim.Acc(tt.payer)
+		recipient := sim.Acc(tt.recipient)
 
-		_, err := tt.purchaseVia.Buy(acc, big.NewInt(tt.buy))
-		if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
-			t.Fatalf("Buy(%d) as account %d; %s", tt.buy, tt.account, diff)
-		}
-
-		got, err := auction.Purchased(nil, acc.From)
+		before, err := auction.Own(nil, recipient.From)
 		if err != nil {
-			t.Fatalf("Purchased(%s) error %v", acc.From, err)
+			t.Fatalf("Own(<recipient>) before purchase; error %v", err)
 		}
-		if got.Cmp(big.NewInt(tt.wantPurchased)) != 0 {
-			t.Errorf("Purchased(%s) got %d; want %d", acc.From, got, tt.wantPurchased)
+
+		_, err = tt.purchaseVia.Buy(payer, recipient.From, big.NewInt(tt.buy))
+		if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
+			t.Fatalf("Buy(account[%d], n=%d) as account %d; %s", tt.recipient, tt.buy, tt.payer, diff)
+		}
+
+		after, err := auction.Own(nil, recipient.From)
+		if err != nil {
+			t.Fatalf("Own(<recipient>) after purchase attempt; error %v", err)
+		}
+		if got := after.Sub(after, before); got.Cmp(big.NewInt(tt.wantPurchased)) != 0 {
+			t.Errorf("Own(%s) got %d; want %d", recipient.From, got, tt.wantPurchased)
 		}
 	}
 
@@ -359,7 +470,11 @@ func TestFundsManagement(t *testing.T) {
 		t.Run(fmt.Sprintf("purchase[%d]", i), func(t *testing.T) {
 			before := sim.BalanceOf(ctx, t, sim.Acc(tt.account).From)
 
-			tx, err := auction.Buy(sim.WithValueFrom(tt.account, tt.sendValue), big.NewInt(tt.num))
+			tx, err := auction.Buy(
+				sim.WithValueFrom(tt.account, tt.sendValue),
+				sim.Acc(tt.account).From,
+				big.NewInt(tt.num),
+			)
 			if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
 				t.Fatalf("Buy() %s", diff)
 			}
