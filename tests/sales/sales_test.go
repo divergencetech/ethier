@@ -545,3 +545,52 @@ func TestFundsManagement(t *testing.T) {
 		})
 	}
 }
+
+func TestFixedPriceSeller(t *testing.T) {
+	sim := ethtest.NewSimulatedBackendTB(t, 1)
+
+	tests := []struct {
+		price     *big.Int
+		wantCosts map[int64]*big.Int
+	}{
+		{
+			price: eth.Ether(1),
+			wantCosts: map[int64]*big.Int{
+				0: big.NewInt(0),
+				1: eth.Ether(1),
+				2: eth.Ether(2),
+				7: eth.Ether(7),
+			},
+		},
+		{
+			price: eth.EtherFraction(1, 2),
+			wantCosts: map[int64]*big.Int{
+				0:  big.NewInt(0),
+				1:  eth.EtherFraction(1, 2),
+				2:  eth.Ether(1),
+				7:  eth.EtherFraction(7, 2),
+				42: eth.Ether(21),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%d wei", tt.price), func(t *testing.T) {
+			_, _, seller, err := DeployTestableFixedPriceSeller(sim.Acc(0), sim, tt.price)
+			if err != nil {
+				t.Fatalf("DeployTestableFixedPriceSeller() error %v", err)
+			}
+
+			for n, want := range tt.wantCosts {
+				got, err := seller.Cost(nil, big.NewInt(n))
+				if err != nil {
+					t.Errorf("Cost(%d) error %v", n, err)
+					continue
+				}
+				if got.Cmp(want) != 0 {
+					t.Errorf("Cost(%d) got %d; want %d", n, got, want)
+				}
+			}
+		})
+	}
+}
