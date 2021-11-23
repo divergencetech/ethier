@@ -62,15 +62,55 @@ func deploy(t *testing.T, auctionConfig LinearDutchAuctionDutchAuctionConfig) (*
 }
 
 func deployConstantPrice(t *testing.T, price *big.Int) (*ethtest.SimulatedBackend, common.Address, *TestableDutchAuction) {
-	return deploy(t, auctionConfig(1, 1, price, big.NewInt(0)))
+	return deploy(t, LinearDutchAuctionDutchAuctionConfig{
+		StartPoint:       big.NewInt(1),
+		NumDecreases:     big.NewInt(0),
+		StartPrice:       price,
+		DecreaseSize:     big.NewInt(0),
+		DecreaseInterval: big.NewInt(1),
+		Unit:             uint8(Block),
+	})
 }
 
-func auctionConfig(startBlock, endBlock int64, startPrice, perBlockDecrease *big.Int) LinearDutchAuctionDutchAuctionConfig {
+// A unit represents the AuctionIntervalUnit enum.
+type unit uint8
+
+const (
+	UnspecifiedAuctionUnit unit = iota
+	Block
+	Time
+)
+
+func (u unit) String() string {
+	names := map[unit]string{
+		Block: "Block",
+		Time:  "Time",
+	}
+	n, ok := names[u]
+	if !ok {
+		return fmt.Sprintf("[UNSPECIFIED UNIT %d]", u)
+	}
+	return fmt.Sprintf("[UNIT: %s]", n)
+}
+
+// A config is equivalent to a LinearDutchAUctionDutchAuctionConfig but uses
+// int64 values instead of *big.Int to make tests easier to write. Fields that
+// refer to values remain as *big.Int to allow use of the eth.Ether*()
+// functions.
+type config struct {
+	StartPoint, NumDecreases, DecreaseInterval int64
+	StartPrice, DecreaseSize                   *big.Int
+	Unit                                       unit
+}
+
+func (c config) convert() LinearDutchAuctionDutchAuctionConfig {
 	return LinearDutchAuctionDutchAuctionConfig{
-		StartBlock:       big.NewInt(startBlock),
-		EndBlock:         big.NewInt(endBlock),
-		StartPrice:       startPrice,
-		PerBlockDecrease: perBlockDecrease,
+		StartPoint:       big.NewInt(c.StartPoint),
+		NumDecreases:     big.NewInt(c.NumDecreases),
+		StartPrice:       c.StartPrice,
+		DecreaseSize:     c.DecreaseSize,
+		DecreaseInterval: big.NewInt(c.DecreaseInterval),
+		Unit:             uint8(c.Unit),
 	}
 }
 
@@ -78,7 +118,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 	const startBlock = 10
 
 	type wantCost struct {
-		block     int64
+		point     int64 // block or time
 		num       *big.Int
 		totalCost *big.Int
 	}
@@ -87,39 +127,53 @@ func TestLinearPriceDecrease(t *testing.T) {
 	two := big.NewInt(2)
 
 	tests := []struct {
-		name                         string
-		endBlock                     int64
-		startPrice, perBlockDecrease *big.Int
-		want                         []wantCost
+		name string
+		cfg  config
+		want []wantCost
 	}{
 		{
-			name:             "constant",
-			endBlock:         startBlock + 10,
-			startPrice:       eth.Ether(2),
-			perBlockDecrease: big.NewInt(0),
+			name: "constant",
+			cfg: config{
+				StartPoint:       startBlock,
+				StartPrice:       eth.Ether(2),
+				NumDecreases:     10,
+				DecreaseInterval: 1,
+				DecreaseSize:     big.NewInt(0),
+				Unit:             Block,
+			},
 			want: []wantCost{
 				{startBlock, one, eth.Ether(2)},
 				{startBlock + 1, one, eth.Ether(2)},
 				{startBlock + 9, two, eth.Ether(4)},
 				{startBlock + 10, one, eth.Ether(2)},
-				{startBlock + 100, one, eth.Ether(2)},
+				{startBlock + 20, one, eth.Ether(2)},
 			},
 		},
 		{
-			name:             "immediate end",
-			endBlock:         startBlock,
-			startPrice:       eth.Ether(42),
-			perBlockDecrease: eth.Ether(43),
+			name: "immediate end",
+			cfg: config{
+				StartPoint:       startBlock,
+				DecreaseInterval: 1,
+				StartPrice:       eth.Ether(42),
+				NumDecreases:     0,
+				DecreaseSize:     eth.Ether(43),
+				Unit:             Block,
+			},
 			want: []wantCost{
 				{startBlock, one, eth.Ether(42)},
 				{startBlock + 1, one, eth.Ether(42)},
 			},
 		},
 		{
-			name:             "decreasing quickly",
-			endBlock:         startBlock + 10,
-			startPrice:       eth.Ether(11),
-			perBlockDecrease: eth.Ether(1),
+			name: "decreasing quickly",
+			cfg: config{
+				StartPoint:       startBlock,
+				NumDecreases:     10,
+				DecreaseInterval: 1,
+				StartPrice:       eth.Ether(11),
+				DecreaseSize:     eth.Ether(1),
+				Unit:             Block,
+			},
 			want: []wantCost{
 				{startBlock, one, eth.Ether(11)},
 				{startBlock, two, eth.Ether(22)},
@@ -129,24 +183,59 @@ func TestLinearPriceDecrease(t *testing.T) {
 				{startBlock + 4, two, eth.Ether(14)},
 				{startBlock + 10, one, eth.Ether(1)},
 				{startBlock + 11, one, eth.Ether(1)},
-				{startBlock + 100, one, eth.Ether(1)},
+				{startBlock + 20, one, eth.Ether(1)},
 			},
 		},
 		{
-			name:             "decreasing slowly",
-			endBlock:         startBlock + 1000,
-			startPrice:       eth.Ether(101),
-			perBlockDecrease: eth.EtherFraction(1, 10),
+			name: "decreasing slowly",
+			cfg: config{
+				StartPoint:       startBlock,
+				NumDecreases:     1000,
+				DecreaseInterval: 1,
+				StartPrice:       eth.Ether(101),
+				DecreaseSize:     eth.EtherFraction(1, 10),
+				Unit:             Block,
+			},
 			want: []wantCost{
 				{startBlock + 1, one, eth.EtherFraction(1009, 10)},
 				{startBlock + 2, one, eth.EtherFraction(1008, 10)},
+			},
+		},
+		{
+			name: "spread decrease with higher interval",
+			cfg: config{
+				StartPoint:       startBlock,
+				NumDecreases:     5,
+				DecreaseInterval: 7,
+				StartPrice:       eth.Ether(10),
+				DecreaseSize:     eth.Ether(1),
+				Unit:             Block,
+			},
+			want: []wantCost{
+				// Make sure to test boundaries before and after multiples of
+				// decreaseInterval.
+				{startBlock, one, eth.Ether(10)},
+				//
+				{startBlock + 6, one, eth.Ether(10)},
+				{startBlock + 7, one, eth.Ether(9)},
+				{startBlock + 8, one, eth.Ether(9)},
+				//
+				{startBlock + 13, one, eth.Ether(9)},
+				{startBlock + 14, one, eth.Ether(8)},
+				{startBlock + 15, one, eth.Ether(8)},
+				//
+				{startBlock + 34, one, eth.Ether(6)},
+				{startBlock + 35, one, eth.Ether(5)},
+				{startBlock + 36, one, eth.Ether(5)},
+				// Respects numDecreases
+				{startBlock + 43, one, eth.Ether(5)},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := auctionConfig(startBlock, tt.endBlock, tt.startPrice, tt.perBlockDecrease)
+			cfg := tt.cfg.convert()
 			t.Logf("%T = %+v", cfg, cfg)
 			sim, _, auction := deploy(t, cfg)
 
@@ -159,18 +248,18 @@ func TestLinearPriceDecrease(t *testing.T) {
 			})
 
 			sort.Slice(tt.want, func(i, j int) bool {
-				return tt.want[i].block < tt.want[j].block
+				return tt.want[i].point < tt.want[j].point
 			})
 
 			for _, w := range tt.want {
-				sim.FastForward(big.NewInt(w.block))
+				sim.FastForward(big.NewInt(w.point))
 				got, err := auction.Cost(nil, w.num)
 				if err != nil {
 					t.Errorf("Cost(%d) at block %d; error %v", w.num, sim.BlockNumber(), err)
 					continue
 				}
 				if want := w.totalCost; got.Cmp(want) != 0 {
-					t.Errorf("Cost(%d) at block %d; got %d want %d", w.num, sim.BlockNumber(), got, want)
+					t.Errorf("Cost(%d) at point %d; got %d want %d", w.num, sim.BlockNumber(), got, want)
 				}
 			}
 		})
