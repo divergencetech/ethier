@@ -36,17 +36,11 @@ type SignedAddress struct {
 	Signature string `json:"signature"`
 }
 
-// sign generates a new signer (if none is provided) and signs a given message
-// TODO given signers
+// sign generates a new signer and signs a given message
 func signAddresses(_ *cobra.Command, args []string) (retErr error) {
-	// pwd, err := os.Getwd()
-	// if err != nil {
-	// 	return fmt.Errorf("os.Getwd(): %v", err)
-	// }
-
 	defer func() {
 		if retErr != nil {
-			retErr = fmt.Errorf("signing: %w", retErr) // TODO What's %w
+			retErr = fmt.Errorf("signing: %w", retErr)
 		}
 	}()
 
@@ -82,6 +76,7 @@ func signAddresses(_ *cobra.Command, args []string) (retErr error) {
 	if err != nil {
 		log.Fatalf("Encoding json: %v", err)
 	}
+
 	fmt.Println(string(json_))
 
 	return nil
