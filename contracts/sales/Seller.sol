@@ -4,6 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
@@ -14,6 +15,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  - Calculate required cost, forwarding to a beneficiary, and refunding extra
  */
 abstract contract Seller is Ownable, ReentrancyGuard {
+    using Address for address payable;
     using Strings for uint256;
 
     /// @dev Note that the address limits are vulnerable to wallet farming.
@@ -166,14 +168,14 @@ abstract contract Seller is Ownable, ReentrancyGuard {
         // modifier and the checks, effects, interactions pattern.
 
         if (_cost > 0) {
-            beneficiary.transfer(_cost);
+            beneficiary.sendValue(_cost);
             emit Revenue(beneficiary, n, _cost);
         }
 
         if (msg.value > _cost) {
             address payable reimburse = payable(_msgSender());
             uint256 refund = msg.value - _cost;
-            reimburse.transfer(refund);
+            reimburse.sendValue(refund);
             emit Refund(reimburse, refund);
         }
     }
