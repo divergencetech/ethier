@@ -17,19 +17,18 @@ library SignatureChecker {
     @notice Requires that the nonce has not been used previously and that the
     recovered signer is contained in the signers AddressSet.
     @param signers Set of addresses from which signatures are accepted.
-    @param usedNonces Set of already-used nonces.
+    @param usedMessages Set of already-used messages.
     @param signature ECDSA signature of keccak256(abi.encodePacked(data,nonce)).
      */
     function validateSignature(
         EnumerableSet.AddressSet storage signers,
-        bytes memory data,
-        bytes32 nonce,
+        bytes32 message,
         bytes calldata signature,
-        mapping(bytes32 => bool) storage usedNonces
+        mapping(bytes32 => bool) storage usedMessages
     ) internal {
-        require(!usedNonces[nonce], "SignatureChecker: Nonce already used");
-        usedNonces[nonce] = true;
-        _validate(signers, keccak256(abi.encodePacked(data, nonce)), signature);
+        require(!usedMessages[message], "SignatureChecker: Message already used");
+        usedMessages[message] = true;
+        _validate(signers, message, signature);
     }
 
     /**
@@ -42,19 +41,6 @@ library SignatureChecker {
         bytes calldata signature
     ) internal view {
         _validate(signers, hash, signature);
-    }
-
-    /**
-    @notice Hashes addr and requires that the recovered signer is contained in
-    the signers AddressSet.
-    @dev Equivalent to validate(sha3(addr), signature);
-     */
-    function validateSignature(
-        EnumerableSet.AddressSet storage signers,
-        address addr,
-        bytes calldata signature
-    ) internal view {
-        _validate(signers, keccak256(abi.encodePacked(addr)), signature);
     }
 
     /**

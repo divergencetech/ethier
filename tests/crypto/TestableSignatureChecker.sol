@@ -15,7 +15,7 @@ contract TestableSignatureChecker {
     using SignatureChecker for EnumerableSet.AddressSet;
 
     EnumerableSet.AddressSet private signers;
-    mapping(bytes32 => bool) private usedNonces;
+    mapping(bytes32 => bool) private usedMessages;
 
     constructor(address[] memory _signers) {
         for (uint256 i = 0; i < _signers.length; i++) {
@@ -29,7 +29,11 @@ contract TestableSignatureChecker {
         bytes32 nonce,
         bytes calldata signature
     ) external {
-        signers.validateSignature(data, nonce, signature, usedNonces);
+        signers.validateSignature(
+            keccak256(abi.encodePacked(data, nonce)),
+            signature,
+            usedMessages
+        );
     }
 
     /// @dev Reverts if the signature is invalid.
@@ -48,7 +52,10 @@ contract TestableSignatureChecker {
         view
         returns (bool)
     {
-        signers.validateSignature(msg.sender, signature);
+        signers.validateSignature(
+            keccak256(abi.encodePacked(msg.sender)),
+            signature
+        );
         return true;
     }
 }
