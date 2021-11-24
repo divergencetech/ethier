@@ -2,10 +2,16 @@
 // Solidity contracts and Go packages for Ethereum development.
 package main
 
-import "github.com/spf13/cobra"
+import (
+	"os"
+
+	"github.com/spf13/cobra"
+)
 
 func main() {
-	rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
 
 var rootCmd = &cobra.Command{

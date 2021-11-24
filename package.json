@@ -1,6 +1,6 @@
 {
   "name": "@divergencetech/ethier",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Golang and Solidity code to make Ethereum development ethier",
   "main": "\"\"",
   "scripts": {
