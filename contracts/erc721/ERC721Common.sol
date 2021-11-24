@@ -6,6 +6,7 @@ import "./BaseOpenSea.sol";
 import "../utils/OwnerPausable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
 
 /**
 @notice An ERC721 contract with common functionality:
@@ -15,6 +16,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
  */
 contract ERC721Common is
     BaseOpenSea,
+    Context,
     ERC721Enumerable,
     ERC721Pausable,
     OwnerPausable
@@ -43,7 +45,7 @@ contract ERC721Common is
     /// @notice Requires that msg.sender owns or is approved for the token.
     modifier onlyApprovedOrOwner(uint256 tokenId) {
         require(
-            _isApprovedOrOwner(msg.sender, tokenId),
+            _isApprovedOrOwner(_msgSender(), tokenId),
             "ERC721Common: Not approved nor owner"
         );
         _;

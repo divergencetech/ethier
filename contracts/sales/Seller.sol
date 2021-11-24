@@ -4,6 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
@@ -117,10 +118,10 @@ abstract contract Seller is Ownable, ReentrancyGuard {
 
         n = _capExtra(n, to, "Buyer limit");
 
-        bool alsoLimitSender = msg.sender != to;
-        bool alsoLimitOrigin = tx.origin != msg.sender && tx.origin != to;
+        bool alsoLimitSender = _msgSender() != to;
+        bool alsoLimitOrigin = tx.origin != _msgSender() && tx.origin != to;
         if (alsoLimitSender) {
-            n = _capExtra(n, msg.sender, "Sender limit");
+            n = _capExtra(n, _msgSender(), "Sender limit");
         }
         if (alsoLimitOrigin) {
             n = _capExtra(n, tx.origin, "Origin limit");
@@ -147,7 +148,7 @@ abstract contract Seller is Ownable, ReentrancyGuard {
          */
         _bought[to] += n;
         if (alsoLimitSender) {
-            _bought[msg.sender] += n;
+            _bought[_msgSender()] += n;
         }
         if (alsoLimitOrigin) {
             _bought[tx.origin] += n;
@@ -170,7 +171,7 @@ abstract contract Seller is Ownable, ReentrancyGuard {
         }
 
         if (msg.value > _cost) {
-            address payable reimburse = payable(msg.sender);
+            address payable reimburse = payable(_msgSender());
             uint256 refund = msg.value - _cost;
             reimburse.transfer(refund);
             emit Refund(reimburse, refund);
