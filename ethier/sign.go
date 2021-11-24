@@ -15,6 +15,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var signer *eth.Signer
+
 func init() {
 	var signCmd = &cobra.Command{
 		Use:   "sign",
@@ -25,9 +27,10 @@ func init() {
 	signCmd.PersistentFlags().String("mnemonic", "", "Path to file containing the mnemonic, password and account number (newline separated) for key derivation")
 
 	var signAddrCmd = &cobra.Command{
-		Use:   "addresses",
-		Short: "Signs addresses from stdin using an ECDSA signer.",
-		RunE:  signAddresses,
+		Use:     "addresses",
+		Short:   "Signs addresses from stdin using an ECDSA signer.",
+		PreRunE: getSigner,
+		RunE:    signAddresses,
 	}
 
 	signCmd.AddCommand(signAddrCmd)
@@ -74,21 +77,11 @@ func getSignerFromMnemonic(filepath string) (*eth.Signer, error) {
 	return signer, nil
 }
 
-// sign addresses generates a new signer or derives it from a given mnemonic
-// to sign a list of addresses
-func signAddresses(cmd *cobra.Command, args []string) (retErr error) {
-	defer func() {
-		if retErr != nil {
-			retErr = fmt.Errorf("signing: %w", retErr)
-		}
-	}()
-
+func getSigner(cmd *cobra.Command, args []string) (retErr error) {
 	mnemonicPath, err := cmd.Flags().GetString("mnemonic")
 	if err != nil {
 		log.Fatalf("Get mnemonics flag: %v", err)
 	}
-
-	var signer *eth.Signer
 
 	if mnemonicPath != "" {
 		signer, err = getSignerFromMnemonic(mnemonicPath)
@@ -101,6 +94,18 @@ func signAddresses(cmd *cobra.Command, args []string) (retErr error) {
 			log.Fatalf("Generate new signer: %v", err)
 		}
 	}
+
+	return nil
+}
+
+// sign addresses generates a new signer or derives it from a given mnemonic
+// to sign a list of addresses
+func signAddresses(_ *cobra.Command, args []string) (retErr error) {
+	defer func() {
+		if retErr != nil {
+			retErr = fmt.Errorf("signing: %w", retErr)
+		}
+	}()
 
 	buf, err := io.ReadAll(os.Stdin)
 	if err != nil {
