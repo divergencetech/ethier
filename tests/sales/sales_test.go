@@ -692,3 +692,26 @@ func TestFixedPriceSeller(t *testing.T) {
 		})
 	}
 }
+
+func TestReentrancyGuard(t *testing.T) {
+	sim, auctionAddr, auction := deployConstantPrice(t, eth.Ether(1))
+
+	// Contract that reenters upon receiving a refund.
+	_, _, attacker, err := DeployReentrantProxyPurchaser(sim.Acc(0), sim, auctionAddr)
+	if err != nil {
+		t.Fatalf("DeployReentrantProxyPurchaser() error %v", err)
+	}
+
+	_, err = attacker.Buy(sim.WithValueFrom(0, eth.Ether(10)), sim.Acc(0).From, big.NewInt(1))
+	if diff := errdiff.Check(err, "ReentrancyGuard: reentrant call"); diff != "" {
+		t.Errorf("%s", diff)
+	}
+
+	got, err := auction.Own(nil, sim.Acc(0).From)
+	if err != nil {
+		t.Fatalf("Own() error %v", err)
+	}
+	if got.Cmp(big.NewInt(0)) != 0 {
+		t.Errorf("Own(<reentrant attacker>) got %d; want 0", got)
+	}
+}

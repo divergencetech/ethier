@@ -56,3 +56,22 @@ contract ProxyPurchaser {
         auction.buy(to, n);
     }
 }
+
+/// @notice A malicious contract that attempts to reenter the buy() function.
+/// @dev Naming things is hard. Is Reenterer a word?
+contract ReentrantProxyPurchaser {
+    TestableDutchAuction public auction;
+
+    constructor(address _auction) {
+        auction = TestableDutchAuction(_auction);
+    }
+
+    function buy(address to, uint256 n) public payable {
+        auction.buy{value: msg.value}(to, n);
+    }
+
+    receive() external payable {
+        // Attempt reentrance when receiving a refund.
+        auction.buy{value: msg.value}(tx.origin, 1);
+    }
+}

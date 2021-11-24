@@ -175,7 +175,19 @@ abstract contract Seller is Ownable, ReentrancyGuard {
         if (msg.value > _cost) {
             address payable reimburse = payable(_msgSender());
             uint256 refund = msg.value - _cost;
-            reimburse.sendValue(refund);
+
+            // Using Address.sendValue() here would mask the revertMsg upon
+            // reentrancy, but we want to expose it to allow for more precise
+            // testing. This otherwise uses the exact same pattern as
+            // Address.sendValue().
+            (bool success, bytes memory returnData) = reimburse.call{
+                value: refund
+            }("");
+            // Although `returnData` will have a spurious prefix, all we really
+            // care about is that it contains the ReentrancyGuard reversion
+            // message so we can check in the tests.
+            require(success, string(returnData));
+
             emit Refund(reimburse, refund);
         }
     }
