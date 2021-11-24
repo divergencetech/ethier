@@ -693,6 +693,22 @@ func TestFixedPriceSeller(t *testing.T) {
 	}
 }
 
+func TestPausing(t *testing.T) {
+	sim, _, auction := deployConstantPrice(t, eth.Ether(0))
+
+	if _, err := auction.Buy(sim.Acc(0), sim.Acc(0).From, big.NewInt(1)); err != nil {
+		t.Fatalf("When not paused, Buy() error %v", err)
+	}
+	if _, err := auction.Pause(sim.Acc(0)); err != nil {
+		t.Fatalf("Pause() error %v", err)
+	}
+
+	_, err := auction.Buy(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))
+	if diff := ethtest.RevertDiff(err, "Pausable: paused"); diff != "" {
+		t.Errorf("When paused, Buy() %s", diff)
+	}
+}
+
 func TestReentrancyGuard(t *testing.T) {
 	sim, auctionAddr, auction := deployConstantPrice(t, eth.Ether(1))
 

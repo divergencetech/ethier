@@ -2,7 +2,7 @@
 // Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "../utils/OwnerPausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
@@ -14,7 +14,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  - Enforce per-wallet / per-transaction limits
  - Calculate required cost, forwarding to a beneficiary, and refunding extra
  */
-abstract contract Seller is Ownable, ReentrancyGuard {
+abstract contract Seller is OwnerPausable, ReentrancyGuard {
     using Address for address payable;
     using Strings for uint256;
 
@@ -112,7 +112,11 @@ abstract contract Seller is Ownable, ReentrancyGuard {
     @param requested The number of items requested for purchase, which MAY be
     reduced when passed to _handlePurchase().
      */
-    function _purchase(address to, uint256 requested) internal nonReentrant {
+    function _purchase(address to, uint256 requested)
+        internal
+        nonReentrant
+        whenNotPaused
+    {
         /**
          * ##### CHECKS
          */
