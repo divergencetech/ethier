@@ -10,7 +10,7 @@ library PRNG {
     be used. This layout MUST NOT be considered part of the public API and
     therefore not relied upon even within stable versions
      */
-    type Source is uint;
+    type Source is uint256;
 
     /// @notice Layout within the buffer. 0x00 is the seed.
     uint256 private constant COUNTER = 0x20;
