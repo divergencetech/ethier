@@ -587,6 +587,8 @@ func TestFundsManagement(t *testing.T) {
 						t.Errorf("Revenue event diff (-want +got):\n%s", diff)
 					}
 				case <-time.After(250 * time.Millisecond):
+					// TODO: using a time delay isn't ideal; is there a way to
+					// properly synchronise with the event filter?
 					if tt.wantSpent != nil && tt.wantSpent.Cmp(big.NewInt(0)) != 0 {
 						t.Errorf("No Revenue event; want amount %d", tt.wantSpent)
 					}
