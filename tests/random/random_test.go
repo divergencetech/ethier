@@ -1,4 +1,4 @@
-package random_test
+package random
 
 import (
 	"fmt"

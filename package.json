@@ -4,7 +4,9 @@
   "description": "Golang and Solidity code to make Ethereum development ethier",
   "main": "\"\"",
   "scripts": {
-    "test": "go generate ./... && go test ./...",
+    "build": "go build -o build/ethier ethier/*.go",
+    "generate": "PATH=\"$(readlink -f build):${PATH}\" go generate ./...",
+    "test": "go test ./...",
     "testverbose": "go generate ./... && go test ./... -test.v"
   },
   "repository": {

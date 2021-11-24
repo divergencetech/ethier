@@ -1,4 +1,4 @@
-package sales_test
+package sales
 
 import (
 	"context"

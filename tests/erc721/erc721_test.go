@@ -1,4 +1,4 @@
-package erc721_test
+package erc721
 
 import (
 	"math/big"

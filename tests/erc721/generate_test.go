@@ -1,3 +1,3 @@
-package erc721_test
+package erc721
 
-//go:generate sh -c "solc TestableERC721Common.sol --base-path ../../ --include-path ../../node_modules --combined-json abi,bin | abigen --combined-json /dev/stdin --pkg erc721_test --out generated_test.go"
+//go:generate ethier gen TestableERC721Common.sol
