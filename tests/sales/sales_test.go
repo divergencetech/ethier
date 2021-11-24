@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/divergencetech/ethier/eth"
 	"github.com/divergencetech/ethier/ethtest"
@@ -569,6 +570,7 @@ func TestFundsManagement(t *testing.T) {
 			}
 
 			t.Run("revenues", func(t *testing.T) {
+				t.Parallel()
 				if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(tt.wantTotalRevenues) != 0 {
 					t.Errorf("Calculating total revenues; %T.BalanceOf(<beneficiary>) got %d; want %d", sim, got, tt.wantTotalRevenues)
 				}
@@ -584,7 +586,7 @@ func TestFundsManagement(t *testing.T) {
 					if diff := cmp.Diff(want, got, ethtest.Comparers()...); diff != "" {
 						t.Errorf("Revenue event diff (-want +got):\n%s", diff)
 					}
-				default:
+				case <-time.After(250 * time.Millisecond):
 					if tt.wantSpent != nil && tt.wantSpent.Cmp(big.NewInt(0)) != 0 {
 						t.Errorf("No Revenue event; want amount %d", tt.wantSpent)
 					}
@@ -592,6 +594,7 @@ func TestFundsManagement(t *testing.T) {
 			})
 
 			t.Run("refund", func(t *testing.T) {
+				t.Parallel()
 				select {
 				case got := <-refunds:
 					got.Raw = types.Log{}
@@ -602,7 +605,7 @@ func TestFundsManagement(t *testing.T) {
 					if diff := cmp.Diff(want, got, ethtest.Comparers()...); diff != "" {
 						t.Errorf("Refund event diff (-want +got):\n%s", diff)
 					}
-				default:
+				case <-time.After(250 * time.Millisecond):
 					if tt.wantRefund != nil && tt.wantRefund.Cmp(big.NewInt(0)) != 0 {
 						t.Errorf("No Refund event logged; want refund of %d", tt.wantRefund)
 					}
@@ -620,15 +623,19 @@ func TestFundsManagement(t *testing.T) {
 			}
 
 			t.Run("buyer balance decrease", func(t *testing.T) {
-				// TODO: these tests fail because of a small (~0.0001ETH)
-				// discrepancy in the gas calculation, which needs investigation.
-				t.Skip("TODO: Investigate gas cost discrepancy")
-
 				after := sim.BalanceOf(ctx, t, sim.Acc(tt.account).From)
-				spent := new(big.Int).Sub(before, after)
-				spent.Sub(spent, sim.GasSpent(ctx, t, tx))
-				if got := spent; got.Cmp(tt.wantSpent) != 0 {
-					t.Errorf("Buy(%d) at price %d; got balance reduction of %d (excluding gas); want %d", tt.num, price, got, tt.wantSpent)
+				gotSpent := new(big.Int).Sub(before, after)
+				gotSpent.Sub(gotSpent, sim.GasSpent(ctx, t, tx))
+
+				// TODO: there's a small (~0.0002ETH) discrepancy in the gas
+				// calculation, which needs investigation. Although not idea,
+				// it's ok to use a tolerance here because the value is in the
+				// favour of the buyer.
+				tolerance := eth.EtherFraction(1, 5000)
+				diff := new(big.Int).Sub(tt.wantSpent, gotSpent)
+
+				if diff.Cmp(tolerance) != -1 {
+					t.Errorf("Buy(%d) at price %d; got balance reduction of %d (excluding gas); want %d within tolerance of %d", tt.num, price, gotSpent, tt.wantSpent, tolerance)
 				}
 			})
 		})
