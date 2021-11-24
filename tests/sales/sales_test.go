@@ -704,7 +704,7 @@ func TestReentrancyGuard(t *testing.T) {
 
 	_, err = attacker.Buy(sim.WithValueFrom(0, eth.Ether(10)), sim.Acc(0).From, big.NewInt(1))
 	if diff := errdiff.Check(err, "ReentrancyGuard: reentrant call"); diff != "" {
-		t.Errorf("%s", diff)
+		t.Errorf("%T.Buy(); invoking Seller._purchase() through reentrant call; %s", attacker, diff)
 	}
 
 	got, err := auction.Own(nil, sim.Acc(0).From)
