@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/divergencetech/ethier/ethtest"
@@ -80,6 +81,66 @@ func TestOwnerPausable(t *testing.T) {
 	for _, tt := range tests {
 		if diff := errdiff.Check(tt.action(), tt.errDiffAgainst); diff != "" {
 			t.Fatalf("%s %s", tt.desc, diff)
+		}
+	}
+}
+
+func TestDynamicBuffer(t *testing.T) {
+	sim := ethtest.NewSimulatedBackendTB(t, 3)
+	_, _, dynBuf, err := DeployTestableDynamicBuffer(sim.Acc(0), sim)
+	if err != nil {
+		t.Fatalf("DeployTestableDynamicBuffer() error %v", err)
+	}
+
+	const testStr = "This is a really long test string that we want to use."
+	const outOfBoundsMsg = "DynamicBuffer: Appending out of bounds."
+
+	tests := []struct {
+		desc           string
+		capacity       int
+		repetitions    int
+		errDiffAgainst interface{}
+	}{
+		{
+			desc:        "Single append;",
+			capacity:    len(testStr),
+			repetitions: 1,
+		},
+		{
+			desc:           "Double append out-of-bound;",
+			capacity:       len(testStr),
+			repetitions:    2,
+			errDiffAgainst: outOfBoundsMsg,
+		},
+		{
+			desc:        "Mutliple append;",
+			capacity:    420 * len(testStr),
+			repetitions: 420,
+		},
+		{
+			desc:           "Mutliple append out-of-bound;",
+			capacity:       420 * len(testStr),
+			repetitions:    421,
+			errDiffAgainst: outOfBoundsMsg,
+		},
+	}
+
+	for _, tt := range tests {
+		buffer, err := dynBuf.AllocateAndAppendRepeated(nil, big.NewInt(int64(tt.capacity)), testStr, big.NewInt(int64(tt.repetitions)))
+
+		if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
+			t.Fatalf("%s %s", tt.desc, diff)
+		}
+
+		if tt.errDiffAgainst == "" {
+			should := ""
+			for rep := 0; rep < tt.repetitions; rep++ {
+				should = should + testStr
+			}
+
+			if buffer != should {
+				t.Fatalf("%s: Expected %s instead of %s", tt.desc, should, buffer)
+			}
 		}
 	}
 }
