@@ -12,7 +12,7 @@ contract TestableFixedPriceSeller is FixedPriceSeller {
 
     function _handlePurchase(address, uint256) internal override {}
 
-    function totalSupply() public pure override returns (uint256) {
+    function totalSold() public pure override returns (uint256) {
         return 0;
     }
 }

@@ -55,10 +55,11 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
     function cost(uint256 n) public view virtual returns (uint256);
 
     /**
-    @dev Must return the number of items already sold. Naming is in keeping with
-    the ERC721Enumerable function that provides the expected functionality.
+    @dev Must return the number of items already sold. This MAY be different to
+    the total number of items in supply (e.g. ERC721Enumerable.totalSupply()) as
+    some items may not count against the Seller's inventory.
      */
-    function totalSupply() public view virtual returns (uint256);
+    function totalSold() public view virtual returns (uint256);
 
     /**
     @dev Called by _purchase() after all limits have been put in place; must
@@ -74,7 +75,7 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
     of transferring out (in the case of ERC721).
     @dev This isn't public as it may be skewed due to differences in msg.sender
     and tx.origin, which it treats in the same way such that
-    sum(_bought)>=totalSupply().
+    sum(_bought)>=totalSold().
      */
     mapping(address => uint256) private _bought;
 
@@ -133,7 +134,7 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
             n = _capExtra(n, tx.origin, "Origin limit");
         }
 
-        n = Math.min(n, sellerConfig.totalInventory - totalSupply());
+        n = Math.min(n, sellerConfig.totalInventory - totalSold());
         require(n > 0, "Sold out");
 
         uint256 _cost = cost(n);

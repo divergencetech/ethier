@@ -31,10 +31,9 @@ contract TestableDutchAuction is LinearDutchAuction {
     }
 
     /**
-    @dev Override of Seller.totalSupply(). Usually this would be
-    fulfilled by ERC721Enumerable.
+    @dev Override of Seller.totalSold().
      */
-    function totalSupply() public view override returns (uint256) {
+    function totalSold() public view override returns (uint256) {
         return total;
     }
 

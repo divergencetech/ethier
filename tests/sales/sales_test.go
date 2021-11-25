@@ -498,13 +498,13 @@ func TestAddressLimit(t *testing.T) {
 		}
 	}
 
-	t.Run("total purchased", func(t *testing.T) {
-		got, err := auction.TotalSupply(nil)
+	t.Run("total sold", func(t *testing.T) {
+		got, err := auction.TotalSold(nil)
 		if err != nil {
-			t.Fatalf("TotalSupply() error %v", err)
+			t.Fatalf("TotalSold() error %v", err)
 		}
 		if got.Cmp(big.NewInt(totalInventory)) != 0 {
-			t.Errorf("TotalSupply() got %d; want %d", got, totalInventory)
+			t.Errorf("TotalSold() got %d; want %d", got, totalInventory)
 		}
 	})
 }

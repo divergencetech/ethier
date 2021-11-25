@@ -1,6 +1,6 @@
 {
   "name": "@divergencetech/ethier",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Golang and Solidity code to make Ethereum development ethier",
   "main": "\"\"",
   "scripts": {
@@ -17,5 +17,9 @@
   "license": "MIT",
   "dependencies": {
     "@openzeppelin/contracts": "^4.3.3"
-  }
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "devDependencies": {}
 }
