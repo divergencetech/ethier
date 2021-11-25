@@ -3,6 +3,7 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../../contracts/crypto/SignatureChecker.sol";
+import "../../contracts/crypto/MessageGenerator.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
@@ -29,11 +30,10 @@ contract TestableSignatureChecker {
         bytes32 nonce,
         bytes calldata signature
     ) external {
-        signers.validateSignature(
-            keccak256(abi.encodePacked(data, nonce)),
-            signature,
-            usedMessages
+        bytes32 message = MessageGenerator.generateMessage(
+            abi.encodePacked(data, nonce)
         );
+        signers.validateSignature(message, signature, usedMessages);
     }
 
     /// @dev Reverts if the signature is invalid.
@@ -42,7 +42,8 @@ contract TestableSignatureChecker {
         view
         returns (bool)
     {
-        signers.validateSignature(keccak256(data), signature);
+        bytes32 message = MessageGenerator.generateMessage(data);
+        signers.validateSignature(message, signature);
         return true;
     }
 
@@ -52,10 +53,8 @@ contract TestableSignatureChecker {
         view
         returns (bool)
     {
-        signers.validateSignature(
-            keccak256(abi.encodePacked(msg.sender)),
-            signature
-        );
+        bytes32 message = MessageGenerator.generateMessage(msg.sender);
+        signers.validateSignature(message, signature);
         return true;
     }
 }
