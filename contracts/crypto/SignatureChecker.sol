@@ -14,11 +14,11 @@ library SignatureChecker {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /**
-    @notice Requires that the nonce has not been used previously and that the
+    @notice Requires that the message has not been used previously and that the
     recovered signer is contained in the signers AddressSet.
     @param signers Set of addresses from which signatures are accepted.
     @param usedMessages Set of already-used messages.
-    @param signature ECDSA signature of keccak256(abi.encodePacked(data,nonce)).
+    @param signature ECDSA signature of message.
      */
     function validateSignature(
         EnumerableSet.AddressSet storage signers,
