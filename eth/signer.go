@@ -108,12 +108,34 @@ func (s *Signer) Sign(buf []byte) ([]byte, error) {
 	return s.RawSign(crypto.Keccak256(buf))
 }
 
+// toEthSignedMessageHash converts a given message hash to conform to the
+// signed data standard according to EIP-191. See also OpenZeppelin's
+// ECDSA.toEthSignedMessageHash
+func toEthSignedMessageHash(hash []byte) ([]byte, error) {
+	if len(hash) != 32 {
+		return nil, fmt.Errorf("toEthSignedMessageHash expected 32 bytes got %v", hash)
+	}
+	prefix := []byte("\x19Ethereum Signed Message:\n32")
+	message := crypto.Keccak256(append(prefix, hash...))
+	return message, nil
+}
+
+// EthSign returns an EIP-191 conform ECDSA signature of keccak256(buf)
+func (s *Signer) EthSign(buf []byte) ([]byte, error) {
+	message, err := toEthSignedMessageHash(crypto.Keccak256(buf))
+	if err != nil {
+		return nil, err
+	}
+
+	return s.RawSign(message)
+}
+
 // CompactSign returns s.Sign(buf) with the final byte, the y parity (always 0
 // or 1), carried in the highest bit of the s parameter, as per EIP-2098. Using
 // CompactSign instead of Sign reduces gas by removing a word from calldata, and
 // is compatible with OpenZeppelin's ECDSA.recover() helper.
 func (s *Signer) CompactSign(buf []byte) ([]byte, error) {
-	rsv, err := s.Sign(buf)
+	rsv, err := s.EthSign(buf)
 	if err != nil {
 		return nil, err
 	}
