@@ -2,8 +2,7 @@
 // Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "../../contracts/crypto/SignatureChecker.sol";
-import "../../contracts/crypto/MessageGenerator.sol";
+import "../../contracts/crypto/SignedAllowance.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
@@ -11,9 +10,10 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
  */
 contract TestableSignatureChecker {
     using EnumerableSet for EnumerableSet.AddressSet;
-    // SignatureChecker adds additional functionality to an AddressSet, allowing
+
+    // SignedAllowance adds additional functionality to an AddressSet, allowing
     // for a signature from any set member.
-    using SignatureChecker for EnumerableSet.AddressSet;
+    using SignedAllowance for EnumerableSet.AddressSet;
 
     EnumerableSet.AddressSet private signers;
     mapping(bytes32 => bool) private usedMessages;
@@ -30,10 +30,11 @@ contract TestableSignatureChecker {
         bytes32 nonce,
         bytes calldata signature
     ) external {
-        bytes32 message = MessageGenerator.generateMessage(
-            abi.encodePacked(data, nonce)
+        signers.validateSignature(
+            abi.encodePacked(data, nonce),
+            signature,
+            usedMessages
         );
-        signers.validateSignature(message, signature, usedMessages);
     }
 
     /// @dev Reverts if the signature is invalid.
@@ -42,8 +43,7 @@ contract TestableSignatureChecker {
         view
         returns (bool)
     {
-        bytes32 message = MessageGenerator.generateMessage(data);
-        signers.validateSignature(message, signature);
+        signers.validateSignature(data, signature);
         return true;
     }
 
@@ -53,8 +53,7 @@ contract TestableSignatureChecker {
         view
         returns (bool)
     {
-        bytes32 message = MessageGenerator.generateMessage(msg.sender);
-        signers.validateSignature(message, signature);
+        signers.validateSignature(msg.sender, signature);
         return true;
     }
 }
