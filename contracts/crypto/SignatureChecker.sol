@@ -37,10 +37,10 @@ library SignatureChecker {
     */
     function validateSignature(
         EnumerableSet.AddressSet storage signers,
-        bytes32 hash,
+        bytes32 message,
         bytes calldata signature
     ) internal view {
-        _validate(signers, hash, signature);
+        _validate(signers, message, signature);
     }
 
     /**
