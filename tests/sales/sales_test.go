@@ -105,6 +105,12 @@ type config struct {
 }
 
 func (c config) convert() LinearDutchAuctionDutchAuctionConfig {
+	if c.StartPrice == nil {
+		c.StartPrice = big.NewInt(0)
+	}
+	if c.DecreaseSize == nil {
+		c.DecreaseSize = big.NewInt(0)
+	}
 	return LinearDutchAuctionDutchAuctionConfig{
 		StartPoint:       big.NewInt(c.StartPoint),
 		NumDecreases:     big.NewInt(c.NumDecreases),
@@ -265,6 +271,37 @@ func TestLinearPriceDecrease(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestZeroStartToDisable(t *testing.T) {
+	cfg := config{
+		StartPoint:       0,
+		StartPrice:       eth.Ether(1),
+		DecreaseInterval: 1,
+		Unit:             Block,
+	}
+	sim, _, auction := deploy(t, cfg.convert())
+
+	const startBlock = 10
+	sim.FastForward(big.NewInt(startBlock))
+
+	_, err := auction.Cost(nil, big.NewInt(1))
+	if diff := ethtest.RevertDiff(err, "LinearDutchAuction: Not started"); diff != "" {
+		t.Errorf("Cost() when StartPoint==0; %s", diff)
+	}
+
+	if _, err := auction.SetAuctionStartPoint(sim.Acc(0), big.NewInt(startBlock)); err != nil {
+		t.Fatalf("SetAuctionStartPoint() error %v", err)
+	}
+
+	got, err := auction.Cost(nil, big.NewInt(1))
+	if err != nil {
+		t.Fatalf("Cost() when StartPoint!=0; error %v", err)
+	}
+	if want := cfg.StartPrice; got.Cmp(want) != 0 {
+		t.Errorf("Cost() when StartPoint!=0; got %d; want %d", got, want)
+	}
+
 }
 
 func TestTxLimit(t *testing.T) {

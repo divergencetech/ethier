@@ -10,7 +10,8 @@ abstract contract LinearDutchAuction is Seller {
     /**
     @param unit The unit of "time" used for decreasing prices, block number or
     timestamp.
-    @param startPoint The block or timestamp at which the auction opens.
+    @param startPoint The block or timestamp at which the auction opens. A value
+    of zero disables the auction. See setAuctionStartPoint().
     @param startPrice The price at `startPoint`.
     @param decreaseInterval The number of units to wait before decreasing the
     price. MUST be non-zero.
@@ -76,6 +77,16 @@ abstract contract LinearDutchAuction is Seller {
         dutchAuctionConfig = config;
     }
 
+    /**
+    @notice Sets the config startPoint. A startPoint of zero disables the
+    auction.
+    @dev The auction can be toggle on and off with this function, without the
+    cost of having to update the entire config.
+     */
+    function setAuctionStartPoint(uint256 startPoint) public onlyOwner {
+        dutchAuctionConfig.startPoint = startPoint;
+    }
+
     /// @notice Override of Seller.cost() with Dutch-auction logic.
     function cost(uint256 n) public view override returns (uint256) {
         DutchAuctionConfig storage cfg = dutchAuctionConfig;
@@ -84,7 +95,10 @@ abstract contract LinearDutchAuction is Seller {
         // block.timestamp here.
         uint256 current = block.number;
 
-        require(current >= cfg.startPoint, "LinearDutchAuction: Not started");
+        require(
+            cfg.startPoint != 0 && current >= cfg.startPoint,
+            "LinearDutchAuction: Not started"
+        );
 
         uint256 decreases = Math.min(
             (current - cfg.startPoint) / cfg.decreaseInterval,
