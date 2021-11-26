@@ -93,40 +93,99 @@ func TestDynamicBuffer(t *testing.T) {
 	}
 
 	const testStr = "This is a really long test string that we want to use."
+	const testStrShort = "This is a short string"
+	const testStr32 = "This test string is 32bytes long"
 	const outOfBoundsMsg = "DynamicBuffer: Appending out of bounds."
 
 	tests := []struct {
 		desc           string
 		capacity       int
+		appendString   string
 		repetitions    int
 		errDiffAgainst interface{}
 	}{
 		{
-			desc:        "Single append;",
-			capacity:    len(testStr),
-			repetitions: 1,
+			desc:         "Single append;",
+			capacity:     len(testStr),
+			repetitions:  1,
+			appendString: testStr,
 		},
 		{
 			desc:           "Double append out-of-bound;",
 			capacity:       len(testStr),
 			repetitions:    2,
 			errDiffAgainst: outOfBoundsMsg,
+			appendString:   testStr,
 		},
 		{
-			desc:        "Mutliple append;",
-			capacity:    420 * len(testStr),
-			repetitions: 420,
+			desc:         "Mutliple append;",
+			capacity:     420 * len(testStr),
+			repetitions:  420,
+			appendString: testStr,
 		},
 		{
 			desc:           "Mutliple append out-of-bound;",
 			capacity:       420 * len(testStr),
 			repetitions:    421,
 			errDiffAgainst: outOfBoundsMsg,
+			appendString:   testStr,
+		},
+		{
+			desc:         "Single append 32B;",
+			capacity:     len(testStr32),
+			repetitions:  1,
+			appendString: testStr32,
+		},
+		{
+			desc:           "Double append 32B out-of-bound;",
+			capacity:       len(testStr32),
+			repetitions:    2,
+			errDiffAgainst: outOfBoundsMsg,
+			appendString:   testStr32,
+		},
+		{
+			desc:         "Mutliple append 32B;",
+			capacity:     420 * len(testStr32),
+			repetitions:  420,
+			appendString: testStr32,
+		},
+		{
+			desc:           "Mutliple append 32B out-of-bound;",
+			capacity:       420 * len(testStr32),
+			repetitions:    421,
+			errDiffAgainst: outOfBoundsMsg,
+			appendString:   testStr32,
+		},
+		{
+			desc:         "Single append short;",
+			capacity:     len(testStrShort),
+			repetitions:  1,
+			appendString: testStrShort,
+		},
+		{
+			desc:           "Double append short out-of-bound;",
+			capacity:       len(testStrShort),
+			repetitions:    2,
+			errDiffAgainst: outOfBoundsMsg,
+			appendString:   testStrShort,
+		},
+		{
+			desc:         "Mutliple append short;",
+			capacity:     420 * len(testStrShort),
+			repetitions:  420,
+			appendString: testStrShort,
+		},
+		{
+			desc:           "Mutliple append short out-of-bound;",
+			capacity:       420 * len(testStrShort),
+			repetitions:    421,
+			errDiffAgainst: outOfBoundsMsg,
+			appendString:   testStrShort,
 		},
 	}
 
 	for _, tt := range tests {
-		buffer, err := dynBuf.AllocateAndAppendRepeated(nil, big.NewInt(int64(tt.capacity)), testStr, big.NewInt(int64(tt.repetitions)))
+		buffer, err := dynBuf.AllocateAndAppendRepeated(nil, big.NewInt(int64(tt.capacity)), tt.appendString, big.NewInt(int64(tt.repetitions)))
 
 		if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
 			t.Fatalf("%s %s", tt.desc, diff)
@@ -135,7 +194,7 @@ func TestDynamicBuffer(t *testing.T) {
 		if tt.errDiffAgainst == "" {
 			should := ""
 			for rep := 0; rep < tt.repetitions; rep++ {
-				should = should + testStr
+				should = should + tt.appendString
 			}
 
 			if buffer != should {

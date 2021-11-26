@@ -12,6 +12,13 @@ pragma solidity >=0.8.0;
 /// @dev First, allocate memory.
 ///      Then use `DynamicBuffer.appendBytes(buffer, theBytes)`
 library DynamicBuffer {
+    /// @notice Allocates container space for the DynamicBuffer
+    /// @param capacity The intended max amount of bytes in the buffer
+    /// @return container The memory location of the container
+    /// @return buffer The memory location of the buffer
+    /// @dev Allocates `capacity + 0x60` bytes of space
+    ///      The buffer array starts at the first container data position,
+    ///      (i.e. `buffer = container + 0x20`)
     function allocate(uint256 capacity)
         internal
         pure
@@ -88,19 +95,12 @@ library DynamicBuffer {
         uint256 capacity;
         uint256 length;
         assembly {
-            capacity := sub(mload(sub(buffer_, 0x20)), 0x20)
+            capacity := sub(mload(sub(buffer_, 0x20)), 0x40)
             length := mload(buffer_)
         }
 
-        // Account for the 32B chunk copying scheme in `appendBytes`
-        uint256 copySize = data_.length;
-        uint256 remainder = data_.length % 32;
-        if (remainder > 0) {
-            copySize += 32 - remainder;
-        }
-
         require(
-            length + copySize <= capacity,
+            length + data_.length <= capacity,
             "DynamicBuffer: Appending out of bounds."
         );
         appendBytes(buffer_, data_);
