@@ -53,56 +53,57 @@ library DynamicBuffer {
         return (container, buffer);
     }
 
-    /// @notice Appends data_ to buffer_, and update buffer_ length
-    /// @param buffer_ the buffer to append the data to
-    /// @param data_ the data to append
+    /// @notice Appends data to buffer, and update buffer length
+    /// @param buffer the buffer to append the data to
+    /// @param data the data to append
     /// @dev Does not perform out-of-bound checks (container capacity)
     ///      for efficiency.
-    function appendBytes(bytes memory buffer_, bytes memory data_)
+    function appendBytesUnchecked(bytes memory buffer, bytes memory data)
         internal
         pure
     {
         assembly {
-            let length := mload(data_)
+            let length := mload(data)
             for {
-                let data := add(data_, 32)
+                data := add(data, 0x20)
                 let dataEnd := add(data, length)
-                let buf := add(buffer_, add(mload(buffer_), 32))
+                let copyTo := add(buffer, add(mload(buffer), 0x20))
             } lt(data, dataEnd) {
-                data := add(data, 32)
-                buf := add(buf, 32)
+                data := add(data, 0x20)
+                copyTo := add(copyTo, 0x20)
             } {
                 // Copy 32B chunks from data to buffer.
                 // This may read over data array boundaries and copy invalid
                 // bytes, which doesn't matter in the end since we will
-                // later set the correct buffer length.
-                mstore(buf, mload(data))
+                // later set the correct buffer length, and have allocated an 
+                // additional word to avoid buffer overflow.
+                mstore(copyTo, mload(data))
             }
 
             // Update buffer length
-            mstore(buffer_, add(mload(buffer_), length))
+            mstore(buffer, add(mload(buffer), length))
         }
     }
 
-    /// @notice Appends data_ to buffer_, and update buffer_ length
-    /// @param buffer_ the buffer to append the data to
-    /// @param data_ the data to append
+    /// @notice Appends data to buffer, and update buffer length
+    /// @param buffer the buffer to append the data to
+    /// @param data the data to append
     /// @dev Performs out-of-bound checks and calls `appendBytes`.
-    function appendBytesSafe(bytes memory buffer_, bytes memory data_)
+    function appendBytesSafe(bytes memory buffer, bytes memory data)
         internal
         pure
     {
         uint256 capacity;
         uint256 length;
         assembly {
-            capacity := sub(mload(sub(buffer_, 0x20)), 0x40)
-            length := mload(buffer_)
+            capacity := sub(mload(sub(buffer, 0x20)), 0x40)
+            length := mload(buffer)
         }
 
         require(
-            length + data_.length <= capacity,
+            length + data.length <= capacity,
             "DynamicBuffer: Appending out of bounds."
         );
-        appendBytes(buffer_, data_);
+        appendBytesUnchecked(buffer, data);
     }
 }
