@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,14 +14,14 @@ import (
 )
 
 func init() {
-	var signCmd = &cobra.Command{
+	signCmd := &cobra.Command{
 		Use:   "sign",
 		Short: "Signs messages from stdin using an ECDSA signer.",
 	}
 
 	rootCmd.AddCommand(signCmd)
 
-	var signAddrCmd = &cobra.Command{
+	signAddrCmd := &cobra.Command{
 		Use:   "addresses",
 		Short: "Signs addresses from stdin using an ECDSA signer.",
 		RunE:  signAddresses,
@@ -37,21 +36,15 @@ type SignedAddress struct {
 }
 
 // sign generates a new signer and signs a given message
-func signAddresses(_ *cobra.Command, args []string) (retErr error) {
-	defer func() {
-		if retErr != nil {
-			retErr = fmt.Errorf("signing: %w", retErr)
-		}
-	}()
-
+func signAddresses(_ *cobra.Command, args []string) error {
 	signer, err := eth.NewSigner(256)
 	if err != nil {
-		log.Fatalf("Generate signer: %v", err)
+		return fmt.Errorf("generate new signer: %v", err)
 	}
 
 	buf, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		log.Fatalf("Read stdin: %v", err)
+		return fmt.Errorf("read address on stdin: %v", err)
 	}
 
 	addresses := strings.Split(strings.TrimSpace(string(buf)), "\n")
@@ -64,20 +57,20 @@ func signAddresses(_ *cobra.Command, args []string) (retErr error) {
 		addr := common.HexToAddress(address)
 		sig, err := signer.SignAddress(addr)
 		if err != nil {
-			log.Fatalf("Signing address %v: %v", address, err)
+			return fmt.Errorf("signing address %v: %v", address, err)
 		}
 		signedAddresses = append(signedAddresses, SignedAddress{
 			Address:   address,
-			Signature: "0x" + hex.EncodeToString(sig),
+			Signature: fmt.Sprintf("%#x", sig),
 		})
 	}
 
-	json_, err := json.MarshalIndent(signedAddresses, "", "  ")
+	buf, err = json.MarshalIndent(signedAddresses, "", "  ")
 	if err != nil {
-		log.Fatalf("Encoding json: %v", err)
+		return fmt.Errorf("encoding json: %v", err)
 	}
 
-	fmt.Println(string(json_))
+	fmt.Println(string(buf))
 
 	return nil
 }
