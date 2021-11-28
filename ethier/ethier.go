@@ -3,12 +3,14 @@
 package main
 
 import (
+	"flag"
 	"os"
 
 	"github.com/spf13/cobra"
 )
 
 func main() {
+	flag.Parse()
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
