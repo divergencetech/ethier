@@ -4,12 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +42,7 @@ func gen(_ *cobra.Command, args []string) (retErr error) {
 	}
 	// The Go package for abigen.
 	pkg := filepath.Base(pwd)
-	log.Printf("Generating package %q: %s", pkg, args)
+	glog.Infof("Generating package %q: %s", pkg, args)
 
 	defer func() {
 		if retErr != nil {
@@ -58,11 +59,22 @@ func gen(_ *cobra.Command, args []string) (retErr error) {
 		}
 	}
 
+	if _, ok := os.LookupEnv("ETHIER_COVERAGE"); ok {
+		glog.Warningf("Generating in coverage mode; *** GENERATED FILES MUST NOT BE DEPLOYED ***")
+		for i, a := range args {
+			dir, file := path.Split(a)
+			file = strings.TrimSuffix(file, ".sol")
+			args[i] = path.Join(dir, fmt.Sprintf(".%s.cover.sol", file))
+		}
+	}
+
 	args = append(
 		args,
 		"--base-path", basePath,
 		"--include-path", filepath.Join(basePath, "node_modules"),
-		"--combined-json", "abi,bin",
+		// srcmap is ignored by abigen so will need to be teed if used instead
+		// of solidity-coverage instrumentation
+		"--combined-json", "abi,bin,srcmap",
 	)
 	solc := exec.Command("solc", args...)
 	solc.Stderr = os.Stderr

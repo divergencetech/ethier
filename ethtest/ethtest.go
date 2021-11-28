@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -85,9 +86,26 @@ func NewSimulatedBackendTB(tb testing.TB, numAccounts int) *SimulatedBackend {
 	if err != nil {
 		tb.Fatal(err)
 	}
+
+	cover := newCoverageCollector()
+	if _, ok := os.LookupEnv("ETHIER_COVERAGE"); ok {
+		cfg := sim.Blockchain().GetVMConfig()
+		cfg.Debug = true
+		cfg.Tracer = cover
+	}
+
 	tb.Cleanup(func() {
 		if err := sim.Close(); err != nil {
 			tb.Errorf("%T.Close(): %v", sim.SimulatedBackend, err)
+		}
+
+		if _, ok := os.LookupEnv("ETHIER_COVERAGE"); ok {
+			buf, err := cover.MarshalJSON()
+			if err != nil {
+				tb.Errorf("Marshal coverage data: %v", err)
+				return
+			}
+			tb.Logf("[ETHIER_COVERAGE]%s[ETHIER_COVERAGE]", buf)
 		}
 	})
 

@@ -7,7 +7,8 @@
     "build": "go build -o build/ethier ethier/*.go",
     "generate": "PATH=\"$(readlink -f build):${PATH}\" go generate ./...",
     "test": "go test ./...",
-    "testverbose": "go generate ./... && go test ./... -test.v"
+    "testverbose": "go test ./... -test.v",
+    "coverage": "node ethier/coverage/coverage.js; PATH=\"$(readlink -f build):${PATH}\" go generate ./..."
   },
   "repository": {
     "type": "git",
@@ -21,5 +22,7 @@
   "directories": {
     "test": "tests"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "solidity-coverage": "^0.7.17"
+  }
 }
