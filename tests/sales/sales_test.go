@@ -273,6 +273,73 @@ func TestLinearPriceDecrease(t *testing.T) {
 	}
 }
 
+func TestNegativeReserveCheck(t *testing.T) {
+	sim, _, auction := deployConstantPrice(t, eth.Ether(0))
+
+	tests := []struct {
+		name    string
+		config  config
+		wantErr bool
+	}{
+		{
+			name: "zero reserve allowed",
+			config: config{
+				StartPrice:   eth.Ether(1),
+				DecreaseSize: eth.EtherFraction(1, 10),
+				NumDecreases: 10,
+				Unit:         Block,
+			},
+			wantErr: false,
+		},
+		{
+			name: "one too many decreases",
+			config: config{
+				StartPrice:   eth.Ether(1),
+				DecreaseSize: eth.EtherFraction(1, 10),
+				NumDecreases: 11,
+				Unit:         Block,
+			},
+			wantErr: true,
+		},
+		{
+			name: "fixed price at zero",
+			config: config{
+				StartPrice:   big.NewInt(0),
+				DecreaseSize: big.NewInt(0),
+				NumDecreases: 100,
+				Unit:         Block,
+			},
+			wantErr: false,
+		},
+		{
+			name: "single Wei decrease",
+			config: config{
+				StartPrice:   eth.Ether(0),
+				DecreaseSize: big.NewInt(1),
+				NumDecreases: 1,
+				Unit:         Block,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.config.DecreaseInterval = 1
+
+			var errDiffAgainst interface{}
+			if tt.wantErr {
+				errDiffAgainst = "LinearDutchAuction: negative reserve"
+			}
+
+			_, err := auction.SetAuctionConfig(sim.Acc(0), tt.config.convert())
+			if diff := errdiff.Check(err, errDiffAgainst); diff != "" {
+				t.Errorf("SetAuctionConfig(%+v) %s", tt.config, diff)
+			}
+		})
+	}
+}
+
 func TestZeroStartToDisable(t *testing.T) {
 	cfg := config{
 		StartPoint:       0,

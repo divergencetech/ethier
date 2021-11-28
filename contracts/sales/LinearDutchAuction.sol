@@ -74,6 +74,10 @@ abstract contract LinearDutchAuction is Seller {
             config.decreaseInterval > 0,
             "LinearDutchAuction: zero decrease interval"
         );
+        require(
+            config.startPrice >= config.decreaseSize * config.numDecreases,
+            "LinearDutchAuction: negative reserve"
+        );
         dutchAuctionConfig = config;
     }
 
