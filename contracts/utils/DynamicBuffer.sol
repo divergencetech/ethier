@@ -14,7 +14,6 @@ pragma solidity >=0.8.0;
 library DynamicBuffer {
     /// @notice Allocates container space for the DynamicBuffer
     /// @param capacity The intended max amount of bytes in the buffer
-    /// @return container The memory location of the container
     /// @return buffer The memory location of the buffer
     /// @dev Allocates `capacity + 0x60` bytes of space
     ///      The buffer array starts at the first container data position,
@@ -22,11 +21,11 @@ library DynamicBuffer {
     function allocate(uint256 capacity)
         internal
         pure
-        returns (bytes memory container, bytes memory buffer)
+        returns (bytes memory buffer)
     {
         assembly {
             // Get next-free memory address
-            container := mload(0x40)
+            let container := mload(0x40)
 
             // Allocate memory by setting a new next-free address
             {
@@ -50,7 +49,7 @@ library DynamicBuffer {
             mstore(buffer, 0)
         }
 
-        return (container, buffer);
+        return buffer;
     }
 
     /// @notice Appends data to buffer, and update buffer length

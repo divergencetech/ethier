@@ -11,17 +11,18 @@ contract TestableDynamicBuffer {
     using DynamicBuffer for bytes;
 
     /**
-    @notice Allocates a buffer with a given capacity and safely appends data for a given number of times.
+    @notice Allocates a buffer with a given capacity and safely appends data for
+    a given number of times.
      */
     function allocateAndAppendRepeated(
         uint256 capacity,
         string memory data,
         uint256 repetitions
     ) public pure returns (string memory) {
-        (, bytes memory buffer) = DynamicBuffer.allocate(capacity);
+        bytes memory buffer = DynamicBuffer.allocate(capacity);
 
         for (uint256 idx = 0; idx < repetitions; ++idx) {
-            DynamicBuffer.appendBytesSafe(buffer, bytes(data));
+            buffer.appendBytesSafe(bytes(data));
         }
 
         return string(buffer);

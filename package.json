@@ -1,7 +1,7 @@
 {
   "name": "@divergencetech/ethier",
-  "version": "0.3.6",
-  "description": "Golang and Solidity code to make Ethereum development ethier",
+  "version": "0.4.0",
+  "description": "Golang and Solidity SDK to make Ethereum development ethier",
   "main": "\"\"",
   "scripts": {
     "build": "go build -o build/ethier ethier/*.go",
