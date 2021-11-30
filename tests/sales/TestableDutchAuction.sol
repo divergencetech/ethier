@@ -13,9 +13,17 @@ constant Seller. Creating only a single Testable contract is simpler.
 contract TestableDutchAuction is LinearDutchAuction {
     constructor(
         LinearDutchAuction.DutchAuctionConfig memory auctionConfig,
+        uint256 expectedReserve,
         Seller.SellerConfig memory sellerConfig,
         address payable beneficiary
-    ) LinearDutchAuction(auctionConfig, sellerConfig, beneficiary) {}
+    )
+        LinearDutchAuction(
+            auctionConfig,
+            expectedReserve,
+            sellerConfig,
+            beneficiary
+        )
+    {}
 
     uint256 private total;
     mapping(address => uint256) public own;

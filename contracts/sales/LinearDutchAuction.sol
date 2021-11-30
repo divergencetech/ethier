@@ -51,22 +51,36 @@ abstract contract LinearDutchAuction is Seller {
         Time
     }
 
+    /// @param expectedReserve See setAuctionConfig().
     constructor(
         DutchAuctionConfig memory config,
+        uint256 expectedReserve,
         Seller.SellerConfig memory sellerConfig,
         address payable _beneficiary
     ) Seller(sellerConfig, _beneficiary) {
-        setAuctionConfig(config);
+        setAuctionConfig(config, expectedReserve);
     }
 
     /// @notice Configuration of price changes.
     DutchAuctionConfig public dutchAuctionConfig;
 
-    /// @notice Sets the auction config.
-    function setAuctionConfig(DutchAuctionConfig memory config)
-        public
-        onlyOwner
-    {
+    /**
+    @notice Sets the auction config.
+    @param expectedReserve A safety check that the reserve, as calculated from
+    the config, is as expected.
+     */
+    function setAuctionConfig(
+        DutchAuctionConfig memory config,
+        uint256 expectedReserve
+    ) public onlyOwner {
+        // Underflow might occur is size/num decreases is too large.
+        unchecked {
+            require(
+                config.startPrice - config.decreaseSize * config.numDecreases ==
+                    expectedReserve,
+                "LinearDutchAuction: incorrect reserve"
+            );
+        }
         require(
             config.unit != AuctionIntervalUnit.UNSPECIFIED,
             "LinearDutchAuction: unspecified unit"
@@ -74,10 +88,6 @@ abstract contract LinearDutchAuction is Seller {
         require(
             config.decreaseInterval > 0,
             "LinearDutchAuction: zero decrease interval"
-        );
-        require(
-            config.startPrice >= config.decreaseSize * config.numDecreases,
-            "LinearDutchAuction: negative reserve"
         );
         dutchAuctionConfig = config;
     }

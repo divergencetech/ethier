@@ -40,9 +40,11 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func deploy(t *testing.T, auctionConfig LinearDutchAuctionDutchAuctionConfig) (*ethtest.SimulatedBackend, common.Address, *TestableDutchAuction) {
+func deploy(t *testing.T, cfg config) (*ethtest.SimulatedBackend, common.Address, *TestableDutchAuction) {
 	t.Helper()
 	sim := ethtest.NewSimulatedBackendTB(t, 10)
+
+	auctionConfig := cfg.convert()
 
 	t.Logf("%T = %+v", auctionConfig, auctionConfig)
 	sellerConfig := SellerSellerConfig{
@@ -53,7 +55,7 @@ func deploy(t *testing.T, auctionConfig LinearDutchAuctionDutchAuctionConfig) (*
 	t.Logf("%T = %+v", sellerConfig, sellerConfig)
 
 	addr, _, auction, err := DeployTestableDutchAuction(
-		sim.Acc(0), sim, auctionConfig, sellerConfig, beneficiary,
+		sim.Acc(0), sim, auctionConfig, cfg.ExpectedReserve, sellerConfig, beneficiary,
 	)
 	if err != nil {
 		t.Fatalf("DeployTestableDutchAuction() error %v", err)
@@ -63,13 +65,15 @@ func deploy(t *testing.T, auctionConfig LinearDutchAuctionDutchAuctionConfig) (*
 }
 
 func deployConstantPrice(t *testing.T, price *big.Int) (*ethtest.SimulatedBackend, common.Address, *TestableDutchAuction) {
-	return deploy(t, LinearDutchAuctionDutchAuctionConfig{
-		StartPoint:       big.NewInt(1),
-		NumDecreases:     big.NewInt(0),
+	t.Helper()
+	return deploy(t, config{
+		StartPoint:       1,
+		NumDecreases:     0,
 		StartPrice:       price,
 		DecreaseSize:     big.NewInt(0),
-		DecreaseInterval: big.NewInt(1),
-		Unit:             uint8(Block),
+		DecreaseInterval: 1,
+		Unit:             Block,
+		ExpectedReserve:  price,
 	})
 }
 
@@ -102,6 +106,9 @@ type config struct {
 	StartPoint, NumDecreases, DecreaseInterval int64
 	StartPrice, DecreaseSize                   *big.Int
 	Unit                                       unit
+	// Although not part of the config, the setter function requires an expected
+	// reserve as a safety check.
+	ExpectedReserve *big.Int
 }
 
 func (c config) convert() LinearDutchAuctionDutchAuctionConfig {
@@ -147,6 +154,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 				DecreaseInterval: 1,
 				DecreaseSize:     big.NewInt(0),
 				Unit:             Block,
+				ExpectedReserve:  eth.Ether(2),
 			},
 			want: []wantCost{
 				{startBlock, one, eth.Ether(2)},
@@ -165,6 +173,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 				NumDecreases:     0,
 				DecreaseSize:     eth.Ether(43),
 				Unit:             Block,
+				ExpectedReserve:  eth.Ether(42),
 			},
 			want: []wantCost{
 				{startBlock, one, eth.Ether(42)},
@@ -180,6 +189,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 				StartPrice:       eth.Ether(11),
 				DecreaseSize:     eth.Ether(1),
 				Unit:             Block,
+				ExpectedReserve:  eth.Ether(1),
 			},
 			want: []wantCost{
 				{startBlock, one, eth.Ether(11)},
@@ -202,6 +212,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 				StartPrice:       eth.Ether(101),
 				DecreaseSize:     eth.EtherFraction(1, 10),
 				Unit:             Block,
+				ExpectedReserve:  eth.Ether(1),
 			},
 			want: []wantCost{
 				{startBlock + 1, one, eth.EtherFraction(1009, 10)},
@@ -217,6 +228,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 				StartPrice:       eth.Ether(10),
 				DecreaseSize:     eth.Ether(1),
 				Unit:             Block,
+				ExpectedReserve:  eth.Ether(5),
 			},
 			want: []wantCost{
 				// Make sure to test boundaries before and after multiples of
@@ -242,9 +254,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg.convert()
-			t.Logf("%T = %+v", cfg, cfg)
-			sim, _, auction := deploy(t, cfg)
+			sim, _, auction := deploy(t, tt.cfg)
 
 			sim.FastForward(big.NewInt(startBlock - 1))
 			t.Run("before start", func(t *testing.T) {
@@ -285,9 +295,10 @@ func TestTimeBasedDecrease(t *testing.T) {
 		NumDecreases:     numDecreases,
 		Unit:             Time,
 		DecreaseInterval: decreaseInterval,
+		ExpectedReserve:  eth.EtherFraction(7, 10),
 	}
 
-	sim, _, auction := deploy(t, cfg.convert())
+	sim, _, auction := deploy(t, cfg)
 
 	timestamp := func(t *testing.T) int64 {
 		t.Helper()
@@ -368,53 +379,69 @@ func TestTimeBasedDecrease(t *testing.T) {
 	}
 }
 
-func TestNegativeReserveCheck(t *testing.T) {
+func TestReserveCheck(t *testing.T) {
 	sim, _, auction := deployConstantPrice(t, eth.Ether(0))
 
 	tests := []struct {
-		name    string
-		config  config
-		wantErr bool
+		name            string
+		config          config
+		expectedReserve *big.Int
+		wantErr         bool
 	}{
 		{
-			name: "zero reserve allowed",
+			name: "zero reserve",
 			config: config{
 				StartPrice:   eth.Ether(1),
 				DecreaseSize: eth.EtherFraction(1, 10),
 				NumDecreases: 10,
 				Unit:         Block,
 			},
-			wantErr: false,
+			expectedReserve: big.NewInt(0),
+			wantErr:         false,
 		},
 		{
-			name: "one too many decreases",
+			name: "non-zero reserve",
 			config: config{
 				StartPrice:   eth.Ether(1),
 				DecreaseSize: eth.EtherFraction(1, 10),
-				NumDecreases: 11,
+				NumDecreases: 2,
 				Unit:         Block,
 			},
-			wantErr: true,
+			expectedReserve: eth.EtherFraction(8, 10),
+			wantErr:         false,
 		},
 		{
-			name: "fixed price at zero",
+			name: "non-zero reserve",
 			config: config{
-				StartPrice:   big.NewInt(0),
-				DecreaseSize: big.NewInt(0),
+				StartPrice:   eth.Ether(200),
+				DecreaseSize: eth.EtherFraction(1, 2),
 				NumDecreases: 100,
 				Unit:         Block,
 			},
-			wantErr: false,
+			expectedReserve: eth.Ether(150),
+			wantErr:         false,
 		},
 		{
-			name: "single Wei decrease",
+			name: "incorrect reserve",
 			config: config{
-				StartPrice:   eth.Ether(0),
+				StartPrice:   eth.Ether(15),
 				DecreaseSize: big.NewInt(1),
-				NumDecreases: 1,
+				NumDecreases: 10,
 				Unit:         Block,
 			},
-			wantErr: true,
+			expectedReserve: eth.Ether(6),
+			wantErr:         true,
+		},
+		{
+			name: "underflow to 'negative' reserve",
+			config: config{
+				StartPrice:   eth.Ether(1),
+				DecreaseSize: big.NewInt(1),
+				NumDecreases: 10,
+				Unit:         Block,
+			},
+			expectedReserve: eth.Ether(-9), // Impossible but underflow will trigger error
+			wantErr:         true,
 		},
 	}
 
@@ -424,12 +451,12 @@ func TestNegativeReserveCheck(t *testing.T) {
 
 			var errDiffAgainst interface{}
 			if tt.wantErr {
-				errDiffAgainst = "LinearDutchAuction: negative reserve"
+				errDiffAgainst = "LinearDutchAuction: incorrect reserve"
 			}
 
-			_, err := auction.SetAuctionConfig(sim.Acc(0), tt.config.convert())
+			_, err := auction.SetAuctionConfig(sim.Acc(0), tt.config.convert(), tt.expectedReserve)
 			if diff := errdiff.Check(err, errDiffAgainst); diff != "" {
-				t.Errorf("SetAuctionConfig(%+v) %s", tt.config, diff)
+				t.Errorf("SetAuctionConfig(%+v, %d) %s", tt.config, tt.expectedReserve, diff)
 			}
 		})
 	}
@@ -441,8 +468,9 @@ func TestZeroStartToDisable(t *testing.T) {
 		StartPrice:       eth.Ether(1),
 		DecreaseInterval: 1,
 		Unit:             Block,
+		ExpectedReserve:  eth.Ether(1),
 	}
-	sim, _, auction := deploy(t, cfg.convert())
+	sim, _, auction := deploy(t, cfg)
 
 	const startBlock = 10
 	sim.FastForward(big.NewInt(startBlock))
