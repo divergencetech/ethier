@@ -41,6 +41,11 @@ contract TestableDutchAuction is LinearDutchAuction {
     function buy(address to, uint256 n) public payable {
         Seller._purchase(to, n);
     }
+
+    /// @dev Returns the current timestamp for testing of time-based auctions.
+    function timestamp() public view returns (uint256) {
+        return block.timestamp;
+    }
 }
 
 /// @notice Buys on behalf of a sender to circumvent per-address limits.

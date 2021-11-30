@@ -9,7 +9,8 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 abstract contract LinearDutchAuction is Seller {
     /**
     @param unit The unit of "time" used for decreasing prices, block number or
-    timestamp.
+    timestamp. NOTE: See the comment on AuctionIntervalUnit re use of Time as a
+    unit.
     @param startPoint The block or timestamp at which the auction opens. A value
     of zero disables the auction. See setAuctionStartPoint().
     @param startPrice The price at `startPoint`.
@@ -38,16 +39,16 @@ abstract contract LinearDutchAuction is Seller {
     @dev If no value is provided then the zero UNSPECIFIED will trigger an
     error.
 
-    TODO: implement Time unit. This requires knowledge of how to precisely
-    control time in geth's SimulatedBackend also how block timestamps are
-    established + the implications thereof on inviariants (e.g. is a timestamp
-    guaranteed to be after a transaction is submitted; this seems unlikely
-    because it will change the Tx hash, which is known in advance; so many
-    questions).
+    NOTE: The Block unit is more reliable as it has an explicit progression
+    (simply incrementing). Miners are allowed to have a time drift into the
+    future although which predisposes to unexpected behaviour by which "future"
+    costs are encountered. See the ConsenSys 15-second rule:
+    https://consensys.net/blog/developers/solidity-best-practices-for-smart-contract-security/
      */
     enum AuctionIntervalUnit {
         UNSPECIFIED,
-        Block
+        Block,
+        Time
     }
 
     constructor(
@@ -95,9 +96,12 @@ abstract contract LinearDutchAuction is Seller {
     function cost(uint256 n) public view override returns (uint256) {
         DutchAuctionConfig storage cfg = dutchAuctionConfig;
 
-        // TODO: once the Time unit is added, select between block.number and
-        // block.timestamp here.
-        uint256 current = block.number;
+        uint256 current;
+        if (cfg.unit == AuctionIntervalUnit.Block) {
+            current = block.number;
+        } else if (cfg.unit == AuctionIntervalUnit.Time) {
+            current = block.timestamp;
+        }
 
         require(
             cfg.startPoint != 0 && current >= cfg.startPoint,

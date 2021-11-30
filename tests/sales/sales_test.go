@@ -273,6 +273,101 @@ func TestLinearPriceDecrease(t *testing.T) {
 	}
 }
 
+func TestTimeBasedDecrease(t *testing.T) {
+	const (
+		decreaseInterval = 60
+		numDecreases     = 3
+	)
+	cfg := config{
+		StartPoint:       0, // Will be reset later
+		StartPrice:       eth.Ether(1),
+		DecreaseSize:     eth.EtherFraction(1, 10),
+		NumDecreases:     numDecreases,
+		Unit:             Time,
+		DecreaseInterval: decreaseInterval,
+	}
+
+	sim, _, auction := deploy(t, cfg.convert())
+
+	timestamp := func(t *testing.T) int64 {
+		t.Helper()
+		tm, err := auction.Timestamp(nil)
+		if err != nil {
+			t.Errorf("Timestamp() error %v", err)
+			return 0
+		}
+		if !tm.IsInt64() {
+			t.Errorf("Timestamp().IsInt64() = false; want true")
+		}
+		return tm.Int64()
+	}
+
+	start := timestamp(t) + 60
+	if _, err := auction.SetAuctionStartPoint(sim.Acc(0), big.NewInt(start)); err != nil {
+		t.Fatalf("SetAuctionStartPoint(now+60) error %v", err)
+	}
+
+	// Note: SimulatedBackend has undocumented functionality that adjusts its
+	// clock by 10 seconds for every Commit(). The specifics of the step aren't
+	// important, but we use Commit() as a means of ticking the clock.
+	//
+	// Because of this, we lock in the expected behaviour with a test to ensure
+	// test coverage across the life of the auction. Each of these will be
+	// deleted when encountered.
+	unseenCosts := map[uint64]bool{
+		eth.Ether(1).Uint64():             true,
+		eth.EtherFraction(9, 10).Uint64(): true,
+		eth.EtherFraction(8, 10).Uint64(): true,
+		eth.EtherFraction(7, 10).Uint64(): true,
+	}
+
+	for i := 0; i < 50; i++ {
+		sim.Commit() // i.e. clock tick
+
+		// This type of logic-based test setup isn't ideal, but we're forced by
+		// the weird time behaviour of the simulator. It attempts to mimic a
+		// table-driven test pattern as closely as possible.
+		var (
+			want           *big.Int
+			errDiffAgainst interface{}
+		)
+
+		dt := timestamp(t) - start
+		t.Run(fmt.Sprintf("time %ds from start", dt), func(t *testing.T) {
+			switch {
+			case dt < 0:
+				errDiffAgainst = "LinearDutchAuction: Not started"
+			case dt < decreaseInterval:
+				want = cfg.StartPrice
+			case dt < 2*decreaseInterval:
+				want = new(big.Int).Sub(cfg.StartPrice, cfg.DecreaseSize)
+			case dt < 3*decreaseInterval:
+				want = new(big.Int).Sub(cfg.StartPrice, new(big.Int).Mul(cfg.DecreaseSize, big.NewInt(2)))
+			default:
+				want = new(big.Int).Sub(cfg.StartPrice, new(big.Int).Mul(cfg.DecreaseSize, big.NewInt(numDecreases)))
+			}
+
+			got, err := auction.Cost(nil, big.NewInt(1))
+			if diff := errdiff.Check(err, errDiffAgainst); diff != "" {
+				t.Fatalf("Cost() %s", diff)
+			}
+			if errDiffAgainst != nil {
+				return
+			}
+
+			if got.Cmp(want) != 0 {
+				t.Errorf("Cost(1) got %d; want %d", got, want)
+			} else {
+				delete(unseenCosts, got.Uint64())
+			}
+		})
+	}
+
+	if len(unseenCosts) > 0 {
+		t.Errorf("Incomplete test coverage; unseen costs: %v", unseenCosts)
+	}
+}
+
 func TestNegativeReserveCheck(t *testing.T) {
 	sim, _, auction := deployConstantPrice(t, eth.Ether(0))
 
