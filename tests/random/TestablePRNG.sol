@@ -17,8 +17,6 @@ contract TestablePRNG {
     part of the public API.
      */
     struct State {
-        uint256 seed;
-        uint256 counter;
         uint256 entropy;
         uint256 remain;
     }
@@ -41,7 +39,7 @@ contract TestablePRNG {
         }
 
         State memory state;
-        (state.seed, state.counter, state.entropy, state.remain) = src.state();
+        (state.entropy, state.remain) = src.state();
 
         return (samples, state);
     }
@@ -101,20 +99,14 @@ contract TestablePRNG {
         );
 
         (
-            uint256 seed0,
-            uint256 counter0,
             uint256 entropy0,
             uint256 remain0
         ) = src.state();
         (
-            uint256 seed1,
-            uint256 counter1,
             uint256 entropy1,
             uint256 remain1
         ) = copy.state();
 
-        require(seed0 == seed1, "Seeds differ");
-        require(counter0 == counter1, "Counters differ");
         require(remain0 == remain1, "Remaining bits differ");
         // Test the entropy last as it's derived from the other values so a
         // revert() from one of them is more informative.
