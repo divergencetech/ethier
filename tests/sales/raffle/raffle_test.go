@@ -1,6 +1,7 @@
 package raffle
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
@@ -14,7 +15,7 @@ const (
 	deployer = iota
 )
 
-func deploy(t *testing.T, maxWinners int64, cost *big.Int) (*ethtest.SimulatedBackend, *TestableRaffleRunner, *Raffle) {
+func deploy(t *testing.T, maxWinners int64, cost *big.Int) (*ethtest.SimulatedBackend, *TestableRaffleRunner, *Raffle, common.Address) {
 	t.Helper()
 	sim := ethtest.NewSimulatedBackendTB(t, 100)
 
@@ -34,7 +35,7 @@ func deploy(t *testing.T, maxWinners int64, cost *big.Int) (*ethtest.SimulatedBa
 		t.Fatalf("NewRaffle(<address from runner>) error %v", err)
 	}
 
-	return sim, runner, raffle
+	return sim, runner, raffle, addr
 }
 
 func wantEntrantState(t *testing.T, raffle *Raffle, addr common.Address, entries, wins int64) {
@@ -54,6 +55,8 @@ func wantEntrantState(t *testing.T, raffle *Raffle, addr common.Address, entries
 }
 
 func TestEndToEnd(t *testing.T) {
+	ctx := context.Background()
+
 	const (
 		maxWinners  = 100
 		cost        = 1 // Ether
@@ -61,7 +64,7 @@ func TestEndToEnd(t *testing.T) {
 		reserveEach = 3
 		entrants    = 50
 	)
-	sim, runner, raffle := deploy(t, maxWinners, eth.Ether(cost))
+	sim, runner, raffle, raffleAddr := deploy(t, maxWinners, eth.Ether(cost))
 
 	var totalEntries int64
 
@@ -207,6 +210,44 @@ func TestEndToEnd(t *testing.T) {
 			t.Errorf("Total wins, determined via logs; got %d; want %d", gotTotal, maxWinners)
 		}
 	})
+
+	t.Run("no excess", func(t *testing.T) {
+		// Thorough testing of excess purchasing is performed elsewhere.
+		_, err := raffle.PurchaseExcess(sim.WithValueFrom(0, eth.Ether(cost)), sim.Acc(0).From, big.NewInt(1))
+		if diff := ethtest.RevertDiff(err, "Raffle: insufficient excess"); diff != "" {
+			t.Errorf("PurchaseExcess(1) when none available; %s", diff)
+		}
+	})
+
+	t.Run("withdrawal", func(t *testing.T) {
+		wantRevenues := eth.Ether(cost * maxWinners)
+
+		if got := sim.BalanceOf(ctx, t, raffleAddr); got.Cmp(wantRevenues) != 0 {
+			t.Errorf("Balance of raffle contract after all redemptions; got %d; want %d", got, wantRevenues)
+		}
+
+		beneficiary := sim.MonotonicAddress(t)
+
+		_, err := raffle.WithdrawAll(sim.Acc(deployer+1), beneficiary)
+		if diff := ethtest.RevertDiff(err, "Ownable: caller is not the owner"); diff != "" {
+			t.Errorf("WithdrawAll() as non contract owner: %s", diff)
+		}
+		if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(big.NewInt(0)) != 0 {
+			t.Fatalf("After WithdrawAll() by non contract owner; balance of beneficiary is %d; want 0", got)
+		}
+
+		if _, err := raffle.WithdrawAll(sim.Acc(deployer), beneficiary); err != nil {
+			t.Errorf("WithdrawAll() as contract owner; error %v", err)
+		}
+		if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(wantRevenues) != 0 {
+			t.Errorf("After WithdrawAll() by contract owner; balance of beneficiary is %d; want %d", got, wantRevenues)
+		}
+
+		_, err = raffle.Withdraw(sim.Acc(deployer), beneficiary, big.NewInt(1))
+		if diff := ethtest.RevertDiff(err, "Raffle: all withdrawn"); diff != "" {
+			t.Errorf("Withdraw(1 Wei) after WithdrawAll() %s", diff)
+		}
+	})
 }
 
 func TestReservationLimits(t *testing.T) {
@@ -214,7 +255,7 @@ func TestReservationLimits(t *testing.T) {
 		maxWinners = 10
 		cost       = 1
 	)
-	sim, runner, raffle := deploy(t, maxWinners, eth.Ether(cost))
+	sim, runner, raffle, _ := deploy(t, maxWinners, eth.Ether(cost))
 
 	t.Run("no direct reservation", func(t *testing.T) {
 		const acc = 1

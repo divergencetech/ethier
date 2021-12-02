@@ -6,6 +6,7 @@ import "./IRaffleRunner.sol";
 import "../../random/PRNG.sol";
 import "../../utils/OwnerPausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 /**
 @notice Provides a raffle mechanism with additional guaranteed pre-reservation.
@@ -22,6 +23,7 @@ rules, and there is no need to check for payable functions or transfers in the
 inheritance tree. 
  */
 contract Raffle is OwnerPausable, ReentrancyGuard {
+    using Address for address payable;
     using PRNG for PRNG.Source;
 
     /**
@@ -65,9 +67,10 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
 
     /**
     @notice Total number of winners thus far.
-    @dev Always equal the sum of Entrant.wins in the entrants map. If it costs
-    to enter the raffle then the beneficiaries MUST NOT receive more than
-    _totalWinners * cost payment at any time.
+    @dev Incremented in line with every Entrant.wins in the entrants map, but
+    not decremented upon redemption. If it costs to enter the raffle then the
+    beneficiaries MUST NOT receive more than _totalWinners * cost payment at any
+    time.
      */
     uint256 private totalWinners;
 
@@ -144,7 +147,7 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
 
     /// @notice Enter the entrant the specified number of times.
     function enter(address entrant, uint128 num)
-        public
+        external
         payable
         canEnter
         costs(num)
@@ -187,7 +190,7 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
     calculate that resetting the state after n steps will result in their entry
     being chosen at step n+1.
      */
-    function shuffle() public {
+    function shuffle() external {
         require(uint256(entropy) != 0, "Raffle: entropy not set");
         uint256 available = maxWinners - totalWinners;
         require(available > 0, "Raffle: all allocated");
@@ -228,6 +231,7 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
         assignWinners(available);
     }
 
+    /// @notice Flag indicating that shuffle() has assigned winners.
     bool public winnersAssigned;
 
     /// @notice Increments winning entrants' win count.
@@ -245,14 +249,19 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
     /// @notice Emitted when an entrant redeems wins, regardless of how many.
     event Redemption(address indexed entrant, uint128 wins);
 
+    /// @notice Requires that winners have been assigned via shuffling.
+    modifier whenWinnersAssigned() {
+        require(winnersAssigned, "Raffle: winners not assigned");
+        _;
+    }
+
     /**
     @notice Redeems wins for and/or reimburses the entrant.
     @dev The message sender is ignored so it's safe to allow calls on behalf of
     an entrant. This allows entrants with zero balance to more easily receive
     their refunds without requiring an additional transfer.
      */
-    function redeem(address entrant) public nonReentrant {
-        require(winnersAssigned, "Raffle: winners not assigned");
+    function redeem(address entrant) external whenWinnersAssigned nonReentrant {
         Entrant storage e = entrants[entrant];
 
         uint128 wins = e.wins;
@@ -288,5 +297,76 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
 
             emit Refund(reimburse, refund);
         }
+    }
+
+    /// @notice Emitted when excess places are purchased.
+    event ExcessPurchase(address to, uint128 num);
+
+    /**
+    @notice Allows purchase of remaining places should totalWinners fall short
+    of maxWinners.
+     */
+    function purchaseExcess(address to, uint128 num)
+        external
+        payable
+        whenWinnersAssigned
+        costs(num)
+    {
+        require(
+            totalWinners + num <= maxWinners,
+            "Raffle: insufficient excess"
+        );
+
+        totalWinners += num;
+        emit ExcessPurchase(to, num);
+
+        runner.protectedRaffleRedemption(to, num);
+    }
+
+    /// @notice Total already sent by withdraw().
+    uint256 public withdrawn;
+
+    /// @notice Emitted by withdraw when funds are sent.
+    event Withdrawal(address indexed to, uint256 amount);
+
+    /**
+    @notice Sends all remaining revenues of winning entries to the provided
+    address.
+    @dev Equivalent to withdraw(to, 2^256-1).
+     */
+    function withdrawAll(address payable to) external {
+        withdraw(to, ~uint256(0));
+    }
+
+    /**
+    @notice Sends partial revenues of winning entries to the provided address.
+     */
+    function withdraw(address payable to, uint256 max)
+        public
+        onlyOwner
+        whenWinnersAssigned
+        nonReentrant
+    {
+        /**
+         * ##### CHECKS
+         */
+        uint256 send = totalWinners * entryCost - withdrawn;
+        require(send > 0, "Raffle: all withdrawn");
+
+        if (send > max) {
+            send = max;
+        }
+
+        /**
+         * ##### EFFECTS
+         */
+
+        withdrawn += send;
+        emit Withdrawal(to, send);
+
+        /**
+         * ##### INTERACTIONS
+         */
+        to.sendValue(send);
     }
 }

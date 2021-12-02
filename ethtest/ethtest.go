@@ -169,6 +169,19 @@ func (sb *SimulatedBackend) GasSpent(ctx context.Context, tb testing.TB, tx *typ
 	return new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(rcpt.GasUsed))
 }
 
+// MonotonicAddress returns the address of a randomly generated
+// account for which the private key is discarded, guaranteeing that its value
+// can never decrease. Its starting Balance is, with exceedingly high
+// probability, zero.
+func (sb *SimulatedBackend) MonotonicAddress(tb testing.TB) common.Address {
+	tb.Helper()
+	s, err := eth.NewSigner(256)
+	if err != nil {
+		tb.Fatalf("eth.NewSigner(256): %v", err)
+	}
+	return s.Address()
+}
+
 // ExecutionErrData checks if err is both an rpc.Error and rpc.DataError, and
 // returns err.ErrorData() iff err.ErrorCode()==3 (i.e. an Execution error under
 // the JSON RPC error codes IP).
