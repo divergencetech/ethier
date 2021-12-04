@@ -11,8 +11,8 @@ library OpenSeaGasFreeListing {
     /**
     @notice Returns whether the operator is an OpenSea proxy for the owner, thus
     allowing it to list without the token owner paying gas.
-    @dev ERC721.isApprovedForAll should be overriden to also check if this
-    function returns true.
+    @dev ERC{721,1155}.isApprovedForAll should be overriden to also check if
+    this function returns true.
      */
     function isApprovedForAll(address owner, address operator)
         internal
