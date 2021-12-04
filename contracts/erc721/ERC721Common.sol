@@ -2,7 +2,7 @@
 // Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "./BaseOpenSea.sol";
+import "./OpenSeaGasFreeListing.sol";
 import "../utils/OwnerPausable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
@@ -15,26 +15,14 @@ import "@openzeppelin/contracts/utils/Context.sol";
  - OpenZeppelin Pausable with functions exposed to Owner only
  */
 contract ERC721Common is
-    BaseOpenSea,
     Context,
     ERC721Enumerable,
     ERC721Pausable,
     OwnerPausable
 {
-    /**
-    @param openSeaProxyRegistry Set to
-    0xa5409ec958c83c3f309868babaca7c86dcb077c1 for Mainnet and
-    0xf57b2c51ded3a29e6891aba85459d600256cf317 for Rinkeby.
-     */
-    constructor(
-        string memory name,
-        string memory symbol,
-        address openSeaProxyRegistry
-    ) ERC721(name, symbol) {
-        if (openSeaProxyRegistry != address(0)) {
-            BaseOpenSea._setOpenSeaRegistry(openSeaProxyRegistry);
-        }
-    }
+    constructor(string memory name, string memory symbol)
+        ERC721(name, symbol)
+    {}
 
     /// @notice Requires that the token exists.
     modifier tokenExists(uint256 tokenId) {
@@ -82,6 +70,6 @@ contract ERC721Common is
     {
         return
             super.isApprovedForAll(owner, operator) ||
-            BaseOpenSea.isOwnersOpenSeaProxy(owner, operator);
+            OpenSeaGasFreeListing.isApprovedForAll(owner, operator);
     }
 }

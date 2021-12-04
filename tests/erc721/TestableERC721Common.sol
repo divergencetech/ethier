@@ -6,7 +6,7 @@ import "../../contracts/erc721/ERC721Common.sol";
 
 /// @notice Exposes a functions modified with the modifiers under test.
 contract TestableERC721Common is ERC721Common {
-    constructor() ERC721Common("Token", "JRR", address(0)) {}
+    constructor() ERC721Common("Token", "JRR") {}
 
     function mint(uint256 tokenId) public {
         ERC721._safeMint(msg.sender, tokenId);
