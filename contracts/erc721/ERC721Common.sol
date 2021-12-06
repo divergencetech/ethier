@@ -46,6 +46,7 @@ contract ERC721Common is Context, ERC721Pausable, OwnerPausable {
     function supportsInterface(bytes4 interfaceId)
         public
         view
+        virtual
         override(ERC721)
         returns (bool)
     {
@@ -59,6 +60,7 @@ contract ERC721Common is Context, ERC721Pausable, OwnerPausable {
     function isApprovedForAll(address owner, address operator)
         public
         view
+        virtual
         override
         returns (bool)
     {

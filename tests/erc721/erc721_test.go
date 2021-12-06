@@ -2,6 +2,7 @@ package erc721
 
 import (
 	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/divergencetech/ethier/ethtest"
@@ -23,13 +24,13 @@ const (
 	notExists
 )
 
-func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721Common) {
+func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721CommonEnumerable) {
 	t.Helper()
 
 	sim := ethtest.NewSimulatedBackendTB(t, 4)
-	_, _, nft, err := DeployTestableERC721Common(sim.Acc(owner), sim)
+	_, _, nft, err := DeployTestableERC721CommonEnumerable(sim.Acc(owner), sim)
 	if err != nil {
-		t.Fatalf("DeployTestableERC721Common() error %v", err)
+		t.Fatalf("DeployTestableERC721CommonEnumerable() error %v", err)
 	}
 
 	if _, err := nft.Mint(sim.Acc(tokenOwner), big.NewInt(exists)); err != nil {
@@ -104,5 +105,58 @@ func TestOnlyApprovedOrOwner(t *testing.T) {
 				t.Errorf("MustBeApprovedOrOwner([%s]), modified with onlyApprovedOrOwner(); %s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestEnumerableInterface(t *testing.T) {
+	enumerableMethods := []string{"TotalSupply", "TokenOfOwnerByIndex", "TokenByIndex"}
+	// Common methods, expected on both, are used as a control because there is
+	// significant embedding by abigen so we need to know which type actually
+	// has the methods.
+	commonMethods := []string{"BalanceOf", "OwnerOf", "IsApprovedForAll"}
+
+	tests := []struct {
+		contract interface{}
+		methods  []string
+		want     bool
+	}{
+		{
+			contract: &ERC721CommonCaller{},
+			methods:  commonMethods,
+			want:     true,
+		},
+		{
+			contract: &ERC721CommonEnumerableCaller{},
+			methods:  commonMethods,
+			want:     true,
+		},
+		{
+			contract: &ERC721CommonCaller{},
+			methods:  enumerableMethods,
+			want:     false,
+		},
+		{
+			contract: &ERC721CommonEnumerableCaller{},
+			methods:  enumerableMethods,
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		typ := reflect.TypeOf(tt.contract)
+		for _, method := range tt.methods {
+			if _, got := typ.MethodByName(method); got != tt.want {
+				t.Errorf("%T has method %q? got %t; want %t", tt.contract, method, got, tt.want)
+			}
+		}
+	}
+
+	// Effectively the same as above but this won't compile if we haven't
+	// inherited properly.
+	var enum ERC721CommonEnumerable
+	_ = []interface{}{
+		enum.TotalSupply,
+		enum.TokenOfOwnerByIndex,
+		enum.TokenByIndex,
 	}
 }
