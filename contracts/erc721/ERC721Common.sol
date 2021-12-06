@@ -4,22 +4,16 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "./OpenSeaGasFreeListing.sol";
 import "../utils/OwnerPausable.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
 /**
 @notice An ERC721 contract with common functionality:
  - OpenSea gas-free listings
- - OpenZeppelin Enumerable and Pausable
+ - OpenZeppelin Pausable
  - OpenZeppelin Pausable with functions exposed to Owner only
  */
-contract ERC721Common is
-    Context,
-    ERC721Enumerable,
-    ERC721Pausable,
-    OwnerPausable
-{
+contract ERC721Common is Context, ERC721Pausable, OwnerPausable {
     constructor(string memory name, string memory symbol)
         ERC721(name, symbol)
     {}
@@ -44,7 +38,7 @@ contract ERC721Common is
         address from,
         address to,
         uint256 tokenId
-    ) internal virtual override(ERC721Enumerable, ERC721Pausable) {
+    ) internal virtual override(ERC721Pausable) {
         super._beforeTokenTransfer(from, to, tokenId);
     }
 
@@ -52,7 +46,7 @@ contract ERC721Common is
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC721, ERC721Enumerable)
+        override(ERC721)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
