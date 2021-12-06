@@ -16,10 +16,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@openzeppelin/contracts": "^4.3.3"
+    "@openzeppelin/contracts": "^4.4.0"
   },
   "directories": {
     "test": "tests"
-  },
-  "devDependencies": {}
+  }
 }
