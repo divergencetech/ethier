@@ -25,15 +25,31 @@ contract TestableDutchAuction is LinearDutchAuction {
         )
     {}
 
+    uint256 private total;
     mapping(address => uint256) public own;
+    mapping(address => uint256) public receivedFree;
 
     /**
     @dev Override of Seller._handlePurchase(), called by Seller._purchase()
     after enforcing any caps, iff n > 0. This is where the primary logic of a
     sale is handled, e.g. ERC721 minting.
      */
-    function _handlePurchase(address to, uint256 n) internal override {
+    function _handlePurchase(
+        address to,
+        uint256 n,
+        bool freeOfCharge
+    ) internal override {
+        // Not standard usage: an additional test to lock in an API guarantee.
+        require(
+            Seller.totalSold() == total,
+            "Seller.totalSold() API promises to be pre-purchase amount"
+        );
+
+        total += n;
         own[to] += n;
+        if (freeOfCharge) {
+            receivedFree[to] += n;
+        }
     }
 
     /// @dev Public API for testing of _purchase().

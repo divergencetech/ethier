@@ -20,13 +20,28 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
     using Monotonic for Monotonic.Increaser;
     using Strings for uint256;
 
-    /// @dev Note that the address limits are vulnerable to wallet farming.
-    /// @param maxPerAddress Unlimited if zero.
-    /// @param maxPerTex Unlimited if zero.
+    /**
+    @dev Note that the address limits are vulnerable to wallet farming.
+    @param maxPerAddress Unlimited if zero.
+    @param maxPerTex Unlimited if zero.
+    @param freeQuota Maximum number that can be purchased free of charge by
+    the contract owner.
+    @param reserveFreeQuota Whether to excplitly reserve the freeQuota amount
+    and not let it be eroded by regular purchases.
+    @param lockFreeQuota If true, calls to setSellerConfig() will ignore changes
+    to freeQuota. Can be locked after initial setting, but not unlocked. This
+    allows a contract owner to commit to a maximum number of reserved items.
+    @param lockTotalInventory Similar to lockFreeQuota but applied to
+    totalInventory.
+    */
     struct SellerConfig {
         uint256 totalInventory;
         uint256 maxPerAddress;
         uint256 maxPerTx;
+        uint248 freeQuota;
+        bool reserveFreeQuota;
+        bool lockFreeQuota;
+        bool lockTotalInventory;
     }
 
     constructor(SellerConfig memory config, address payable _beneficiary) {
@@ -39,6 +54,30 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
 
     /// @notice Sets the seller config.
     function setSellerConfig(SellerConfig memory config) public onlyOwner {
+        require(
+            config.totalInventory >= config.freeQuota,
+            "Seller: excessive free quota"
+        );
+        require(
+            config.totalInventory >= _totalSold.current(),
+            "Seller: inventory < already sold"
+        );
+        require(
+            config.freeQuota >= purchasedFreeOfCharge.current(),
+            "Seller: free quota < already used"
+        );
+
+        // Overriding the in-memory fields before copying the whole struct, as
+        // against writing individual fields, gives a greater guarantee of
+        // correctness as the code is simpler to read.
+        if (sellerConfig.lockTotalInventory) {
+            config.lockTotalInventory = true;
+            config.totalInventory = sellerConfig.totalInventory;
+        }
+        if (sellerConfig.lockFreeQuota) {
+            config.lockFreeQuota = true;
+            config.freeQuota = sellerConfig.freeQuota;
+        }
         sellerConfig = config;
     }
 
@@ -59,15 +98,26 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
     function cost(uint256 n) public view virtual returns (uint256);
 
     /**
-    @dev Called by _purchase() after all limits have been put in place; must
-    perform all contract-specific sale logic, e.g. ERC721 minting.
+    @dev Called by both _purchase() and purchaseFreeOfCharge() after all limits
+    have been put in place; must perform all contract-specific sale logic, e.g.
+    ERC721 minting. When _handlePurchase() is called, the value returned by
+    Seller.totalSold() will be the pre-purchase amount.
     @param to The recipient of the item(s).
     @param n The number of items allowed to be purchased, which MAY be less than
     to the number passed to _purchase() but SHALL be greater than zero.
+    @param freeOfCharge Indicates that the call originated from
+    purchaseFreeOfCharge() and not _purchase().
     */
-    function _handlePurchase(address to, uint256 n) internal virtual;
+    function _handlePurchase(
+        address to,
+        uint256 n,
+        bool freeOfCharge
+    ) internal virtual;
 
-    /// @notice Tracks total number of items sold by this contract.
+    /**
+    @notice Tracks total number of items sold by this contract, including those
+    purchased free of charge by the contract owner.
+     */
     Monotonic.Increaser private _totalSold;
 
     /// @notice Returns the total number of items sold by this contract.
@@ -110,6 +160,34 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
         uint256 amount
     );
 
+    /// @notice Tracks number of items purchased free of charge.
+    Monotonic.Increaser private purchasedFreeOfCharge;
+
+    /**
+    @notice Allows the contract owner to purchase without payment, within the
+    quota enforced by the SellerConfig.
+     */
+    function purchaseFreeOfCharge(address to, uint256 n)
+        public
+        onlyOwner
+        whenNotPaused
+    {
+        uint256 freeQuota = sellerConfig.freeQuota;
+        n = Math.min(n, freeQuota - purchasedFreeOfCharge.current());
+        require(n > 0, "Seller: Free quota exceeded");
+
+        uint256 totalInventory = sellerConfig.totalInventory;
+        n = Math.min(n, totalInventory - _totalSold.current());
+        require(n > 0, "Seller: Sold out");
+
+        _handlePurchase(to, n, true);
+
+        _totalSold.add(n);
+        purchasedFreeOfCharge.add(n);
+        assert(_totalSold.current() <= totalInventory);
+        assert(purchasedFreeOfCharge.current() <= freeQuota);
+    }
+
     /**
     @notice Enforces all purchase limits (counts and costs) before calling
     _handlePurchase(), after which the received funds are disbursed to the
@@ -132,8 +210,11 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
             ? requested
             : Math.min(requested, config.maxPerTx);
 
-        n = Math.min(n, config.totalInventory - _totalSold.current());
-        require(n > 0, "Sold out");
+        uint256 maxAvailable = config.reserveFreeQuota
+            ? config.totalInventory - config.freeQuota
+            : config.totalInventory;
+        n = Math.min(n, maxAvailable - _totalSold.current());
+        require(n > 0, "Seller: Sold out");
 
         if (config.maxPerAddress > 0) {
             bool alsoLimitSender = _msgSender() != to;
@@ -161,7 +242,7 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
             revert(
                 string(
                     abi.encodePacked(
-                        "Costs ",
+                        "Seller: Costs ",
                         (_cost / 1e9).toString(),
                         " GWei"
                     )
@@ -173,8 +254,9 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
          * ##### EFFECTS
          */
 
-        _handlePurchase(to, n);
+        _handlePurchase(to, n, false);
         _totalSold.add(n);
+        assert(_totalSold.current() <= config.totalInventory);
 
         /**
          * ##### INTERACTIONS

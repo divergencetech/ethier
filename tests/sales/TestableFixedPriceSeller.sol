@@ -7,8 +7,16 @@ import "../../contracts/sales/FixedPriceSeller.sol";
 /// @notice A concrete FixedPriceSeller for testing the cost() function.
 contract TestableFixedPriceSeller is FixedPriceSeller {
     constructor(uint256 price)
-        FixedPriceSeller(price, SellerConfig(0, 0, 0), payable(0))
+        FixedPriceSeller(
+            price,
+            SellerConfig(0, 0, 0, 0, false, false, false),
+            payable(0)
+        )
     {}
 
-    function _handlePurchase(address, uint256) internal override {}
+    function _handlePurchase(
+        address,
+        uint256,
+        bool
+    ) internal override {}
 }

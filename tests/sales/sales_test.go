@@ -51,6 +51,7 @@ func deploy(t *testing.T, cfg config) (*ethtest.SimulatedBackend, common.Address
 		TotalInventory: big.NewInt(totalInventory),
 		MaxPerAddress:  big.NewInt(maxPerAddress),
 		MaxPerTx:       big.NewInt(maxPerTx),
+		FreeQuota:      big.NewInt(0),
 	}
 	t.Logf("%T = %+v", sellerConfig, sellerConfig)
 
@@ -554,9 +555,11 @@ func TestAddressLimit(t *testing.T) {
 
 		// TODO: submit a PR so geth/accounts/abi/bind returns named structs.
 		want := struct {
-			TotalInventory, MaxPerAddress, MaxPerTx *big.Int
+			TotalInventory, MaxPerAddress, MaxPerTx, FreeQuota  *big.Int
+			ReserveFreeQuota, LockFreeQuota, LockTotalInventory bool
 		}{
-			big.NewInt(25), big.NewInt(10), big.NewInt(3),
+			big.NewInt(25), big.NewInt(10), big.NewInt(3), big.NewInt(0),
+			false, false, false,
 		}
 
 		if diff := cmp.Diff(want, got, ethtest.Comparers()...); diff != "" {
@@ -722,6 +725,10 @@ func TestAddressLimit(t *testing.T) {
 		}
 		if got := after.Sub(after, before); got.Cmp(big.NewInt(tt.wantPurchased)) != 0 {
 			t.Errorf("Own(%s) got %d; want %d", recipient.From, got, tt.wantPurchased)
+		}
+
+		if got, err := auction.ReceivedFree(nil, recipient.From); got.Cmp(big.NewInt(0)) != 0 || err != nil {
+			t.Errorf("ReceivedFree(%s) got %d, err %v; want 0, nil err", recipient.From, got, err)
 		}
 	}
 
@@ -967,6 +974,7 @@ func TestUnlimited(t *testing.T) {
 		TotalInventory: big.NewInt(total),
 		MaxPerAddress:  big.NewInt(0),
 		MaxPerTx:       big.NewInt(0),
+		FreeQuota:      big.NewInt(0),
 	}
 	if _, err := auction.SetSellerConfig(sim.Acc(0), cfg); err != nil {
 		t.Fatalf("SetSellerConfig(%+v) error %v", cfg, err)
@@ -978,7 +986,119 @@ func TestUnlimited(t *testing.T) {
 	}
 
 	_, err := auction.Buy(buyer, buyer.From, big.NewInt(1))
-	if diff := ethtest.RevertDiff(err, "Sold out"); diff != "" {
+	if diff := ethtest.RevertDiff(err, "Seller: Sold out"); diff != "" {
 		t.Errorf("Buy(1) with no more inventory; %s", diff)
 	}
+}
+
+// wantOwned is a helper to confirm total number of items owned by an address,
+// and total received free of charge.
+func wantOwned(t *testing.T, auction *TestableDutchAuction, addr common.Address, wantTotal, wantFree int64) {
+	t.Helper()
+
+	if got, err := auction.Own(nil, addr); got.Cmp(big.NewInt(wantTotal)) != 0 || err != nil {
+		t.Errorf("Own(%q) got %d, err %v; want %d, nil err", addr, got, err, wantTotal)
+	}
+	if got, err := auction.ReceivedFree(nil, addr); got.Cmp(big.NewInt(wantFree)) != 0 || err != nil {
+		t.Errorf("ReceivedFree(%q) got %d, err %v; want %d, nil err", addr, got, err, wantFree)
+	}
+}
+
+func TestReservedFreePurchasing(t *testing.T) {
+	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
+
+	const (
+		totalInventory = 10
+		freeQuota      = 4
+	)
+
+	cfg := SellerSellerConfig{
+		TotalInventory:   big.NewInt(totalInventory),
+		FreeQuota:        big.NewInt(freeQuota),
+		ReserveFreeQuota: true,
+		// Required but irrelevant to tests:
+		MaxPerAddress: big.NewInt(0),
+		MaxPerTx:      big.NewInt(0),
+	}
+	if _, err := auction.SetSellerConfig(sim.Acc(0), cfg); err != nil {
+		t.Fatalf("SetSellerConfig(%+v) error %v", cfg, err)
+	}
+
+	t.Run("only owner purchases free", func(t *testing.T) {
+		_, err := auction.PurchaseFreeOfCharge(sim.Acc(1), sim.Acc(1).From, big.NewInt(1))
+		if diff := ethtest.RevertDiff(err, "Ownable: caller is not the owner"); diff != "" {
+			t.Errorf("PurchaseFreeOfCharge() as non-owner; %s", diff)
+		}
+		wantOwned(t, auction, sim.Acc(1).From, 0, 0)
+	})
+
+	t.Run("reserved free quota honoured", func(t *testing.T) {
+		n := big.NewInt(totalInventory - freeQuota)
+		if _, err := auction.Buy(sim.WithValueFrom(0, n), sim.Acc(0).From, n); err != nil {
+			t.Errorf("Buy(totalInventory - freeQuota) error %v", err)
+		}
+		_, err := auction.Buy(sim.WithValueFrom(0, big.NewInt(1)), sim.Acc(0).From, big.NewInt(1))
+		if diff := ethtest.RevertDiff(err, "Seller: Sold out"); diff != "" {
+			t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) %s", diff)
+		}
+
+		wantOwned(t, auction, sim.Acc(0).From, totalInventory-freeQuota, 0)
+	})
+
+	t.Run("free quota enforced", func(t *testing.T) {
+		if _, err := auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota)); err != nil {
+			t.Errorf("PurchaseFreeOfCharge(freeQuota) error %v", err)
+		}
+		_, err := auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))
+		if diff := ethtest.RevertDiff(err, "Seller: Free quota exceeded"); diff != "" {
+			t.Errorf("PurchaseFreeOfCharge(1) after exhausting quota; %s", diff)
+		}
+
+		wantOwned(t, auction, sim.Acc(0).From, totalInventory, freeQuota)
+	})
+}
+
+func TestUnreservedFreePurchasing(t *testing.T) {
+	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
+
+	const (
+		totalInventory = 10
+		freeQuota      = 4
+	)
+
+	cfg := SellerSellerConfig{
+		TotalInventory:   big.NewInt(totalInventory),
+		FreeQuota:        big.NewInt(freeQuota),
+		ReserveFreeQuota: false,
+		// Required but irrelevant to tests:
+		MaxPerAddress: big.NewInt(0),
+		MaxPerTx:      big.NewInt(0),
+	}
+	if _, err := auction.SetSellerConfig(sim.Acc(0), cfg); err != nil {
+		t.Fatalf("SetSellerConfig(%+v) error %v", cfg, err)
+	}
+
+	t.Run("unreserved free quota ignored", func(t *testing.T) {
+		n := big.NewInt(totalInventory - freeQuota)
+		if _, err := auction.Buy(sim.WithValueFrom(0, n), sim.Acc(0).From, n); err != nil {
+			t.Errorf("Buy(totalInventory - freeQuota) error %v", err)
+		}
+		if _, err := auction.Buy(sim.WithValueFrom(0, big.NewInt(1)), sim.Acc(0).From, big.NewInt(1)); err != nil {
+			t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) error %v", err)
+		}
+
+		wantOwned(t, auction, sim.Acc(0).From, totalInventory-freeQuota+1, 0)
+	})
+
+	t.Run("total inventory honoured even if free", func(t *testing.T) {
+		if _, err := auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota-1)); err != nil {
+			t.Errorf("PurchaseFreeOfCharge(freeQuota-1) error %v", err)
+		}
+		_, err := auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))
+		if diff := ethtest.RevertDiff(err, "Seller: Sold out"); diff != "" {
+			t.Errorf("PurchaseFreeOfCharge(1) when last unreserved quota already sold; %s", diff)
+		}
+
+		wantOwned(t, auction, sim.Acc(0).From, totalInventory, freeQuota-1)
+	})
 }
