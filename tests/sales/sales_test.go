@@ -958,3 +958,27 @@ func TestReentrancyGuard(t *testing.T) {
 		t.Errorf("Own(<reentrant attacker>) got %d; want 0", got)
 	}
 }
+
+func TestUnlimited(t *testing.T) {
+	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
+
+	const total = 1e6
+	cfg := SellerSellerConfig{
+		TotalInventory: big.NewInt(total),
+		MaxPerAddress:  big.NewInt(0),
+		MaxPerTx:       big.NewInt(0),
+	}
+	if _, err := auction.SetSellerConfig(sim.Acc(0), cfg); err != nil {
+		t.Fatalf("SetSellerConfig(%+v) error %v", cfg, err)
+	}
+
+	buyer := sim.WithValueFrom(0, big.NewInt(total))
+	if _, err := auction.Buy(buyer, buyer.From, big.NewInt(total)); err != nil {
+		t.Errorf("Buy(%d) with unlimited transaction and address limits; error %v", int(total), err)
+	}
+
+	_, err := auction.Buy(buyer, buyer.From, big.NewInt(1))
+	if diff := ethtest.RevertDiff(err, "Sold out"); diff != "" {
+		t.Errorf("Buy(1) with no more inventory; %s", diff)
+	}
+}

@@ -2,6 +2,7 @@
 // Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
 pragma solidity >=0.8.0 <0.9.0;
 
+import "../utils/Monotonic.sol";
 import "../utils/OwnerPausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -16,9 +17,12 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  */
 abstract contract Seller is OwnerPausable, ReentrancyGuard {
     using Address for address payable;
+    using Monotonic for Monotonic.Increaser;
     using Strings for uint256;
 
     /// @dev Note that the address limits are vulnerable to wallet farming.
+    /// @param maxPerAddress Unlimited if zero.
+    /// @param maxPerTex Unlimited if zero.
     struct SellerConfig {
         uint256 totalInventory;
         uint256 maxPerAddress;
@@ -55,20 +59,21 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
     function cost(uint256 n) public view virtual returns (uint256);
 
     /**
-    @dev Must return the number of items already sold. This MAY be different to
-    the total number of items in supply (e.g. ERC721Enumerable.totalSupply()) as
-    some items may not count against the Seller's inventory.
-     */
-    function totalSold() public view virtual returns (uint256);
-
-    /**
     @dev Called by _purchase() after all limits have been put in place; must
     perform all contract-specific sale logic, e.g. ERC721 minting.
     @param to The recipient of the item(s).
     @param n The number of items allowed to be purchased, which MAY be less than
     to the number passed to _purchase() but SHALL be greater than zero.
-     */
+    */
     function _handlePurchase(address to, uint256 n) internal virtual;
+
+    /// @notice Tracks total number of items sold by this contract.
+    Monotonic.Increaser private _totalSold;
+
+    /// @notice Returns the total number of items sold by this contract.
+    function totalSold() public view returns (uint256) {
+        return _totalSold.current();
+    }
 
     /**
     @notice Tracks the number of items already bought by an address, regardless
@@ -121,21 +126,35 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
         /**
          * ##### CHECKS
          */
-        uint256 n = Math.min(requested, sellerConfig.maxPerTx);
+        SellerConfig memory config = sellerConfig;
 
-        n = _capExtra(n, to, "Buyer limit");
+        uint256 n = config.maxPerTx == 0
+            ? requested
+            : Math.min(requested, config.maxPerTx);
 
-        bool alsoLimitSender = _msgSender() != to;
-        bool alsoLimitOrigin = tx.origin != _msgSender() && tx.origin != to;
-        if (alsoLimitSender) {
-            n = _capExtra(n, _msgSender(), "Sender limit");
-        }
-        if (alsoLimitOrigin) {
-            n = _capExtra(n, tx.origin, "Origin limit");
-        }
-
-        n = Math.min(n, sellerConfig.totalInventory - totalSold());
+        n = Math.min(n, config.totalInventory - _totalSold.current());
         require(n > 0, "Sold out");
+
+        if (config.maxPerAddress > 0) {
+            bool alsoLimitSender = _msgSender() != to;
+            bool alsoLimitOrigin = tx.origin != _msgSender() && tx.origin != to;
+
+            n = _capExtra(n, to, "Buyer limit");
+            if (alsoLimitSender) {
+                n = _capExtra(n, _msgSender(), "Sender limit");
+            }
+            if (alsoLimitOrigin) {
+                n = _capExtra(n, tx.origin, "Origin limit");
+            }
+
+            _bought[to] += n;
+            if (alsoLimitSender) {
+                _bought[_msgSender()] += n;
+            }
+            if (alsoLimitOrigin) {
+                _bought[tx.origin] += n;
+            }
+        }
 
         uint256 _cost = cost(n);
         if (msg.value < _cost) {
@@ -153,15 +172,9 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
         /**
          * ##### EFFECTS
          */
-        _bought[to] += n;
-        if (alsoLimitSender) {
-            _bought[_msgSender()] += n;
-        }
-        if (alsoLimitOrigin) {
-            _bought[tx.origin] += n;
-        }
 
         _handlePurchase(to, n);
+        _totalSold.add(n);
 
         /**
          * ##### INTERACTIONS

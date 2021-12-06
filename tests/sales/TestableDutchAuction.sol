@@ -25,7 +25,6 @@ contract TestableDutchAuction is LinearDutchAuction {
         )
     {}
 
-    uint256 private total;
     mapping(address => uint256) public own;
 
     /**
@@ -34,15 +33,7 @@ contract TestableDutchAuction is LinearDutchAuction {
     sale is handled, e.g. ERC721 minting.
      */
     function _handlePurchase(address to, uint256 n) internal override {
-        total += n;
         own[to] += n;
-    }
-
-    /**
-    @dev Override of Seller.totalSold().
-     */
-    function totalSold() public view override returns (uint256) {
-        return total;
     }
 
     /// @dev Public API for testing of _purchase().
