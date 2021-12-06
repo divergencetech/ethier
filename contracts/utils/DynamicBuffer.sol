@@ -10,7 +10,8 @@ pragma solidity >=0.8.0;
 //          which will be subsequently filled without needing to reallocate
 ///         memory.
 /// @dev First, allocate memory.
-///      Then use `DynamicBuffer.appendBytes(buffer, theBytes)`
+///      Then use `buffer.appendUnchecked(theBytes)` or `appendSafe()` if
+///      bounds checking is required.
 library DynamicBuffer {
     /// @notice Allocates container space for the DynamicBuffer
     /// @param capacity The intended max amount of bytes in the buffer
@@ -57,7 +58,7 @@ library DynamicBuffer {
     /// @param data the data to append
     /// @dev Does not perform out-of-bound checks (container capacity)
     ///      for efficiency.
-    function appendBytesUnchecked(bytes memory buffer, bytes memory data)
+    function appendUnchecked(bytes memory buffer, bytes memory data)
         internal
         pure
     {
@@ -74,7 +75,7 @@ library DynamicBuffer {
                 // Copy 32B chunks from data to buffer.
                 // This may read over data array boundaries and copy invalid
                 // bytes, which doesn't matter in the end since we will
-                // later set the correct buffer length, and have allocated an 
+                // later set the correct buffer length, and have allocated an
                 // additional word to avoid buffer overflow.
                 mstore(copyTo, mload(data))
             }
@@ -87,11 +88,8 @@ library DynamicBuffer {
     /// @notice Appends data to buffer, and update buffer length
     /// @param buffer the buffer to append the data to
     /// @param data the data to append
-    /// @dev Performs out-of-bound checks and calls `appendBytes`.
-    function appendBytesSafe(bytes memory buffer, bytes memory data)
-        internal
-        pure
-    {
+    /// @dev Performs out-of-bound checks and calls `appendUnchecked`.
+    function appendSafe(bytes memory buffer, bytes memory data) internal pure {
         uint256 capacity;
         uint256 length;
         assembly {
@@ -103,6 +101,6 @@ library DynamicBuffer {
             length + data.length <= capacity,
             "DynamicBuffer: Appending out of bounds."
         );
-        appendBytesUnchecked(buffer, data);
+        appendUnchecked(buffer, data);
     }
 }

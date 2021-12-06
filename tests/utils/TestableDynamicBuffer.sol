@@ -22,7 +22,7 @@ contract TestableDynamicBuffer {
         bytes memory buffer = DynamicBuffer.allocate(capacity);
 
         for (uint256 idx = 0; idx < repetitions; ++idx) {
-            buffer.appendBytesSafe(bytes(data));
+            buffer.appendSafe(bytes(data));
         }
 
         return string(buffer);
