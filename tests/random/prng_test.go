@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func deploy(t *testing.T) *TestablePRNG {
+func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestablePRNG) {
 	t.Helper()
 
 	sim := ethtest.NewSimulatedBackendTB(t, 1)
@@ -22,11 +22,11 @@ func deploy(t *testing.T) *TestablePRNG {
 		t.Fatalf("DeployTestablePRNG() error %v", err)
 	}
 
-	return prng
+	return sim, prng
 }
 
 func TestRead(t *testing.T) {
-	prng := deploy(t)
+	_, prng := deploy(t)
 	tests := []struct {
 		seedFrom                  string
 		bitsPerSample, numSamples uint64
@@ -34,22 +34,22 @@ func TestRead(t *testing.T) {
 		{
 			seedFrom:      "a",
 			bitsPerSample: 8,
-			numSamples:    5000,
+			numSamples:    5_000,
 		},
 		{
 			seedFrom:      "b",
 			bitsPerSample: 5,
-			numSamples:    5000,
+			numSamples:    5_000,
 		},
 		{
 			seedFrom:      "c",
 			bitsPerSample: 7,
-			numSamples:    5000,
+			numSamples:    10_000,
 		},
 		{
 			seedFrom:      "d",
 			bitsPerSample: 3,
-			numSamples:    7500,
+			numSamples:    7_500,
 		},
 	}
 
@@ -108,11 +108,10 @@ func TestRead(t *testing.T) {
 					Remain:  big.NewInt(256 - int64(tt.bitsPerSample*tt.numSamples)%256),
 				}
 
-				// PRNG fills the entropy pool with keccak256(seed||counter) and
-				// then increments the counter. We must therefore decrease the
-				// counter when regenerating the expected entropy.
+				// PRNG increments the counter and then fills the entropy pool
+				// with keccak256(seed||counter).
 				entropy := new(big.Int).Lsh(wantState.Seed, 256)
-				entropy.Add(entropy, new(big.Int).Sub(wantState.Counter, big.NewInt(1)))
+				entropy.Add(entropy, wantState.Counter)
 				// It's important not to use entropy.Bytes() here as we MUST
 				// have exactly 64 bytes to be hashed.
 				buf := make([]byte, 64)
@@ -133,7 +132,7 @@ func TestRead(t *testing.T) {
 }
 
 func TestBitLength(t *testing.T) {
-	prng := deploy(t)
+	_, prng := deploy(t)
 
 	for _, in := range []uint64{0, 1, 2, 3, 4, 5, 63, 64, 127, 128, 255, 256, math.MaxUint64} {
 		want := bits.Len64(in)
@@ -152,7 +151,7 @@ func TestBitLength(t *testing.T) {
 }
 
 func TestReadLessThan(t *testing.T) {
-	prng := deploy(t)
+	_, prng := deploy(t)
 
 	const n = uint16(1e4)
 
@@ -172,5 +171,41 @@ func TestReadLessThan(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestStoreAndLoad(t *testing.T) {
+	// The tests for store() and loadSource() are performed by TestablePRNG
+	// itself, by asserting that a series of calls to read() are identical. This
+	// Go test merely triggers the function and checks that there's no error.
+
+	tests := []struct {
+		bits, beforeStore uint16
+	}{
+		{
+			// Used bits mod 256 == 0
+			bits:        16,
+			beforeStore: 32,
+		},
+		{
+			// Used bits mod 256 != 0
+			bits:        19,
+			beforeStore: 17,
+		},
+		{
+			bits:        253,
+			beforeStore: 10,
+		},
+	}
+
+	for i, tt := range tests {
+		var seed [32]byte
+		seed[31] = byte(i + 1)
+
+		sim, prng := deploy(t)
+
+		if _, err := prng.TestStoreAndLoad(sim.Acc(0), seed, tt.bits, tt.beforeStore); err != nil {
+			t.Errorf("StoreAndLoad(%#x, %d, %d) error %v", seed, tt.bits, tt.beforeStore, err)
+		}
 	}
 }

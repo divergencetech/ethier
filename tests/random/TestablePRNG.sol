@@ -3,10 +3,12 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../../contracts/random/PRNG.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 /// @notice Testing contract that exposes functionality of the PRNG library.
 contract TestablePRNG {
     using PRNG for PRNG.Source;
+    using Strings for uint256;
 
     /**
     @notice Representation of the internal state of a PRNG.Source.
@@ -67,5 +69,60 @@ contract TestablePRNG {
             samples[i] = src.readLessThan(max, bits);
         }
         return samples;
+    }
+
+    uint256[2] public storedSource;
+
+    /**
+    @notice Tests store() and loadSource().
+    @dev Makes `beforeStore` calls to read(bits) to ensure a non-zero
+    state in the Source, stores it to storedSource and immediately reloads it to
+    a different Source. Internal state of both copies is also compared before
+    100 additional reads are asserted to be identical.
+     */
+    function testStoreAndLoad(
+        bytes32 seed,
+        uint16 bits,
+        uint16 beforeStore
+    ) public {
+        PRNG.Source src = PRNG.newSource(seed);
+        for (uint256 i = 0; i < beforeStore; i++) {
+            src.read(bits);
+        }
+
+        src.store(storedSource);
+        PRNG.Source copy = PRNG.loadSource(storedSource);
+
+        // Confirm that we've actually round-tripped the internal state via
+        // storage and not just copied it.
+        require(
+            PRNG.Source.unwrap(src) != PRNG.Source.unwrap(copy),
+            "Identical Sources, not a copy"
+        );
+
+        (
+            uint256 seed0,
+            uint256 counter0,
+            uint256 entropy0,
+            uint256 remain0
+        ) = src.state();
+        (
+            uint256 seed1,
+            uint256 counter1,
+            uint256 entropy1,
+            uint256 remain1
+        ) = copy.state();
+
+        require(seed0 == seed1, "Seeds differ");
+        require(counter0 == counter1, "Counters differ");
+        require(remain0 == remain1, "Remaining bits differ");
+        // Test the entropy last as it's derived from the other values so a
+        // revert() from one of them is more informative.
+        require(entropy0 == entropy1, "Entropy differs");
+
+        // Although unnecessary given the check of state, merely being thorough.
+        for (uint256 i = 0; i < 100; i++) {
+            assert(src.read(bits) == copy.read(bits));
+        }
     }
 }

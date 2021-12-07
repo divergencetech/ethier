@@ -31,19 +31,25 @@ library PRNG {
             mstore(0x40, add(src, 0x80))
             mstore(src, seed)
         }
-        _refill(src);
+        // DO NOT call _refill() on the new Source as newSource() is also used
+        // by loadSource(), which implements its own state modifications. The
+        // first call to read() on a fresh Source will induce a call to
+        // _refill().
     }
 
     /**
     @dev Hashes seed||counter, placing it in the entropy word, and resets the
-    remaining bits to 256. Increments the counter ready for the next refill.
+    remaining bits to 256. Increments the counter BEFORE the refill (ie 0 is
+    never used) as this simplifies round-tripping with store() and loadSource()
+    because the stored counter state is the same as the one used for deriving
+    the entropy pool.
      */
     function _refill(Source src) private pure {
         assembly {
-            mstore(add(src, ENTROPY), keccak256(src, 0x40))
-            mstore(add(src, REMAIN), 256)
             let ctr := add(src, COUNTER)
             mstore(ctr, add(1, mload(ctr)))
+            mstore(add(src, ENTROPY), keccak256(src, 0x40))
+            mstore(add(src, REMAIN), 256)
         }
     }
 
@@ -174,5 +180,54 @@ library PRNG {
             entropy := mload(add(src, ENTROPY))
             remain := mload(add(src, REMAIN))
         }
+    }
+
+    /**
+    @notice Stores the state of the Source in a 2-word buffer. See loadSource().
+    @dev The layout of the stored state MUST NOT be considered part of the
+    public API, and is subject to change without warning. It is therefore only
+    safe to rely on stored Sources _within_ contracts, but not _between_ them.
+     */
+    function store(Source src, uint256[2] storage stored) internal {
+        uint256 seed;
+        // Counter will never be as high as 2^247 (because the sun will have
+        // depleted by then) and remain is in [0,256], so pack them to save 20k
+        // gas on an SSTORE.
+        uint256 packed;
+        assembly {
+            seed := mload(src)
+            packed := add(
+                shl(9, mload(add(src, COUNTER))),
+                mload(add(src, REMAIN))
+            )
+        }
+        stored[0] = seed;
+        stored[1] = packed;
+        // Not storing the entropy as it can be recalculated later.
+    }
+
+    /**
+    @notice Recreates a Source from the state stored with store().
+     */
+    function loadSource(uint256[2] storage stored)
+        internal
+        view
+        returns (Source)
+    {
+        Source src = newSource(bytes32(stored[0]));
+        uint256 packed = stored[1];
+        uint256 counter = packed >> 9;
+        uint256 remain = packed & 511;
+
+        assembly {
+            mstore(add(src, COUNTER), counter)
+            mstore(add(src, REMAIN), remain)
+
+            // Has the same effect on internal state as as _refill() then
+            // read(256-rem).
+            let ent := shr(sub(256, remain), keccak256(src, 0x40))
+            mstore(add(src, ENTROPY), ent)
+        }
+        return src;
     }
 }
