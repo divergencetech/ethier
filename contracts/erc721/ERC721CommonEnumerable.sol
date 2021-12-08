@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
+// Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
 import "./ERC721Common.sol";

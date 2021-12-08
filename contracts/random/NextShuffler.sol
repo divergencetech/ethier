@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
+// Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.9 <0.9.0;
 
 import "./PRNG.sol";
@@ -69,7 +69,7 @@ contract NextShuffler {
      */
     function _next(PRNG.Source src) internal returns (uint256) {
         require(shuffled < NUM_TO_SHUFFLE, "NextShuffler: finished");
-        
+
         uint256 j = src.readLessThan(NUM_TO_SHUFFLE - shuffled) + shuffled;
         emit ShuffledWith(shuffled, j);
 
