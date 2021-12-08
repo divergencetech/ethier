@@ -15,6 +15,19 @@ contract TestableRaffleRunner is RaffleRunner {
 
     function reserve(uint128 num) public payable {
         /**
+        NOTE: in an actual deployment, this function MUST be protected with
+        whatever logic is appropriate for defining who can reserve a guaranteed
+        entry.
+
+        e.g.
+        import "@divergencetech/ethier/contracts/crypto/SignatureChecker.sol";
+        …
+        using SignatureChecker for EnumerableSet.AddressSet;
+        …
+        signers.validateSignature(msg.sender, sig);
+         */
+
+        /**
         TEST CODE ONLY. An exposed reserve() function MUST implement logic to
         determine whether the sender is allowed to reserve a ticket gauranteed
         to win.
@@ -25,6 +38,7 @@ contract TestableRaffleRunner is RaffleRunner {
     mapping(address => uint128) public wins;
 
     function redeemRaffleWins(address winner, uint128 num) internal override {
+        // e.g. Mint an ERC721
         wins[winner] += num;
     }
 }

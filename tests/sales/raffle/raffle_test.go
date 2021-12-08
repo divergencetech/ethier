@@ -2,6 +2,7 @@ package raffle
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 
 const (
 	deployer = iota
+	vandal
 )
 
 func deploy(t *testing.T, maxWinners int64, cost *big.Int) (*ethtest.SimulatedBackend, *TestableRaffleRunner, *Raffle, common.Address) {
@@ -62,18 +64,40 @@ func TestEndToEnd(t *testing.T) {
 		cost        = 1 // Ether
 		reserveFor  = 2
 		reserveEach = 3
+		reserveFree = 4
 		entrants    = 50
 	)
 	sim, runner, raffle, raffleAddr := deploy(t, maxWinners, eth.Ether(cost))
 
 	var totalEntries int64
 
+	const (
+		reservedFreeAcc = iota + vandal + 1
+		reservedPaidAcc0
+		reservedPaidAcc1
+	)
+
+	t.Run("free reservation by owner", func(t *testing.T) {
+		_, err := raffle.ReserveFree(sim.Acc(vandal), sim.Acc(vandal).From, big.NewInt(1))
+		if diff := ethtest.RevertDiff(err, "Ownable: caller is not the owner"); diff != "" {
+			t.Errorf("ReserveFree() called by non-owner; %s", diff)
+		}
+		wantEntrantState(t, raffle, sim.Acc(vandal).From, 0, 0)
+
+		if _, err := raffle.ReserveFree(sim.Acc(deployer), sim.Acc(reservedFreeAcc).From, big.NewInt(reserveFree)); err != nil {
+			t.Fatalf("ReserveFree() called by owner; error %v", err)
+		}
+		wantEntrantState(t, raffle, sim.Acc(reservedFreeAcc).From, reserveFree, reserveFree)
+		totalEntries += reserveFree
+	})
+
 	for i := 0; i < reserveFor; i++ {
 		totalEntries += reserveEach
-		if _, err := runner.Reserve(sim.WithValueFrom(i, eth.Ether(cost*reserveEach)), big.NewInt(reserveEach)); err != nil {
+		acc := reservedPaidAcc0 + i
+		if _, err := runner.Reserve(sim.WithValueFrom(acc, eth.Ether(cost*reserveEach)), big.NewInt(reserveEach)); err != nil {
 			t.Fatalf("Reserve(%d) error %v", reserveEach, err)
 		}
-		wantEntrantState(t, raffle, sim.Acc(i).From, reserveEach, reserveEach)
+		wantEntrantState(t, raffle, sim.Acc(acc).From, reserveEach, reserveEach)
 	}
 
 	for i := 0; i < entrants; i++ {
@@ -81,13 +105,20 @@ func TestEndToEnd(t *testing.T) {
 		totalEntries += entries
 
 		entrant := sim.WithValueFrom(i, eth.Ether(cost*entries))
-		if _, err := raffle.Enter(entrant, entrant.From, big.NewInt(entries)); err != nil {
+		tx, err := raffle.Enter(entrant, entrant.From, big.NewInt(entries))
+		if err != nil {
 			t.Fatalf("Enter(%d) error %v", entries, err)
 		}
+		ethtest.GasPrice = 100
+		ethtest.LogGas(t, tx, fmt.Sprintf("%d entries", entries))
 
 		wantEntries := entries
 		var wantWins int64
-		if i < reserveFor {
+		switch i {
+		case reservedFreeAcc:
+			wantEntries += reserveFree
+			wantWins = reserveFree
+		case reservedPaidAcc0, reservedPaidAcc1:
 			wantEntries += reserveEach
 			wantWins = reserveEach
 		}
@@ -98,36 +129,24 @@ func TestEndToEnd(t *testing.T) {
 	// set.
 	var entropy [32]byte
 	entropy[0] = 1
-	// The canEnter modifier requires that the contract isn't paused and that
-	// entropy hasn't been set. If we allow entropy to be set without first
-	// pausing then we risk a race condition that might revert some entries and
-	// unfairly cost them gas.
-	_, err := raffle.SetEntropy(sim.Acc(deployer), entropy)
-	if diff := ethtest.RevertDiff(err, "Pausable: not paused"); diff != "" {
-		t.Errorf("SetEntropy() when not paused; %s", diff)
-	}
-	if _, err := raffle.Pause(sim.Acc(deployer)); err != nil {
-		t.Errorf("Pause() error %v", err)
-	}
 
 	noEntries := func(t *testing.T, when, wantRevertMsg string) {
 		t.Helper()
 
-		t.Run("no entries nor reservations when "+when, func(t *testing.T) {
+		t.Run("no entries when "+when, func(t *testing.T) {
 			entrant := sim.WithValueFrom(0, eth.Ether(cost))
 
-			_, err = raffle.Enter(entrant, entrant.From, big.NewInt(1))
+			_, err := raffle.Enter(entrant, entrant.From, big.NewInt(1))
 			if diff := ethtest.RevertDiff(err, wantRevertMsg); diff != "" {
-				t.Errorf("Enter() when paused; %s", diff)
-			}
-
-			_, err = runner.Reserve(entrant, big.NewInt(1))
-			if diff := ethtest.RevertDiff(err, wantRevertMsg); diff != "" {
-				t.Errorf("Reserve() when paused; %s", diff)
+				t.Errorf("Enter() %s", diff)
 			}
 		})
 	}
-	noEntries(t, "paused", "Raffle: closed")
+
+	if _, err := raffle.Pause(sim.Acc(deployer)); err != nil {
+		t.Errorf("Pause() error %v", err)
+	}
+	noEntries(t, "paused", "Pausable: paused")
 
 	if _, err := raffle.SetEntropy(sim.Acc(deployer), entropy); err != nil {
 		t.Fatalf("SetEntropy() error %v", err)
@@ -137,6 +156,21 @@ func TestEndToEnd(t *testing.T) {
 		t.Errorf("Unpause() error %v", err)
 	}
 	noEntries(t, "entropy set", "Raffle: entropy set")
+
+	t.Run("no reservations when entropy set", func(t *testing.T) {
+		const wantRevertMsg = "Raffle: entropy set"
+		entrant := sim.WithValueFrom(0, eth.Ether(cost))
+
+		_, err := runner.Reserve(entrant, big.NewInt(1))
+		if diff := ethtest.RevertDiff(err, wantRevertMsg); diff != "" {
+			t.Errorf("Reserve() %s", diff)
+		}
+
+		_, err = raffle.ReserveFree(sim.Acc(deployer), entrant.From, big.NewInt(1))
+		if diff := ethtest.RevertDiff(err, wantRevertMsg); diff != "" {
+			t.Errorf("ReserveFree() %s", diff)
+		}
+	})
 
 	t.Run("no redeem before shuffle", func(t *testing.T) {
 		_, err := raffle.Redeem(sim.Acc(0), sim.Acc(0).From)
@@ -152,9 +186,17 @@ func TestEndToEnd(t *testing.T) {
 	ethtest.LogGas(t, tx, "Raffle shuffle")
 
 	for i := 0; i < entrants; i++ {
-		if _, err := raffle.Redeem(sim.Acc(i), sim.Acc(i).From); err != nil {
+		entrant, err := raffle.Entrants(nil, sim.Acc(i).From)
+		if err != nil {
+			entrant.Entries = big.NewInt(-1)
+			entrant.Wins = big.NewInt(-1)
+		}
+
+		tx, err := raffle.Redeem(sim.Acc(i), sim.Acc(i).From)
+		if err != nil {
 			t.Fatalf("Redeem() error %v", err)
 		}
+		ethtest.LogGas(t, tx, fmt.Sprintf("Redeem %d entries with %d wins", entrant.Entries, entrant.Wins))
 	}
 
 	t.Run("refunds", func(t *testing.T) {
@@ -220,7 +262,7 @@ func TestEndToEnd(t *testing.T) {
 	})
 
 	t.Run("withdrawal", func(t *testing.T) {
-		wantRevenues := eth.Ether(cost * maxWinners)
+		wantRevenues := eth.Ether(cost * (maxWinners - reserveFree))
 
 		if got := sim.BalanceOf(ctx, t, raffleAddr); got.Cmp(wantRevenues) != 0 {
 			t.Errorf("Balance of raffle contract after all redemptions; got %d; want %d", got, wantRevenues)

@@ -2,9 +2,9 @@
 // Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "./IRaffleRunner.sol";
-import "../../random/PRNG.sol";
-import "../../utils/OwnerPausable.sol";
+import "../IRaffleRunner.sol";
+import "../../../random/PRNG.sol";
+import "../../../utils/OwnerPausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
@@ -12,9 +12,9 @@ import "@openzeppelin/contracts/utils/Address.sol";
 @notice Provides a raffle mechanism with additional guaranteed pre-reservation.
 This is well-suited to use as an NFT mint pass as entry and refunds require
 minimal gas while redemption can be performed at a time when the gas price is
-lower.
-@dev Entries are fungible, removing the need to track tickets held by a
+lower. Entries are fungible, removing the need to track tickets held by a
 particular address.
+@dev Do not deploy a Raffle directly. Instead inherit from RaffleRunner.
 
 Intended usage: like OpenZeppelin's escrow contracts, this contract should be a
 standalone contract that only interacts with the RaffleRunner that instantiated
@@ -54,7 +54,7 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
     @notice Tracks the number of times a particular address has entered / won.
     @dev Raffle tickets are fungible so there's no need to track specific
     instances; this also makes pre-reservation as simple as simultaneously
-    incrementing a Entrant's entries and wins by the number of pre-reserved
+    incrementing an Entrant's entries and wins by the number of pre-reserved
     tickets.
      */
     struct Entrant {
@@ -69,7 +69,7 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
     @notice Total number of winners thus far.
     @dev Incremented in line with every Entrant.wins in the entrants map, but
     not decremented upon redemption. If it costs to enter the raffle then the
-    beneficiaries MUST NOT receive more than _totalWinners * cost payment at any
+    beneficiaries MUST NOT receive more than totalWinners * cost payment at any
     time.
      */
     uint256 private totalWinners;
@@ -81,12 +81,24 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
     }
 
     /**
-    @notice Requires that the raffle is in a state to accept new entrants.
+    @notice Requires that the shuffling entropy is not yet set, so it's safe to
+    accept new entrants.
      */
-    modifier canEnter() {
-        require(!Pausable.paused(), "Raffle: closed");
-        requireEntropyNotSet();
+    modifier entropyNotSet() {
+        require(uint256(entropy) == 0, "Raffle: entropy set");
         _;
+    }
+
+    /**
+    @notice Reserves the specified number of guaranteed winning tickets for the
+    entrant, without requiring payment.
+    @dev This uses the same logic as the payable reserve() but also increments
+    the `withdrawn` funds variable to mimic the owner buying and immediately
+    withdrawing the funds (effectively identical to a free reservation).
+     */
+    function reserveFree(address entrant, uint128 num) external onlyOwner {
+        _reserve(entrant, num);
+        withdrawn += num * entryCost;
     }
 
     /**
@@ -95,16 +107,15 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
     @dev MUST be called from the RaffleRunner, which is responsible for all
     logic determining who may reserve.
      */
-    function reserve(address entrant, uint128 num)
-        external
-        payable
-        canEnter
-        costs(num)
-    {
+    function reserve(address entrant, uint128 num) external payable costs(num) {
         require(
             msg.sender == address(runner),
             "Raffle: only runner can reserve"
         );
+        _reserve(entrant, num);
+    }
+
+    function _reserve(address entrant, uint128 num) private entropyNotSet {
         uint256 total = totalWinners + num;
         require(total <= maxWinners, "Raffle: too many reserved");
 
@@ -117,7 +128,7 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
     /**
     @notice Together, these store a bi-directional mapping from address to
     uint32 identifier, with O(1) lookup.
-    @dev Using these IDs instead of raw address in the _entries array reduces
+    @dev Using these IDs instead of raw address in the entries array reduces
     gas for 5 entries by 19% and for choosing 1024 winners from 5000 entries by
     25%. Reduction to uint16 has no extra gain for entry and minimal further
     gain for shuffling, but limits to 65k participating addresses. See _idFor().
@@ -128,7 +139,7 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
     /**
     @notice Returns the already-assigned or new ID for the address.
     @dev Mappings will always return a default value even if a key doesn't
-    exist. We therefore store the index from the _ids array, incremented by one
+    exist. We therefore store the index from the ids array, incremented by one
     to differentiate between the first entrant and new ones.
      */
     function idFor(address entrant) private returns (uint32) {
@@ -149,7 +160,8 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
     function enter(address entrant, uint128 num)
         external
         payable
-        canEnter
+        whenNotPaused
+        entropyNotSet
         costs(num)
     {
         entrants[entrant].entries += num;
@@ -167,19 +179,13 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
      */
     bytes32 public entropy;
 
-    /// @dev Requires that `entropy` == 0.
-    function requireEntropyNotSet() private view {
-        require(uint256(entropy) == 0, "Raffle: entropy set");
-    }
-
-    /**
-    @notice Sets the randomisation entropy source.
-    @dev The whenPaused modifier avoids a race condition with calls to enter().
-     */
-    function setEntropy(bytes32 entropy_) external onlyOwner whenPaused {
-        requireEntropyNotSet();
+    /// @notice Sets the randomisation entropy source.
+    function setEntropy(bytes32 entropy_) external onlyOwner entropyNotSet {
         entropy = entropy_;
     }
+
+    /// @notice Flag indicating that shuffle() has assigned winners.
+    bool public winnersAssigned;
 
     /**
     @notice Shuffle the entrants and assign the winners.
@@ -199,7 +205,11 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
         // shuffle.
         uint256 j = entries.length;
         if (j < available) {
-            assignWinners(j);
+            for (uint256 i = 0; i < j; i++) {
+                entrants[addresses[entries[i]]].wins++;
+            }
+            totalWinners += j;
+            winnersAssigned = true;
             return;
         }
 
@@ -212,14 +222,17 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
         PRNG.Source src = PRNG.newSource(entropy);
 
         uint256 winner;
-        uint32 swapTmp;
         for (uint256 i = 0; i < available; i++) {
             // Rejection sampling from the last j entrants.
             for (winner = j; winner >= j; winner = src.read(bits)) {}
-            winner += i; // Don't swap out existing winners
-            swapTmp = entries[i];
-            entries[i] = entries[winner];
-            entries[winner] = swapTmp;
+            winner += i; // Don't swap out existing winners; i.e. _last_ j.
+
+            // Instead of moving the winner earlier in the array, just increment
+            // their wins and swap the i'th entry to the winner's original
+            // position so they're still in with a chance. Fisher–Yates never
+            // touches already-selected elements so our approach is ok.
+            entrants[addresses[entries[winner]]].wins++;
+            entries[winner] = entries[i];
 
             if (j & (j - 1) == 0) {
                 // j is a power of 2
@@ -228,18 +241,7 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
             j--;
         }
 
-        assignWinners(available);
-    }
-
-    /// @notice Flag indicating that shuffle() has assigned winners.
-    bool public winnersAssigned;
-
-    /// @notice Increments winning entrants' win count.
-    function assignWinners(uint256 n) private {
-        for (uint256 i = 0; i < n; i++) {
-            entrants[addresses[entries[i]]].wins++;
-        }
-        totalWinners += n;
+        totalWinners += available;
         winnersAssigned = true;
     }
 
@@ -310,6 +312,7 @@ contract Raffle is OwnerPausable, ReentrancyGuard {
         external
         payable
         whenWinnersAssigned
+        whenNotPaused
         costs(num)
     {
         require(

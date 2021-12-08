@@ -3,11 +3,14 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "./IRaffleRunner.sol";
-import "./Raffle.sol";
+import "./internal/Raffle.sol";
 
 /**
-@dev Similarly to OpenZeppelin escrow contracts, a Raffle MUST be a separate
-contract, responsible for its own funds.
+@dev Do not deploy a Raffle directly; instead inherit from RaffleRunner to
+deploy an independent Raffle contract. Similarly to OpenZeppelin escrow
+contracts, a Raffle MUST be a separate contract, responsible for its own funds.
+
+TODO: copy comments from Raffle re rationale.
  */
 abstract contract RaffleRunner is IRaffleRunner {
     Raffle public immutable raffle;
