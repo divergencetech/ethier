@@ -10,6 +10,7 @@ import (
 	"github.com/divergencetech/ethier/ethtest"
 	"github.com/dustin/go-humanize"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/google/go-cmp/cmp"
 )
 
 func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestablePRNG) {
@@ -70,7 +71,7 @@ func TestRead(t *testing.T) {
 			var seed [32]byte
 			copy(seed[:], crypto.Keccak256([]byte(tt.seedFrom)))
 
-			samples, _, err := prng.Sample(nil, seed, uint16(tt.bitsPerSample), uint16(tt.numSamples))
+			samples, state, err := prng.Sample(nil, seed, uint16(tt.bitsPerSample), uint16(tt.numSamples))
 			if err != nil {
 				t.Fatalf("Sample(%x, 8 bits, 1000 samples) error %v", seed, err)
 			}
@@ -171,35 +172,44 @@ func TestRead(t *testing.T) {
 				}
 			})
 
-			// t.Run("internal state", func(t *testing.T) {
-			// 	// This test is primarily in place to confirm that the assembly
-			// 	// implementation works as intended when converted to a
-			// 	// high-level, more readable equivalent.
-			// 	wantState := TestablePRNGState{
-			// 		Seed:    new(big.Int).SetBytes(seed[:]),
-			// 		Remain:  big.NewInt(256 - int64(tt.bitsPerSample*tt.numSamples)%256),
-			// 	}
+			t.Run("internal state", func(t *testing.T) {
+				// // This test is primarily in place to confirm that the assembly
+				// // implementation works as intended when converted to a
+				// // high-level, more readable equivalent.
 
-			// 	// PRNG fills the entropy pool with keccak256(seed||counter) and
-			// 	// then increments the counter. We must therefore decrease the
-			// 	// counter when regenerating the expected entropy.
-			// 	entropy := new(big.Int).Lsh(wantState.Seed, 256)
-			// 	entropy.Add(entropy, new(big.Int).Sub(wantState.Counter, big.NewInt(1)))
-			// 	// It's important not to use entropy.Bytes() here as we MUST
-			// 	// have exactly 64 bytes to be hashed.
-			// 	buf := make([]byte, 64)
-			// 	entropy.FillBytes(buf)
-			// 	// Some of the entropy has depleted; we know how much from
-			// 	// Remain.
-			// 	wantState.Entropy = new(big.Int).Rsh(
-			// 		new(big.Int).SetBytes(crypto.Keccak256(buf)),
-			// 		uint(256-wantState.Remain.Uint64()),
-			// 	)
+				seedInt := new(big.Int).SetBytes(seed[:])
+				two128 := new(big.Int).Lsh(big.NewInt(1), 128)
 
-			// 	if diff := cmp.Diff(wantState, state, ethtest.Comparers()...); diff != "" {
-			// 		t.Errorf("After %d samples of %d bits each; internal state diff (-want +got):\n%s", tt.numSamples, tt.bitsPerSample, diff)
-			// 	}
-			// })
+				// first 128 bits of seed
+				carry := new(big.Int).Rsh(seedInt, 128)
+
+				// last 128 bits of seed
+				number := new(big.Int).Mod(seedInt, two128)
+
+				factor := new(big.Int).Sub(two128, big.NewInt(10408))
+
+				// Performing MWC updates
+				nRefills := (tt.numSamples * tt.bitsPerSample) / 128
+				for k := uint64(0); k < nRefills; k++ {
+					tmp := new(big.Int).Mul(factor, number)
+					tmp.Add(tmp, carry)
+
+					carry.Rsh(tmp, 128)
+					number.Mod(tmp, two128)
+				}
+
+				carry.Lsh(carry, 128)
+				entropy := new(big.Int).Add(carry, number)
+
+				wantState := TestablePRNGState{
+					Entropy: entropy,
+					Remain:  big.NewInt(128 - int64(tt.bitsPerSample*tt.numSamples)%128),
+				}
+
+				if diff := cmp.Diff(wantState, state, ethtest.Comparers()...); diff != "" {
+					t.Errorf("After %d samples of %d bits each; internal state diff (-want +got):\n%s", tt.numSamples, tt.bitsPerSample, diff)
+				}
+			})
 		})
 	}
 }

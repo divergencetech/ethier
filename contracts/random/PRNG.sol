@@ -13,7 +13,7 @@ library PRNG {
     type Source is uint256;
 
     uint256 private constant MWC_FACTOR = 2**128-10408;
-    uint256 private constant MWC_BASE = 2**128;
+    // uint256 private constant MWC_BASE = 2**128;
 
     /// @notice Layout within the buffer. 0x00 is the seed.
     uint256 private constant CARRY_AND_NUMBER = 0x00;
@@ -32,6 +32,7 @@ library PRNG {
             src := mload(0x40)
             mstore(0x40, add(src, 0x40))
             mstore(add(src, CARRY_AND_NUMBER), seed)
+            mstore(add(src, REMAIN), 128)
         }
         // DO NOT call _refill() on the new Source as newSource() is also used
         // by loadSource(), which implements its own state modifications. The
