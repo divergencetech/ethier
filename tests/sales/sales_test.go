@@ -315,9 +315,7 @@ func TestTimeBasedDecrease(t *testing.T) {
 	}
 
 	start := timestamp(t) + 60
-	if _, err := auction.SetAuctionStartPoint(sim.Acc(0), big.NewInt(start)); err != nil {
-		t.Fatalf("SetAuctionStartPoint(now+60) error %v", err)
-	}
+	sim.Must(t, "SetAuctionStartPoint(now+60")(auction.SetAuctionStartPoint(sim.Acc(0), big.NewInt(start)))
 
 	// Note: SimulatedBackend has undocumented functionality that adjusts its
 	// clock by 10 seconds for every Commit(). The specifics of the step aren't
@@ -930,12 +928,8 @@ func TestFixedPriceSeller(t *testing.T) {
 func TestPausing(t *testing.T) {
 	sim, _, auction := deployConstantPrice(t, eth.Ether(0))
 
-	if _, err := auction.Buy(sim.Acc(0), sim.Acc(0).From, big.NewInt(1)); err != nil {
-		t.Fatalf("When not paused, Buy() error %v", err)
-	}
-	if _, err := auction.Pause(sim.Acc(0)); err != nil {
-		t.Fatalf("Pause() error %v", err)
-	}
+	sim.Must(t, "When not paused, Buy()")(auction.Buy(sim.Acc(0), sim.Acc(0).From, big.NewInt(1)))
+	sim.Must(t, "Pause()")(auction.Pause(sim.Acc(0)))
 
 	_, err := auction.Buy(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))
 	if diff := ethtest.RevertDiff(err, "Pausable: paused"); diff != "" {
@@ -976,14 +970,12 @@ func TestUnlimited(t *testing.T) {
 		MaxPerTx:       big.NewInt(0),
 		FreeQuota:      big.NewInt(0),
 	}
-	if _, err := auction.SetSellerConfig(sim.Acc(0), cfg); err != nil {
-		t.Fatalf("SetSellerConfig(%+v) error %v", cfg, err)
-	}
+	sim.Must(t, "SetSellerConfig(%+v)", cfg)(auction.SetSellerConfig(sim.Acc(0), cfg))
 
 	buyer := sim.WithValueFrom(0, big.NewInt(total))
-	if _, err := auction.Buy(buyer, buyer.From, big.NewInt(total)); err != nil {
-		t.Errorf("Buy(%d) with unlimited transaction and address limits; error %v", int(total), err)
-	}
+	sim.Must(t, "Buy(%d) with unlimited transaction / address limits", int(total))(
+		auction.Buy(buyer, buyer.From, big.NewInt(total)),
+	)
 
 	_, err := auction.Buy(buyer, buyer.From, big.NewInt(1))
 	if diff := ethtest.RevertDiff(err, "Seller: Sold out"); diff != "" {
@@ -1020,9 +1012,7 @@ func TestReservedFreePurchasing(t *testing.T) {
 		MaxPerAddress: big.NewInt(0),
 		MaxPerTx:      big.NewInt(0),
 	}
-	if _, err := auction.SetSellerConfig(sim.Acc(0), cfg); err != nil {
-		t.Fatalf("SetSellerConfig(%+v) error %v", cfg, err)
-	}
+	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(0), cfg))
 
 	t.Run("only owner purchases free", func(t *testing.T) {
 		_, err := auction.PurchaseFreeOfCharge(sim.Acc(1), sim.Acc(1).From, big.NewInt(1))
@@ -1034,9 +1024,8 @@ func TestReservedFreePurchasing(t *testing.T) {
 
 	t.Run("reserved free quota honoured", func(t *testing.T) {
 		n := big.NewInt(totalInventory - freeQuota)
-		if _, err := auction.Buy(sim.WithValueFrom(0, n), sim.Acc(0).From, n); err != nil {
-			t.Errorf("Buy(totalInventory - freeQuota) error %v", err)
-		}
+		sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(0, n), sim.Acc(0).From, n))
+
 		_, err := auction.Buy(sim.WithValueFrom(0, big.NewInt(1)), sim.Acc(0).From, big.NewInt(1))
 		if diff := ethtest.RevertDiff(err, "Seller: Sold out"); diff != "" {
 			t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) %s", diff)
@@ -1046,9 +1035,8 @@ func TestReservedFreePurchasing(t *testing.T) {
 	})
 
 	t.Run("free quota enforced", func(t *testing.T) {
-		if _, err := auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota)); err != nil {
-			t.Errorf("PurchaseFreeOfCharge(freeQuota) error %v", err)
-		}
+		sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota)))
+
 		_, err := auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))
 		if diff := ethtest.RevertDiff(err, "Seller: Free quota exceeded"); diff != "" {
 			t.Errorf("PurchaseFreeOfCharge(1) after exhausting quota; %s", diff)
@@ -1074,26 +1062,23 @@ func TestUnreservedFreePurchasing(t *testing.T) {
 		MaxPerAddress: big.NewInt(0),
 		MaxPerTx:      big.NewInt(0),
 	}
-	if _, err := auction.SetSellerConfig(sim.Acc(0), cfg); err != nil {
-		t.Fatalf("SetSellerConfig(%+v) error %v", cfg, err)
-	}
+	sim.Must(t, "SetSellerConfig(%+v)", cfg)(auction.SetSellerConfig(sim.Acc(0), cfg))
 
 	t.Run("unreserved free quota ignored", func(t *testing.T) {
 		n := big.NewInt(totalInventory - freeQuota)
-		if _, err := auction.Buy(sim.WithValueFrom(0, n), sim.Acc(0).From, n); err != nil {
-			t.Errorf("Buy(totalInventory - freeQuota) error %v", err)
-		}
-		if _, err := auction.Buy(sim.WithValueFrom(0, big.NewInt(1)), sim.Acc(0).From, big.NewInt(1)); err != nil {
-			t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) error %v", err)
-		}
+		sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(0, n), sim.Acc(0).From, n))
+		sim.Must(t, "After Buy(totalInventory - freeQuota); Buy(1)")(
+			auction.Buy(sim.WithValueFrom(0, big.NewInt(1)), sim.Acc(0).From, big.NewInt(1)),
+		)
 
 		wantOwned(t, auction, sim.Acc(0).From, totalInventory-freeQuota+1, 0)
 	})
 
 	t.Run("total inventory honoured even if free", func(t *testing.T) {
-		if _, err := auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota-1)); err != nil {
-			t.Errorf("PurchaseFreeOfCharge(freeQuota-1) error %v", err)
-		}
+		sim.Must(t, "PurchsaeFreeOfCharge(freeQuota-1)")(
+			auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota-1)),
+		)
+
 		_, err := auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))
 		if diff := ethtest.RevertDiff(err, "Seller: Sold out"); diff != "" {
 			t.Errorf("PurchaseFreeOfCharge(1) when last unreserved quota already sold; %s", diff)

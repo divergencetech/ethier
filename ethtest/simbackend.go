@@ -163,3 +163,38 @@ func (sb *SimulatedBackend) GasSpent(ctx context.Context, tb testing.TB, tx *typ
 	}
 	return new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(rcpt.GasUsed))
 }
+
+// Must returns a function that ensures a successful transaction, reporting any
+// error on tb.Fatal, or propagating the transaction.
+//
+// Intended usage:
+//  sb.Must(t, "ContractFunc()")(foo.ContractFunc(sim.Acc(<acc>), …))
+//
+// The description format and associated args will be used as a prefix in any
+// reported errors. The returned function MUST be used immediately, and can only
+// be used once.
+func (sb *SimulatedBackend) Must(tb testing.TB, descFormat string, descArgs ...interface{}) func(*types.Transaction, error) *types.Transaction {
+	// This function is "naughty" and not strictly within idiomatic Go
+	// style. Similarly to how contexts mustn't be held within structs, holding
+	// a testing.T risks it becoming irrelevant with respect to the scope within
+	// which it's used. To avoid this, we limit the returned function to single
+	// use; it's not a perfect solution, but a user would have to deliberately
+	// misuse the API.
+	var used bool
+
+	desc := fmt.Sprintf(descFormat, descArgs...)
+
+	return func(tx *types.Transaction, err error) *types.Transaction {
+		tb.Helper()
+		if used {
+			tb.Errorf("Function returned by %T.Must(%q) must only be used once", sb, desc)
+		}
+		used = true
+
+		if err != nil {
+			tb.Fatalf("%s; got err %v; want nil err", desc, err)
+			return nil
+		}
+		return tx
+	}
+}
