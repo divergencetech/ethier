@@ -5,18 +5,17 @@ pragma solidity >=0.8.9 <0.9.0;
 library PRNG {
     /**
     @notice A source of random numbers.
-    @dev Pointer to a 3-word buffer of {seed, entropy, remaining unread
+    @dev Pointer to a 2-word buffer of {carry || number, remaining unread
     bits}. however, note that this is abstracted away by the API and SHOULD NOT
     be used. This layout MUST NOT be considered part of the public API and
     therefore not relied upon even within stable versions.
      */
     type Source is uint256;
 
+    /// @notice The biggest safe prime for modulus 2**128
     uint256 private constant MWC_FACTOR = 2**128-10408;
-    // uint256 private constant MWC_BASE = 2**128;
 
-    /// @notice Layout within the buffer. 0x00 is the seed.
-    uint256 private constant CARRY_AND_NUMBER = 0x00;
+    /// @notice Layout within the buffer. 0x00 is the current (carry || number)
     uint256 private constant REMAIN = 0x20;
 
     /**
@@ -26,12 +25,13 @@ library PRNG {
     such as Chainlink VRF, or a commit-and-reveal protocol MUST be used if
     unpredictability is required. The latter is only appropriate if the contract
     owner can be trusted within the specified threat model.
+    @dev The 256bit seed is used to initialize carry || number
      */
     function newSource(bytes32 seed) internal pure returns (Source src) {
         assembly {
             src := mload(0x40)
             mstore(0x40, add(src, 0x40))
-            mstore(add(src, CARRY_AND_NUMBER), seed)
+            mstore(src, seed)
             mstore(add(src, REMAIN), 128)
         }
         // DO NOT call _refill() on the new Source as newSource() is also used
@@ -45,17 +45,15 @@ library PRNG {
     algorithm and resets the remaining bits to 128.
     `nextNumber = (factor * number + carry) mod 2**128`
     `nextCarry  = (factor * number + carry) //  2**128`
-    The CARRY_AND_NUMBER word in `src` contains carry||number that are used for
-    the scheme and are updated accordingly.
      */
     function _refill(Source src) private pure {
         assembly {
-            let carryAndNumber := mload(add(src, CARRY_AND_NUMBER))
+            let carryAndNumber := mload(src)
             let rand := and(carryAndNumber, 0xffffffffffffffffffffffffffffffff)
             let carry := shr(128, carryAndNumber)
             let tmp := add(mul(MWC_FACTOR, rand), carry)
             mstore(add(src, REMAIN), 128)
-            mstore(add(src, CARRY_AND_NUMBER), tmp)
+            mstore(src, tmp)
         }
     }
 
@@ -98,8 +96,7 @@ library PRNG {
         returns (uint256 sample)
     {
         assembly {
-            let pool := add(src, CARRY_AND_NUMBER)
-            let ent := mload(pool)
+            let ent := mload(src)
             let rem := add(src, REMAIN)
             let remain := mload(rem)
             sample := shr(sub(256, bits), shl(sub(256, remain), ent))
@@ -149,7 +146,7 @@ library PRNG {
     number of bits required to capture n; if this is not known, use
     readLessThan(Source, uint) or bitLength(). Although rejections are reduced
     by using twice the number of bits, this increases the rate at which the
-    entropy pool must be refreshed with a call to keccak256().
+    entropy pool must be refreshed with a call to `_refill`.
 
     TODO: benchmark higher number of bits for rejection vs hashing gas cost.
      */
@@ -178,7 +175,7 @@ library PRNG {
         )
     {
         assembly {
-            entropy := mload(add(src, CARRY_AND_NUMBER))
+            entropy := mload(src)
             remain := mload(add(src, REMAIN))
         }
     }
@@ -193,7 +190,7 @@ library PRNG {
         uint256 carryAndNumber;
         uint256 remain;
         assembly {
-            carryAndNumber := mload(add(src, CARRY_AND_NUMBER))
+            carryAndNumber := mload(src)
             remain := mload(add(src, REMAIN))
         }
         stored[0] = carryAndNumber;
@@ -213,7 +210,7 @@ library PRNG {
         uint256 remain = stored[1];
 
         assembly {
-            mstore(add(src, CARRY_AND_NUMBER), carryAndNumber)
+            mstore(src, carryAndNumber)
             mstore(add(src, REMAIN), remain)
         }
         return src;
