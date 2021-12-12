@@ -12,6 +12,7 @@ import (
 
 	"github.com/divergencetech/ethier/eth"
 	"github.com/divergencetech/ethier/ethtest"
+	"github.com/divergencetech/ethier/ethtest/revert"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -259,8 +260,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 
 			sim.FastForward(big.NewInt(startBlock - 1))
 			t.Run("before start", func(t *testing.T) {
-				_, err := auction.Cost(nil, big.NewInt(1))
-				if diff := ethtest.RevertDiff(err, "LinearDutchAuction: Not started"); diff != "" {
+				if diff := revert.NotStarted.Diff(auction.Cost(nil, big.NewInt(1))); diff != "" {
 					t.Errorf("Cost() before auction start; %s", diff)
 				}
 			})
@@ -474,8 +474,7 @@ func TestZeroStartToDisable(t *testing.T) {
 	const startBlock = 10
 	sim.FastForward(big.NewInt(startBlock))
 
-	_, err := auction.Cost(nil, big.NewInt(1))
-	if diff := ethtest.RevertDiff(err, "LinearDutchAuction: Not started"); diff != "" {
+	if diff := revert.NotStarted.Diff(auction.Cost(nil, big.NewInt(1))); diff != "" {
 		t.Errorf("Cost() when StartPoint==0; %s", diff)
 	}
 
@@ -931,8 +930,7 @@ func TestPausing(t *testing.T) {
 	sim.Must(t, "When not paused, Buy()")(auction.Buy(sim.Acc(0), sim.Acc(0).From, big.NewInt(1)))
 	sim.Must(t, "Pause()")(auction.Pause(sim.Acc(0)))
 
-	_, err := auction.Buy(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))
-	if diff := ethtest.RevertDiff(err, "Pausable: paused"); diff != "" {
+	if diff := revert.Paused.Diff(auction.Buy(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))); diff != "" {
 		t.Errorf("When paused, Buy() %s", diff)
 	}
 }
@@ -946,8 +944,9 @@ func TestReentrancyGuard(t *testing.T) {
 		t.Fatalf("DeployReentrantProxyPurchaser() error %v", err)
 	}
 
-	_, err = attacker.Buy(sim.WithValueFrom(0, eth.Ether(10)), sim.Acc(0).From, big.NewInt(1))
-	if diff := errdiff.Check(err, "ReentrancyGuard: reentrant call"); diff != "" {
+	if diff := revert.Reentrant.Diff(
+		attacker.Buy(sim.WithValueFrom(0, eth.Ether(10)), sim.Acc(0).From, big.NewInt(1)),
+	); diff != "" {
 		t.Errorf("%T.Buy(); invoking Seller._purchase() through reentrant call; %s", attacker, diff)
 	}
 
@@ -977,8 +976,7 @@ func TestUnlimited(t *testing.T) {
 		auction.Buy(buyer, buyer.From, big.NewInt(total)),
 	)
 
-	_, err := auction.Buy(buyer, buyer.From, big.NewInt(1))
-	if diff := ethtest.RevertDiff(err, "Seller: Sold out"); diff != "" {
+	if diff := revert.SoldOut.Diff(auction.Buy(buyer, buyer.From, big.NewInt(1))); diff != "" {
 		t.Errorf("Buy(1) with no more inventory; %s", diff)
 	}
 }
@@ -1015,8 +1013,7 @@ func TestReservedFreePurchasing(t *testing.T) {
 	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(0), cfg))
 
 	t.Run("only owner purchases free", func(t *testing.T) {
-		_, err := auction.PurchaseFreeOfCharge(sim.Acc(1), sim.Acc(1).From, big.NewInt(1))
-		if diff := ethtest.RevertDiff(err, "Ownable: caller is not the owner"); diff != "" {
+		if diff := revert.OnlyOwner.Diff(auction.PurchaseFreeOfCharge(sim.Acc(1), sim.Acc(1).From, big.NewInt(1))); diff != "" {
 			t.Errorf("PurchaseFreeOfCharge() as non-owner; %s", diff)
 		}
 		wantOwned(t, auction, sim.Acc(1).From, 0, 0)
@@ -1026,8 +1023,9 @@ func TestReservedFreePurchasing(t *testing.T) {
 		n := big.NewInt(totalInventory - freeQuota)
 		sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(0, n), sim.Acc(0).From, n))
 
-		_, err := auction.Buy(sim.WithValueFrom(0, big.NewInt(1)), sim.Acc(0).From, big.NewInt(1))
-		if diff := ethtest.RevertDiff(err, "Seller: Sold out"); diff != "" {
+		if diff := revert.SoldOut.Diff(
+			auction.Buy(sim.WithValueFrom(0, big.NewInt(1)), sim.Acc(0).From, big.NewInt(1)),
+		); diff != "" {
 			t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) %s", diff)
 		}
 
@@ -1037,8 +1035,8 @@ func TestReservedFreePurchasing(t *testing.T) {
 	t.Run("free quota enforced", func(t *testing.T) {
 		sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota)))
 
-		_, err := auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))
-		if diff := ethtest.RevertDiff(err, "Seller: Free quota exceeded"); diff != "" {
+		c := revert.Checker("Seller: Free quota exceeded")
+		if diff := c.Diff(auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))); diff != "" {
 			t.Errorf("PurchaseFreeOfCharge(1) after exhausting quota; %s", diff)
 		}
 
@@ -1079,9 +1077,16 @@ func TestUnreservedFreePurchasing(t *testing.T) {
 			auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota-1)),
 		)
 
-		_, err := auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))
-		if diff := ethtest.RevertDiff(err, "Seller: Sold out"); diff != "" {
+		if diff := revert.SoldOut.Diff(
+			auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1)),
+		); diff != "" {
 			t.Errorf("PurchaseFreeOfCharge(1) when last unreserved quota already sold; %s", diff)
+		}
+
+		if diff := revert.SoldOut.Diff(
+			auction.Buy(sim.Acc(0), sim.Acc(0).From, big.NewInt(1)),
+		); diff != "" {
+			t.Errorf("Buy(1) when last unreserved quota already sold; %s", diff)
 		}
 
 		wantOwned(t, auction, sim.Acc(0).From, totalInventory, freeQuota-1)

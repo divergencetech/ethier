@@ -7,7 +7,6 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/google/go-cmp/cmp"
-	"github.com/h-fam/errdiff"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -33,12 +32,6 @@ func ExecutionErrData(err error) (interface{}, bool) {
 	default:
 		return nil, false
 	}
-}
-
-// RevertDiff compares the error from a transaction by extracting its data,
-// confirming that it carries a string, and comparing it to `want`.
-func RevertDiff(got error, want string) string {
-	return errdiff.Substring(got, `execution reverted: `+want)
 }
 
 // GasPrice is the assumed gas price, in GWei, when logging transaction costs.
