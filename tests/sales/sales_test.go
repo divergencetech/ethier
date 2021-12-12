@@ -1019,21 +1019,24 @@ func TestReservedFreePurchasing(t *testing.T) {
 		wantOwned(t, auction, sim.Acc(1).From, 0, 0)
 	})
 
+	// Mint some free purchases before the normal sale starts
+	sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1)))
+
 	t.Run("reserved free quota honoured", func(t *testing.T) {
 		n := big.NewInt(totalInventory - freeQuota)
 		sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(0, n), sim.Acc(0).From, n))
 
 		if diff := revert.SoldOut.Diff(
-			auction.Buy(sim.WithValueFrom(0, big.NewInt(1)), sim.Acc(0).From, big.NewInt(1)),
+			auction.Buy(sim.WithValueFrom(1, big.NewInt(1)), sim.Acc(1).From, big.NewInt(1)),
 		); diff != "" {
 			t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) %s", diff)
 		}
 
-		wantOwned(t, auction, sim.Acc(0).From, totalInventory-freeQuota, 0)
+		wantOwned(t, auction, sim.Acc(0).From, totalInventory-freeQuota+1, 1)
 	})
 
 	t.Run("free quota enforced", func(t *testing.T) {
-		sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota)))
+		sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota-1)))
 
 		c := revert.Checker("Seller: Free quota exceeded")
 		if diff := c.Diff(auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))); diff != "" {
