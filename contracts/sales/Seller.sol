@@ -210,10 +210,18 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
             ? requested
             : Math.min(requested, config.maxPerTx);
 
-        uint256 maxAvailable = config.reserveFreeQuota
-            ? config.totalInventory - config.freeQuota
-            : config.totalInventory;
-        n = Math.min(n, maxAvailable - _totalSold.current());
+        uint256 maxAvailable;
+        uint256 sold;
+        
+        if (config.reserveFreeQuota) {
+            maxAvailable = config.totalInventory - config.freeQuota;
+            sold = _totalSold.current() - purchasedFreeOfCharge.current();
+        } else {
+            maxAvailable = config.totalInventory;
+            sold = _totalSold.current();
+        }
+
+        n = Math.min(n, maxAvailable - sold);
         require(n > 0, "Seller: Sold out");
 
         if (config.maxPerAddress > 0) {
