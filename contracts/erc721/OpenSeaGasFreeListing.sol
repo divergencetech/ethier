@@ -8,16 +8,13 @@ pragma solidity >=0.8.0 <0.9.0;
 
 /// @notice Library to achieve gas-free listings on OpenSea.
 library OpenSeaGasFreeListing {
-
     /**
     @notice Convinience function to get the right chainId
      */
-    function getChainId() internal view returns (uint256) {
-        uint256 id;
+    function getChainId() internal view returns (uint256 id) {
         assembly {
             id := chainid()
         }
-        return id;
     }
 
     /**
@@ -34,9 +31,10 @@ library OpenSeaGasFreeListing {
         uint256 chainId = getChainId();
         if (chainId == 1 || chainId == 4) {
             return isApprovedForAllWyvern(owner, operator, chainId);
-        } else {
+        } else if (chainId == 137 || chainId == 80001) {
             return isApprovedForAllZeroEx(operator, chainId);
         }
+        return false;
     }
 
     /**
@@ -44,12 +42,12 @@ library OpenSeaGasFreeListing {
     allowing it to list without the token owner paying gas in Ethereum mainnet and rinkeby. 
     @dev Assumes that the passed in chainId is 1 or 4.
      */
-    function isApprovedForAllWyvern(address owner, address operator, uint256 chainId)
-        internal
-        view
-        returns (bool) 
-    {
-        ProxyRegistry registry; 
+    function isApprovedForAllWyvern(
+        address owner,
+        address operator,
+        uint256 chainId
+    ) internal view returns (bool) {
+        ProxyRegistry registry;
         assembly {
             switch chainId
             case 1 {
@@ -75,23 +73,21 @@ library OpenSeaGasFreeListing {
     function isApprovedForAllZeroEx(address operator, uint256 chainId)
         internal
         pure
-        returns (bool) 
+        returns (bool)
     {
         address registry;
         assembly {
             switch chainId
             case 137 {
                 // polygon
-                registry:= 0x58807baD0B376efc12F5AD86aAc70E78ed67deaE
+                registry := 0x58807baD0B376efc12F5AD86aAc70E78ed67deaE
             }
             case 80001 {
                 // mumbai
-                registry:= 0xff7Ca10aF37178BdD056628eF42fD7F799fAc77c
+                registry := 0xff7Ca10aF37178BdD056628eF42fD7F799fAc77c
             }
         }
-        return 
-            address(registry) != address(0) && 
-            address(registry) == operator;        
+        return address(registry) != address(0) && address(registry) == operator;
     }
 }
 
