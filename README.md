@@ -1,3 +1,5 @@
+![testing](https://github.com/divergencetech/ethier/actions/workflows/test.yml/badge.svg)
+
 # Motivation
 
 _ethier_ (pronounced "easier" with a lisp) intends to:
