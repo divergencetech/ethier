@@ -39,7 +39,7 @@ func deployCSPRNG(t *testing.T) (*ethtest.SimulatedBackend, *TestableCSPRNG) {
 	return sim, prng
 }
 
-type TestingContract interface {
+type testablePRNG interface {
 	Sample(opts *bind.CallOpts, seed [32]byte, bits uint16, n uint16) ([]*big.Int, error)
 	BitLength(opts *bind.CallOpts, n *big.Int) (*big.Int, error)
 	ReadLessThan(opts *bind.CallOpts, seed [32]byte, max *big.Int, n uint16) ([]*big.Int, error)
@@ -49,10 +49,12 @@ type TestingContract interface {
 type Implementation struct {
 	name string
 	sim  *ethtest.SimulatedBackend
-	prng TestingContract
+	prng testablePRNG
 }
 
-func getImplementations(t *testing.T) []Implementation {
+func deployPRNGs(t *testing.T) []Implementation {
+	t.Helper()
+
 	var impl []Implementation
 	{
 		sim, prng := deployPRNG(t)
@@ -85,7 +87,45 @@ func normalCDF(z float64) float64 {
 	return 0.5 + 0.5*math.Erf(z/math.Sqrt2)
 }
 
-func TestReadProbabilistic(t *testing.T) {
+func TestNormalCDF(t *testing.T) {
+
+	tests := []struct {
+		z    float64
+		want float64
+	}{
+		{
+			z:    0,
+			want: 0.5,
+		},
+		{
+			z:    1,
+			want: 0.84134,
+		},
+		{
+			z:    2,
+			want: 0.97725,
+		},
+		{
+			z:    -2,
+			want: 0.0227501,
+		},
+	}
+
+	for _, tt := range tests {
+		name := fmt.Sprintf("normalCDF(%.3f)", tt.z)
+		t.Run(name, func(t *testing.T) {
+
+			got := normalCDF(tt.z)
+
+			if relDev := math.Abs(got-tt.want) / tt.want; relDev > 0.001 {
+				t.Errorf("got %.03f; want %.03f; relDev %.03f", got, tt.want, relDev)
+			}
+		})
+	}
+
+}
+
+func TestReadStatistical(t *testing.T) {
 	tests := []struct {
 		seedFrom                  string
 		bitsPerSample, numSamples uint64
@@ -118,12 +158,12 @@ func TestReadProbabilistic(t *testing.T) {
 			var seed [32]byte
 			copy(seed[:], crypto.Keccak256([]byte(tt.seedFrom)))
 
-			for _, ii := range getImplementations(t) {
-				t.Run(ii.name, func(t *testing.T) {
+			for _, impl := range deployPRNGs(t) {
+				t.Run(impl.name, func(t *testing.T) {
 
-					samples, err := ii.prng.Sample(nil, seed, uint16(tt.bitsPerSample), uint16(tt.numSamples))
+					samples, err := impl.prng.Sample(nil, seed, uint16(tt.bitsPerSample), uint16(tt.numSamples))
 					if err != nil {
-						t.Fatalf("Sample(%x, 8 bits, 1000 samples) error %v", seed, err)
+						t.Fatalf("Sample(%x, %d bits, %d samples) error %v", seed, tt.bitsPerSample, tt.numSamples, err)
 					}
 
 					var min, max, sum uint64
@@ -131,11 +171,10 @@ func TestReadProbabilistic(t *testing.T) {
 
 					numMax := (1 << tt.bitsPerSample) - 1
 					distMean := float64(numMax) / 2.
-					distVar := float64(numMax*numMax) / 12.
 
 					min = math.MaxUint64
 
-					var cusum, cusumMax int64
+					var cuSum, cuSumMax int64
 
 					for i, s := range samples {
 						if !s.IsUint64() {
@@ -154,11 +193,12 @@ func TestReadProbabilistic(t *testing.T) {
 						onesCount += bits.OnesCount64(u)
 
 						for j := uint64(0); j < tt.bitsPerSample; j++ {
-							z := 2*int64((u>>j)&1) - 1
-							cusum += z
-							abs := abs(cusum)
-							if abs > cusumMax {
-								cusumMax = abs
+							// Iterates though the bits of a sample and performs
+							// a random walk
+							z := 2*int64((u>>j)&1) - 1 // z=-1,+1 for bit=0,1
+							cuSum += z
+							if a := abs(cuSum); a > cuSumMax {
+								cuSumMax = a
 							}
 						}
 					}
@@ -176,12 +216,17 @@ func TestReadProbabilistic(t *testing.T) {
 					})
 
 					t.Run("Sum", func(t *testing.T) {
+						// Sample variance of a discrete uniform distribution in [0,nMax]
+						n := numMax + 1
+						distVar := float64(n*n-1) / 12.
 
 						expectedSum := distMean * float64(tt.numSamples)
-						// The variance of as sum of uniform random variables in
-						// [0,sampleMax] is given by the sum of the individual variances
-						twoSigmaRelDev := 2 * math.Sqrt(distVar*float64(tt.numSamples)) / expectedSum
 
+						// The variance of a sum of uniform random variables in
+						// [0,nMax] is given by the sum of the individual variances
+						expectedVariance := distVar * float64(tt.numSamples)
+
+						twoSigmaRelDev := 2 * math.Sqrt(expectedVariance) / expectedSum
 						if dev := 1 - float64(expectedSum)/float64(sum); math.Abs(dev) > twoSigmaRelDev {
 							t.Errorf("Sum = %s deviates by %.2f%% (>%.2f%% abs = 2 sigma) from expected sum %s", humanize.Comma(int64(sum)), dev*100, twoSigmaRelDev*100, humanize.Comma(int64(expectedSum)))
 						}
@@ -197,22 +242,22 @@ func TestReadProbabilistic(t *testing.T) {
 						}
 					})
 
-					t.Run("Monobit CUSUM", func(t *testing.T) {
+					t.Run("Monobit cumulative sum", func(t *testing.T) {
 						// See Sect. 2.13 in https://nvlpubs.nist.gov/nistpubs/legacy/sp/nistspecialpublication800-22r1a.pdf
 						p := float64(1)
 						n := tt.numSamples * tt.bitsPerSample
-						z := cusumMax
-						sqrtn := math.Sqrt(float64(n))
+						z := cuSumMax
+						sqrtN := math.Sqrt(float64(n))
 						kStart := int64(0.25 * (-float64(n)/float64(z) + 1))
 						kEnd := int64(0.25 * (float64(n)/float64(z) - 1))
 
 						for k := kStart; k <= kEnd; k++ {
-							p -= normalCDF(float64((4*k+1)*z)/sqrtn) - normalCDF(float64((4*k-1)*z)/sqrtn)
+							p -= normalCDF(float64((4*k+1)*z)/sqrtN) - normalCDF(float64((4*k-1)*z)/sqrtN)
 						}
 
 						kStart = int64(0.25 * (-float64(n)/float64(z) - 3))
 						for k := kStart; k <= kEnd; k++ {
-							p += normalCDF(float64((4*k+3)*z)/sqrtn) - normalCDF(float64((4*k+1)*z)/sqrtn)
+							p += normalCDF(float64((4*k+3)*z)/sqrtN) - normalCDF(float64((4*k+1)*z)/sqrtN)
 						}
 
 						if p < 0.01 {
@@ -380,13 +425,13 @@ func TestReadInternalStateCSPRNG(t *testing.T) {
 
 func TestBitLength(t *testing.T) {
 
-	for _, ii := range getImplementations(t) {
-		t.Run(ii.name, func(t *testing.T) {
+	for _, impl := range deployPRNGs(t) {
+		t.Run(impl.name, func(t *testing.T) {
 
 			for _, in := range []uint64{0, 1, 2, 3, 4, 5, 63, 64, 127, 128, 255, 256, math.MaxUint64} {
 				want := bits.Len64(in)
 
-				got, err := ii.prng.BitLength(nil, new(big.Int).SetUint64(in))
+				got, err := impl.prng.BitLength(nil, new(big.Int).SetUint64(in))
 				if err != nil {
 					t.Errorf("BitLength(%d) error %v", in, err)
 					continue
@@ -403,8 +448,8 @@ func TestBitLength(t *testing.T) {
 
 func TestReadLessThan(t *testing.T) {
 
-	for _, ii := range getImplementations(t) {
-		t.Run(ii.name, func(t *testing.T) {
+	for _, impl := range deployPRNGs(t) {
+		t.Run(impl.name, func(t *testing.T) {
 
 			const n = uint16(1e4)
 
@@ -413,7 +458,7 @@ func TestReadLessThan(t *testing.T) {
 					var seed [32]byte
 
 					bigMax := new(big.Int).SetUint64(max)
-					got, err := ii.prng.ReadLessThan(nil, seed, bigMax, n)
+					got, err := impl.prng.ReadLessThan(nil, seed, bigMax, n)
 					if err != nil {
 						t.Fatalf("ReadLessThan() error %v", err)
 					}
@@ -457,10 +502,10 @@ func TestStoreAndLoad(t *testing.T) {
 		var seed [32]byte
 		seed[31] = byte(i + 1)
 
-		for _, ii := range getImplementations(t) {
-			t.Run(ii.name, func(t *testing.T) {
+		for _, impl := range deployPRNGs(t) {
+			t.Run(impl.name, func(t *testing.T) {
 
-				if _, err := ii.prng.TestStoreAndLoad(ii.sim.Acc(0), seed, tt.bits, tt.beforeStore); err != nil {
+				if _, err := impl.prng.TestStoreAndLoad(impl.sim.Acc(0), seed, tt.bits, tt.beforeStore); err != nil {
 					t.Errorf("StoreAndLoad(%#x, %d, %d) error %v", seed, tt.bits, tt.beforeStore, err)
 				}
 			})
