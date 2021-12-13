@@ -1025,9 +1025,6 @@ func TestReservedFreePurchasing(t *testing.T) {
 		wantOwned(t, auction, sim.Acc(rcvFree).From, 0, 0)
 	})
 
-	// Mint some free purchases before the normal sale starts
-	sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Acc(rcvFree).From, big.NewInt(1)))
-
 	t.Run("reserved free quota honoured", func(t *testing.T) {
 		n := big.NewInt(totalInventory - freeQuota)
 		sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, n), sim.Acc(buyer).From, n))
@@ -1042,7 +1039,7 @@ func TestReservedFreePurchasing(t *testing.T) {
 	})
 
 	t.Run("free quota enforced", func(t *testing.T) {
-		sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Acc(rcvFree).From, big.NewInt(freeQuota-1)))
+		sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Acc(rcvFree).From, big.NewInt(freeQuota)))
 
 		c := revert.Checker("Seller: Free quota exceeded")
 		if diff := c.Diff(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Acc(rcvFree).From, big.NewInt(1))); diff != "" {
@@ -1051,6 +1048,36 @@ func TestReservedFreePurchasing(t *testing.T) {
 
 		wantOwned(t, auction, sim.Acc(rcvFree).From, freeQuota, freeQuota)
 	})
+}
+
+func TestIssue8Regression(t *testing.T) {
+	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
+
+	const (
+		deployer = iota
+		rcvFree
+		buyer
+	)
+
+	const (
+		totalInventory = 20
+		freeQuota      = 3
+	)
+
+	cfg := SellerSellerConfig{
+		TotalInventory:   big.NewInt(totalInventory),
+		FreeQuota:        big.NewInt(freeQuota),
+		ReserveFreeQuota: true,
+		// Required but irrelevant to tests:
+		MaxPerAddress: big.NewInt(0),
+		MaxPerTx:      big.NewInt(0),
+	}
+	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(deployer), cfg))
+	sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Acc(rcvFree).From, big.NewInt(3)))
+	sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, big.NewInt(14)), sim.Acc(buyer).From, big.NewInt(14)))
+
+	// This call will revert due to the bug described in issue 8
+	sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, big.NewInt(3)), sim.Acc(buyer).From, big.NewInt(3)))
 }
 
 func TestUnreservedFreePurchasing(t *testing.T) {
