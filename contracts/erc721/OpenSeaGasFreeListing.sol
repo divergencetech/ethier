@@ -9,15 +9,6 @@ pragma solidity >=0.8.0 <0.9.0;
 /// @notice Library to achieve gas-free listings on OpenSea.
 library OpenSeaGasFreeListing {
     /**
-    @notice Convinience function to get the right chainId
-     */
-    function getChainId() internal view returns (uint256 id) {
-        assembly {
-            id := chainid()
-        }
-    }
-
-    /**
     @notice Returns whether the operator is an OpenSea proxy for the owner, thus
     allowing it to list without the token owner paying gas.
     @dev ERC{721,1155}.isApprovedForAll should be overriden to also check if
@@ -28,11 +19,14 @@ library OpenSeaGasFreeListing {
         view
         returns (bool)
     {
-        uint256 chainId = getChainId();
+        uint256 chainId;
+        assembly {
+            chainId := chainid()
+        }
         if (chainId == 1 || chainId == 4) {
-            return isApprovedForAllWyvern(owner, operator, chainId);
+            return isApprovedForAllWyvern(owner, operator);
         } else if (chainId == 137 || chainId == 80001) {
-            return isApprovedForAllZeroEx(operator, chainId);
+            return isApprovedForAllZeroEx(operator);
         }
         return false;
     }
@@ -42,14 +36,14 @@ library OpenSeaGasFreeListing {
     allowing it to list without the token owner paying gas in Ethereum mainnet and rinkeby. 
     @dev Assumes that the passed in chainId is 1 or 4.
      */
-    function isApprovedForAllWyvern(
-        address owner,
-        address operator,
-        uint256 chainId
-    ) internal view returns (bool) {
+    function isApprovedForAllWyvern(address owner, address operator)
+        internal
+        view
+        returns (bool)
+    {
         ProxyRegistry registry;
         assembly {
-            switch chainId
+            switch chainid()
             case 1 {
                 // mainnet
                 registry := 0xa5409ec958c83c3f309868babaca7c86dcb077c1
@@ -70,14 +64,14 @@ library OpenSeaGasFreeListing {
     allowing it to list without the token owner paying gas in Polygon mainnet and mumbai.
     @dev Assumes that the passed in chainId is 137 or 80001.
      */
-    function isApprovedForAllZeroEx(address operator, uint256 chainId)
+    function isApprovedForAllZeroEx(address operator)
         internal
-        pure
+        view
         returns (bool)
     {
         address registry;
         assembly {
-            switch chainId
+            switch chainid()
             case 137 {
                 // polygon
                 registry := 0x58807baD0B376efc12F5AD86aAc70E78ed67deaE
