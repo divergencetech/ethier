@@ -59,10 +59,10 @@ library SignatureChecker {
      */
     function requireValidSignature(
         EnumerableSet.AddressSet storage signers,
-        address address_,
+        address a,
         bytes calldata signature
     ) internal view {
-        bytes32 message = generateMessage(abi.encodePacked(address_));
+        bytes32 message = generateMessage(abi.encodePacked(a));
         requireValidSignature(signers, message, signature);
     }
 
