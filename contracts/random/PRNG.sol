@@ -18,6 +18,9 @@ library PRNG {
     /// @notice Layout within the buffer. 0x00 is the current (carry || number)
     uint256 private constant REMAIN = 0x20;
 
+    /// @notice Mask for the 128 least significant bits
+    uint256 private constant MASK_128_BITS = 0xffffffffffffffffffffffffffffffff;
+
     /**
     @notice Returns a new deterministic Source, differentiated only by the seed.
     @dev Use of PRNG.Source does NOT provide any unpredictability as generated
@@ -49,7 +52,7 @@ library PRNG {
     function _refill(Source src) private pure {
         assembly {
             let carryAndNumber := mload(src)
-            let rand := and(carryAndNumber, 0xffffffffffffffffffffffffffffffff)
+            let rand := and(carryAndNumber, MASK_128_BITS)
             let carry := shr(128, carryAndNumber)
             let tmp := add(mul(MWC_FACTOR, rand), carry)
             mstore(add(src, REMAIN), 128)
