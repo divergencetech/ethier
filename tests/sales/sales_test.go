@@ -1050,7 +1050,7 @@ func TestReservedFreePurchasing(t *testing.T) {
 	})
 }
 
-func TestIssue8Regression(t *testing.T) {
+func TestIssue7Regression(t *testing.T) {
 	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
 
 	const (
@@ -1073,11 +1073,17 @@ func TestIssue8Regression(t *testing.T) {
 		MaxPerTx:      big.NewInt(0),
 	}
 	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(deployer), cfg))
-	sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Acc(rcvFree).From, big.NewInt(3)))
-	sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, big.NewInt(14)), sim.Acc(buyer).From, big.NewInt(14)))
+	sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Acc(rcvFree).From, big.NewInt(freeQuota)))
+	sim.Must(t, "Buy(totalInventory-2*freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, big.NewInt(totalInventory-2*freeQuota)), sim.Acc(buyer).From, big.NewInt(totalInventory-2*freeQuota)))
 
-	// This call will revert due to the bug described in issue 8
-	sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, big.NewInt(3)), sim.Acc(buyer).From, big.NewInt(3)))
+	// Without the fix, this call would have reverted due to https://github.com/divergencetech/ethier/issues/7
+	sim.Must(t, "Buy(freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, big.NewInt(freeQuota)), sim.Acc(buyer).From, big.NewInt(freeQuota)))
+
+	if diff := revert.SoldOut.Diff(
+		auction.Buy(sim.WithValueFrom(buyer, big.NewInt(1)), sim.Acc(buyer).From, big.NewInt(1)),
+	); diff != "" {
+		t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) %s", diff)
+	}
 }
 
 func TestUnreservedFreePurchasing(t *testing.T) {
