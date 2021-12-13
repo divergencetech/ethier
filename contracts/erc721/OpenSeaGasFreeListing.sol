@@ -19,6 +19,28 @@ library OpenSeaGasFreeListing {
         view
         returns (bool)
     {
+        uint256 chainId;
+        assembly {
+            chainId := chainid()
+        }
+        if (chainId == 1 || chainId == 4) {
+            return isApprovedForAllWyvern(owner, operator);
+        } else if (chainId == 137 || chainId == 80001) {
+            return isApprovedForAllZeroEx(operator);
+        }
+        return false;
+    }
+
+    /**
+    @notice Returns whether the operator is an OpenSea proxy for the owner on a Wyvern exchange, thus
+    allowing it to list without the token owner paying gas in Ethereum mainnet and rinkeby. 
+    @dev Assumes that the passed in chainId is 1 or 4.
+     */
+    function isApprovedForAllWyvern(address owner, address operator)
+        internal
+        view
+        returns (bool)
+    {
         ProxyRegistry registry;
         assembly {
             switch chainid()
@@ -35,6 +57,31 @@ library OpenSeaGasFreeListing {
         return
             address(registry) != address(0) &&
             address(registry.proxies(owner)) == operator;
+    }
+
+    /**
+    @notice Returns whether the operator is an OpenSea proxy for the owner on a 0x exchange, thus
+    allowing it to list without the token owner paying gas in Polygon mainnet and mumbai.
+    @dev Assumes that the passed in chainId is 137 or 80001.
+     */
+    function isApprovedForAllZeroEx(address operator)
+        internal
+        view
+        returns (bool)
+    {
+        address registry;
+        assembly {
+            switch chainid()
+            case 137 {
+                // polygon
+                registry := 0x58807baD0B376efc12F5AD86aAc70E78ed67deaE
+            }
+            case 80001 {
+                // mumbai
+                registry := 0xff7Ca10aF37178BdD056628eF42fD7F799fAc77c
+            }
+        }
+        return address(registry) != address(0) && address(registry) == operator;
     }
 }
 
