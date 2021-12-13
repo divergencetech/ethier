@@ -22,7 +22,7 @@ library SignatureChecker {
     @param usedMessages Set of already-used messages.
     @param signature ECDSA signature of message.
      */
-    function validateSignature(
+    function requireValidSignature(
         EnumerableSet.AddressSet storage signers,
         bytes memory data,
         bytes calldata signature,
@@ -42,7 +42,7 @@ library SignatureChecker {
     recovered signer is contained in the signers AddressSet.
     @dev Convenience wrapper for message generation + signature verification.
      */
-    function validateSignature(
+    function requireValidSignature(
         EnumerableSet.AddressSet storage signers,
         bytes memory data,
         bytes calldata signature
@@ -57,7 +57,7 @@ library SignatureChecker {
     @dev Convenience wrapper for message generation from address +
     signature verification.
      */
-    function validateSignature(
+    function requireValidSignature(
         EnumerableSet.AddressSet storage signers,
         address address_,
         bytes calldata signature
@@ -70,7 +70,7 @@ library SignatureChecker {
     @notice Common validator logic, checking if the recovered signer is
     contained in the signers AddressSet.
     */
-    function validateSignature(
+    function isValidateSignature(
         EnumerableSet.AddressSet storage signers,
         bytes32 message,
         bytes calldata signature
@@ -89,7 +89,7 @@ library SignatureChecker {
         bytes calldata signature
     ) internal view {
         require(
-            validateSignature(signers, message, signature),
+            isValidateSignature(signers, message, signature),
             "SignatureChecker: Invalid signature"
         );
     }

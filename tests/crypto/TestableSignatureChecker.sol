@@ -29,7 +29,7 @@ contract TestableSignatureChecker {
         bytes32 nonce,
         bytes calldata signature
     ) external {
-        signers.validateSignature(
+        signers.requireValidSignature(
             abi.encodePacked(data, nonce),
             signature,
             usedMessages
@@ -42,7 +42,7 @@ contract TestableSignatureChecker {
         view
         returns (bool)
     {
-        signers.validateSignature(data, signature);
+        signers.requireValidSignature(data, signature);
         return true;
     }
 
@@ -52,7 +52,7 @@ contract TestableSignatureChecker {
         view
         returns (bool)
     {
-        signers.validateSignature(msg.sender, signature);
+        signers.requireValidSignature(msg.sender, signature);
         return true;
     }
 }
