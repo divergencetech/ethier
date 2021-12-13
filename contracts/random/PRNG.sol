@@ -54,9 +54,8 @@ library PRNG {
             let carryAndNumber := mload(src)
             let rand := and(carryAndNumber, MASK_128_BITS)
             let carry := shr(128, carryAndNumber)
-            let tmp := add(mul(MWC_FACTOR, rand), carry)
+            mstore(src, add(mul(MWC_FACTOR, rand), carry))
             mstore(add(src, REMAIN), 128)
-            mstore(src, tmp)
         }
     }
 
