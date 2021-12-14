@@ -212,7 +212,7 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
 
         uint256 maxAvailable;
         uint256 sold;
-        
+
         if (config.reserveFreeQuota) {
             maxAvailable = config.totalInventory - config.freeQuota;
             sold = _totalSold.current() - purchasedFreeOfCharge.current();
