@@ -1,4 +1,5 @@
 ![testing](https://github.com/divergencetech/ethier/actions/workflows/test.yml/badge.svg)
+![linter](https://github.com/divergencetech/ethier/actions/workflows/lint.yml/badge.svg)
 
 # Motivation
 
