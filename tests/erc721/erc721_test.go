@@ -36,7 +36,7 @@ func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721CommonEnume
 	if _, err := nft.Mint(sim.Acc(tokenOwner), big.NewInt(exists)); err != nil {
 		t.Fatalf("Mint(%d) error %v", exists, err)
 	}
-	if _, err := nft.Approve(sim.Acc(tokenOwner), sim.Acc(approved).From, big.NewInt(exists)); err != nil {
+	if _, err := nft.Approve(sim.Acc(tokenOwner), sim.Addr(approved), big.NewInt(exists)); err != nil {
 		t.Fatalf("Approve(<approved account>, %d) error %v", exists, err)
 	}
 

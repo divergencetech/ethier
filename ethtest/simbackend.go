@@ -110,6 +110,11 @@ func (sb *SimulatedBackend) Acc(account int) *bind.TransactOpts {
 	}
 }
 
+// Addr returns the Address of the specified account number.
+func (sb *SimulatedBackend) Addr(account int) common.Address {
+	return sb.accounts[account].From
+}
+
 // WithValueFrom returns a TransactOpts that sends the specified value from the
 // account. If value==0, sb.Acc(account) can be used directly.
 func (sb *SimulatedBackend) WithValueFrom(account int, value *big.Int) *bind.TransactOpts {

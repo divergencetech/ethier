@@ -163,7 +163,7 @@ func TestAddressSignature(t *testing.T) {
 
 	signAddr := func(signer *eth.Signer, party int) []byte {
 		t.Helper()
-		addr := sim.Acc(party).From
+		addr := sim.Addr(party)
 
 		sig, err := signer.SignAddress(addr)
 		if err != nil {
