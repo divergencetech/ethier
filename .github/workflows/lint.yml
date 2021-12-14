@@ -1,4 +1,4 @@
-name: Test
+name: Lint
 
 on:
   push:
@@ -6,16 +6,20 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  lint_go:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: Setup Go
         uses: actions/setup-go@v2
-      - name: Build ethier
-        run: |
-          go version
-          go build -o ~/.local/bin/ethier ./ethier
+
+      - name: Check Go code formatting
+        run: test -z $(goimports -l .)
+        
+  lint_sol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
 
       - name: Setup NodeJs
         uses: actions/setup-node@v2
@@ -33,11 +37,5 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: npm ci --ignore-scripts
 
-      - name: Setup Solidity tooling
-        run: |
-          sudo add-apt-repository ppa:ethereum/ethereum
-          sudo apt-get update
-          sudo apt-get install -y solc abigen
-
-      - name: Run tests
-        run: npm run testverbose
+      - name: Check Solidity code formatting
+        run: npx prettier '**/*.sol' --check
