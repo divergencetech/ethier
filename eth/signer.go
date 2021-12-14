@@ -149,7 +149,35 @@ func (s *Signer) SignWithNonce(buf []byte) ([]byte, [32]byte, error) {
 	return sig, nonce, nil
 }
 
-// SignAddress is a convenience wrapper for s.CompactSign(addr.Bytes()).
-func (s *Signer) SignAddress(addr common.Address) ([]byte, error) {
-	return s.CompactSign(addr.Bytes())
+// toEthSignedMessageHash converts a given message to conform to the signed data
+// standard according to EIP-191.
+func toEthPersonalSignedMessage(message []byte) []byte {
+	prefix := []byte(fmt.Sprintf("\x19Ethereum Signed Message:\n%d", len(message)))
+	return append(prefix, message...)
+}
+
+// PersonalSign returns an EIP-191 conform personal ECDSA signature of buf
+// Convenience wrapper for s.CompactSign(toEthPersonalSignedMessage(buf))
+func (s *Signer) PersonalSign(buf []byte) ([]byte, error) {
+	return s.CompactSign(toEthPersonalSignedMessage(buf))
+}
+
+// PersonalSignWithNonce generates a 32-byte nonce with crypto/rand and returns
+// s.PersonalSign(append(buf, nonce)).
+func (s *Signer) PersonalSignWithNonce(buf []byte) ([]byte, [32]byte, error) {
+	var nonce [32]byte
+	if n, err := rand.Read(nonce[:]); n != 32 || err != nil {
+		return nil, nonce, fmt.Errorf("read 32 random bytes: got %d bytes with err %v", n, err)
+	}
+
+	sig, err := s.PersonalSign(append(buf, nonce[:]...))
+	if err != nil {
+		return nil, nonce, err
+	}
+	return sig, nonce, nil
+}
+
+// SignAddress is a convenience wrapper for s.PersonalSign(addr.Bytes()).
+func (s *Signer) PersonalSignAddress(addr common.Address) ([]byte, error) {
+	return s.PersonalSign(addr.Bytes())
 }
