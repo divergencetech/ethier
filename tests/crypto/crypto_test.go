@@ -125,8 +125,8 @@ func TestSingleUseSignature(t *testing.T) {
 			}
 
 			_, gotRepeat := checker.NeedsSignature(sim.Acc(0), tt.sentData, nonce, sig)
-			if diff := errdiff.Check(gotRepeat, "SignatureChecker: Nonce already used"); diff != "" {
-				t.Errorf("NeedsSignature() on second call with same nonce; %s", diff)
+			if diff := errdiff.Check(gotRepeat, "SignatureChecker: Message already used"); diff != "" {
+				t.Errorf("NeedsSignature() on second call with same message; %s", diff)
 			}
 		})
 	}
