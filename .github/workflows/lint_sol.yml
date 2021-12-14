@@ -1,4 +1,4 @@
-name: Lint
+name: Lint Solidity
 
 on:
   push:
@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Setup Go
-        uses: actions/setup-go@v2
 
       - name: Setup NodeJs
         uses: actions/setup-node@v2
@@ -31,6 +29,3 @@ jobs:
 
       - name: Check Solidity code formatting
         run: npx prettier '**/*.sol' --check
-
-      - name: Check Go code formatting
-        run: test -z $(goimports -l .)
