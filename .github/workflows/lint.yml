@@ -1,4 +1,4 @@
-name: Lint Solidity
+name: Lint
 
 on:
   push:
@@ -6,6 +6,16 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint_go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+
+      - name: Check Go code formatting
+        run: test -z $(goimports -l .)
+        
   lint_sol:
     runs-on: ubuntu-latest
     steps:
