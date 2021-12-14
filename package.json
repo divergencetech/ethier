@@ -6,7 +6,8 @@
   "scripts": {
     "build": "go build -o build/ethier ethier/*.go",
     "generate": "PATH=\"$(readlink -f build):${PATH}\" go generate ./...",
-    "test": "go test ./...",
+    "testlight": "go test ./...",
+    "test": "go generate ./... && go test ./...",
     "testverbose": "go generate ./... && go test ./... -test.v"
   },
   "repository": {
