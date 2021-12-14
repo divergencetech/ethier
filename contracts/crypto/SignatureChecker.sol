@@ -70,7 +70,7 @@ library SignatureChecker {
     @notice Common validator logic, checking if the recovered signer is
     contained in the signers AddressSet.
     */
-    function isValidateSignature(
+    function validSignature(
         EnumerableSet.AddressSet storage signers,
         bytes32 message,
         bytes calldata signature
@@ -89,7 +89,7 @@ library SignatureChecker {
         bytes calldata signature
     ) internal view {
         require(
-            isValidateSignature(signers, message, signature),
+            validSignature(signers, message, signature),
             "SignatureChecker: Invalid signature"
         );
     }
