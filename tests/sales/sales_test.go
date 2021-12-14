@@ -998,6 +998,12 @@ func TestReservedFreePurchasing(t *testing.T) {
 	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
 
 	const (
+		deployer = iota
+		rcvFree
+		buyer
+	)
+
+	const (
 		totalInventory = 10
 		freeQuota      = 4
 	)
@@ -1010,38 +1016,74 @@ func TestReservedFreePurchasing(t *testing.T) {
 		MaxPerAddress: big.NewInt(0),
 		MaxPerTx:      big.NewInt(0),
 	}
-	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(0), cfg))
+	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(deployer), cfg))
 
 	t.Run("only owner purchases free", func(t *testing.T) {
-		if diff := revert.OnlyOwner.Diff(auction.PurchaseFreeOfCharge(sim.Acc(1), sim.Acc(1).From, big.NewInt(1))); diff != "" {
+		if diff := revert.OnlyOwner.Diff(auction.PurchaseFreeOfCharge(sim.Acc(rcvFree), sim.Acc(rcvFree).From, big.NewInt(1))); diff != "" {
 			t.Errorf("PurchaseFreeOfCharge() as non-owner; %s", diff)
 		}
-		wantOwned(t, auction, sim.Acc(1).From, 0, 0)
+		wantOwned(t, auction, sim.Acc(rcvFree).From, 0, 0)
 	})
 
 	t.Run("reserved free quota honoured", func(t *testing.T) {
 		n := big.NewInt(totalInventory - freeQuota)
-		sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(0, n), sim.Acc(0).From, n))
+		sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, n), sim.Acc(buyer).From, n))
 
 		if diff := revert.SoldOut.Diff(
-			auction.Buy(sim.WithValueFrom(0, big.NewInt(1)), sim.Acc(0).From, big.NewInt(1)),
+			auction.Buy(sim.WithValueFrom(buyer, big.NewInt(1)), sim.Acc(buyer).From, big.NewInt(1)),
 		); diff != "" {
 			t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) %s", diff)
 		}
 
-		wantOwned(t, auction, sim.Acc(0).From, totalInventory-freeQuota, 0)
+		wantOwned(t, auction, sim.Acc(buyer).From, totalInventory-freeQuota, 0)
 	})
 
 	t.Run("free quota enforced", func(t *testing.T) {
-		sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(freeQuota)))
+		sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Acc(rcvFree).From, big.NewInt(freeQuota)))
 
 		c := revert.Checker("Seller: Free quota exceeded")
-		if diff := c.Diff(auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Acc(0).From, big.NewInt(1))); diff != "" {
+		if diff := c.Diff(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Acc(rcvFree).From, big.NewInt(1))); diff != "" {
 			t.Errorf("PurchaseFreeOfCharge(1) after exhausting quota; %s", diff)
 		}
 
-		wantOwned(t, auction, sim.Acc(0).From, totalInventory, freeQuota)
+		wantOwned(t, auction, sim.Acc(rcvFree).From, freeQuota, freeQuota)
 	})
+}
+
+func TestIssue7Regression(t *testing.T) {
+	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
+
+	const (
+		deployer = iota
+		rcvFree
+		buyer
+	)
+
+	const (
+		totalInventory = 20
+		freeQuota      = 3
+	)
+
+	cfg := SellerSellerConfig{
+		TotalInventory:   big.NewInt(totalInventory),
+		FreeQuota:        big.NewInt(freeQuota),
+		ReserveFreeQuota: true,
+		// Required but irrelevant to tests:
+		MaxPerAddress: big.NewInt(0),
+		MaxPerTx:      big.NewInt(0),
+	}
+	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(deployer), cfg))
+	sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Acc(rcvFree).From, big.NewInt(freeQuota)))
+	sim.Must(t, "Buy(totalInventory-2*freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, big.NewInt(totalInventory-2*freeQuota)), sim.Acc(buyer).From, big.NewInt(totalInventory-2*freeQuota)))
+
+	// Without the fix, this call would have reverted due to https://github.com/divergencetech/ethier/issues/7
+	sim.Must(t, "Buy(freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, big.NewInt(freeQuota)), sim.Acc(buyer).From, big.NewInt(freeQuota)))
+
+	if diff := revert.SoldOut.Diff(
+		auction.Buy(sim.WithValueFrom(buyer, big.NewInt(1)), sim.Acc(buyer).From, big.NewInt(1)),
+	); diff != "" {
+		t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) %s", diff)
+	}
 }
 
 func TestUnreservedFreePurchasing(t *testing.T) {
