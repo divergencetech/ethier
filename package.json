@@ -7,8 +7,8 @@
     "build": "go build -o build/ethier ethier/*.go",
     "generate": "PATH=\"$(readlink -f build):${PATH}\" go generate ./...",
     "testlight": "go test ./...",
-    "test": "go generate ./... && go test ./...",
-    "testverbose": "go generate ./... && go test ./... -test.v"
+    "test": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./...",
+    "testverbose": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./... -test.v"
   },
   "repository": {
     "type": "git",
