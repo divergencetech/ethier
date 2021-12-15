@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 package main
 
 import (

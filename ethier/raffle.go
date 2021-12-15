@@ -1,27 +1,5 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
-//
-// The raffle binary randomly selects n entrants from a given list in a
-// deterministic but fair manner. Fairness is defined as an inability on the
-// part of the party running the binary to influence its outcome with
-// non-negligible probability.
-//
-// Two sources of entropy are used: the list of entrants itself, and an
-// arbitrary hex seed which MUST be out of the control of the party running the
-// binary (e.g. specify a future Ethereum block number and then use its hex hash
-// without prefix). Each source is hashed with keccak256 and the resulting 8x
-// 64-bit blocks are XORd to create an int64 seed for math/rand to shuffle the
-// entrants.
-//
-// The list of addresses MUST be commited to before the entropy becomes known
-// otherwise the party running the binary can influence its outcome by adding
-// dummy addresses.
-//
-// Assuming math/rand.Shuffle is adequately uniform in its selection of a
-// permutation then all fairness is based on the seed entropy.
-//
-// Usage, where the file "entrants" is new-line delimited:
-// $ < entrants raffle --n=[num_to_select] --entropy=[uncontrollable_seed_entropy]
 package main
 
 import (
@@ -42,7 +20,26 @@ import (
 
 func init() {
 	cmd := &cobra.Command{
-		Use: "raffle",
+		Use:   "raffle --n=[num_to_select] --entropy=[uncontrollable_seed_entropy]",
+		Short: "Randomly selects n entrants from a given list of addresses in a deterministic but fair manner",
+		Long: `The command binary randomly selects n entrants from a given list in a
+deterministic but fair manner. Fairness is defined as an inability on the
+part of the party running the binary to influence its outcome with
+non-negligible probability.
+		
+Two sources of entropy are used: the list of entrants itself, and an
+arbitrary hex seed which MUST be out of the control of the party running the
+binary (e.g. specify a future Ethereum block number and then use its hex hash
+without prefix). Each source is hashed with keccak256 and the resulting 8x
+64-bit blocks are XORd to create an int64 seed for math/rand to shuffle the
+entrants.
+		
+The list of addresses MUST be commited to before the entropy becomes known
+otherwise the party running the binary can influence its outcome by adding
+dummy addresses.
+		
+Assuming math/rand.Shuffle is adequately uniform in its selection of a
+permutation then all fairness is based on the seed entropy.`,
 	}
 
 	// TODO(aschlosberg): investigate the idiomatic way of accessing cobra
