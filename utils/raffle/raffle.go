@@ -59,7 +59,9 @@ func main() {
 	if err != nil {
 		glog.Exitf("Choosing: %v", err)
 	}
-	fmt.Println(winners)
+	for _, w := range winners {
+		fmt.Println(w)
+	}
 }
 
 // choose reads newline-delimeted hexadecimal addresses from r and returns n of
@@ -121,10 +123,14 @@ func seed(addrs []common.Address, entropy []byte) int64 {
 	// randomness.
 	var result [8]byte
 	for lbl, src := range map[string][]byte{
-		"seed": crypto.Keccak256(entropy),
-		"list": crypto.Keccak256(addrBytes...),
+		"entropy":  crypto.Keccak256(entropy),
+		"entrants": crypto.Keccak256(addrBytes...),
 	} {
 		glog.Infof("Keccak256 of %s: %#x", lbl, src)
+
+		if n := len(src); n != 32 {
+			glog.Fatalf("Entropy source from %s of length %d; must be 32", lbl, n)
+		}
 		var buf [32]byte
 		copy(buf[:], src)
 
@@ -135,5 +141,10 @@ func seed(addrs []common.Address, entropy []byte) int64 {
 		}
 	}
 
-	return *(*int64)(unsafe.Pointer(&result))
+	return intFromBytes(&result)
+}
+
+// intFromBytes casts an 8-byte array as an int64.
+func intFromBytes(x *[8]byte) int64 {
+	return *(*int64)(unsafe.Pointer(x))
 }
