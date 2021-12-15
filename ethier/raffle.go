@@ -26,10 +26,9 @@ package main
 
 import (
 	"bytes"
-	"encoding/hex"
-	"flag"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"os"
 	"sort"
@@ -38,36 +37,46 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	n := flag.Int("n", 0, "Number of elements to select from stdin")
-	rawEntropy := flag.String("entropy", "", "An arbitrary hexidecimal seed to influence the selection; this MUST be set to something out of your control, such as a future block's hash")
-	flag.Parse()
-
-	ent, err := hex.DecodeString(*rawEntropy)
-	if err != nil {
-		glog.Exitf("Decode hex entropy %q: %v", *rawEntropy, err)
+func init() {
+	cmd := &cobra.Command{
+		Use: "raffle",
 	}
-	if len(ent) == 0 {
-		glog.Exit("Empty entropy buffer")
-	}
-	glog.Infof("Entropy: %#x", ent)
 
-	winners, err := choose(os.Stdin, *n, ent)
+	// TODO(aschlosberg): investigate the idiomatic way of accessing cobra
+	// flags, presumably via the Command passed to run.
+	r := &raffle{
+		n:       cmd.Flags().Int("n", 0, "Number of elements to select from stdin"),
+		entropy: cmd.Flags().BytesHex("entropy", nil, "An arbitrary hexidecimal seed to influence the selection; this MUST be set to something out of your control, such as a future block's hash"),
+	}
+	cmd.RunE = r.run
+
+	rootCmd.AddCommand(cmd)
+}
+
+type raffle struct {
+	n       *int
+	entropy *[]byte
+}
+
+func (r *raffle) run(c *cobra.Command, args []string) error {
+	winners, err := choose(os.Stdin, *r.n, *r.entropy)
 	if err != nil {
-		glog.Exitf("Choosing: %v", err)
+		return fmt.Errorf("choosing: %v", err)
 	}
 	for _, w := range winners {
 		fmt.Println(w)
 	}
+
+	return nil
 }
 
 // choose reads newline-delimeted hexadecimal addresses from r and returns n of
 // them at random, deterministically seeded.
-func choose(r io.Reader, n int, entropy []byte) ([]common.Address, error) {
-	addrs, err := readAddresses(r)
+func choose(from io.Reader, n int, entropy []byte) ([]common.Address, error) {
+	addrs, err := readAddresses(from)
 	if err != nil {
 		return nil, fmt.Errorf("read addresses: %v", err)
 	}
@@ -76,7 +85,7 @@ func choose(r io.Reader, n int, entropy []byte) ([]common.Address, error) {
 	}
 
 	s := seed(addrs, entropy)
-	glog.Infof("Seed: %d", s)
+	log.Printf("Seed: %d", s)
 	rng := rand.New(rand.NewSource(s))
 
 	rng.Shuffle(len(addrs), func(i, j int) {
@@ -126,10 +135,10 @@ func seed(addrs []common.Address, entropy []byte) int64 {
 		"entropy":  crypto.Keccak256(entropy),
 		"entrants": crypto.Keccak256(addrBytes...),
 	} {
-		glog.Infof("Keccak256 of %s: %#x", lbl, src)
+		log.Printf("Keccak256 of %s: %#x", lbl, src)
 
 		if n := len(src); n != 32 {
-			glog.Fatalf("Entropy source from %s of length %d; must be 32", lbl, n)
+			log.Fatalf("Entropy source from %s of length %d; must be 32", lbl, n)
 		}
 		var buf [32]byte
 		copy(buf[:], src)
