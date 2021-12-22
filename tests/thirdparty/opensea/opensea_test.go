@@ -18,6 +18,7 @@ import (
 const (
 	deployer = iota
 	proxy
+	vandal
 	recipient0
 	recipient1
 
@@ -201,5 +202,56 @@ func TestMint(t *testing.T) {
 
 	if diff := cmp.Diff(wantMinted, gotMinted, ethtest.Comparers()...); diff != "" {
 		t.Errorf("All %T.Mints() after successful and blocked mints; (-want +got) diff:\n%s", nft, diff)
+	}
+}
+
+func TestIsApprovedForAll(t *testing.T) {
+	sim, _, factory := deploy(t, 1, "")
+
+	tests := []struct {
+		owner, operator common.Address
+		want            bool
+	}{
+		{
+			owner:    sim.Addr(deployer),
+			operator: sim.Addr(deployer),
+			want:     true,
+		},
+		{
+			owner:    sim.Addr(deployer),
+			operator: sim.Addr(proxy),
+			want:     true,
+		},
+		{
+			owner:    sim.Addr(deployer),
+			operator: sim.Addr(vandal),
+			want:     false,
+		},
+		{
+			owner:    sim.Addr(vandal),
+			operator: sim.Addr(deployer),
+			want:     false,
+		},
+		{
+			owner:    sim.Addr(proxy),
+			operator: sim.Addr(deployer),
+			want:     false,
+		},
+		{
+			owner:    sim.Addr(proxy),
+			operator: sim.Addr(proxy),
+			want:     false,
+		},
+	}
+
+	t.Logf("Contract owner: %v", sim.Addr(deployer))
+	t.Logf("Contract owner's proxy: %v", sim.Addr(proxy))
+	t.Logf("Evil miscreant: %v", sim.Addr(vandal))
+
+	for _, tt := range tests {
+		got, err := factory.IsApprovedForAll(nil, tt.owner, tt.operator)
+		if err != nil || got != tt.want {
+			t.Errorf("%T.IsApprovedForAll(%v, %v) got %t, err = %v; want %t, nil err", factory, tt.owner, tt.operator, got, err, tt.want)
+		}
 	}
 }

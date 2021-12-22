@@ -2,7 +2,6 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "./IFactoryERC721.sol";
 import "./OpenSeaGasFreeListing.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
@@ -75,7 +74,7 @@ abstract contract OpenSeaERC721Mintable {
 @dev There is likely no need to use this contract directly; intead, inherit from
 OpenSeaERC721Mintable and implement the necessary virtual functions.
  */
-contract OpenSeaERC721Factory is IFactoryERC721, Ownable {
+contract OpenSeaERC721Factory is Ownable {
     using Strings for uint256;
 
     /// @notice Contract that deployed this factory.
@@ -127,7 +126,9 @@ contract OpenSeaERC721Factory is IFactoryERC721, Ownable {
     the factoryCanMint() method of the contract that deployed this factory.
      */
     function canMint(uint256 optionId) external view returns (bool) {
-        return token.factoryCanMint(optionId);
+        return
+            optionId < token.numFactoryOptions() &&
+            token.factoryCanMint(optionId);
     }
 
     /**
@@ -152,12 +153,52 @@ contract OpenSeaERC721Factory is IFactoryERC721, Ownable {
     Wyvern proxy, then proxies the call to the factoryMint() method of the
     contract that deployed this factory.
      */
-    function mint(uint256 optionId, address to) external {
+    function mint(uint256 optionId, address to) public {
         require(
             msg.sender == owner() ||
                 msg.sender == OpenSeaGasFreeListing.proxyFor(owner()),
             "OpenSeaERC721Factory: only owner or proxy"
         );
         token.factoryMint(optionId, to);
+    }
+
+    /**
+    @dev Calls mint(tokenId, to) to comply with OpenSea's overriding of the use
+    of the ERC721 interface. Presumably they have hijacked their standard sale
+    workflow to "transfer" a factory NFT to the buyer, which must have the
+    effect of minting them a real NFT (this also explains the isApprovedForAll
+    behaviour).
+     */
+    function transferFrom(
+        address,
+        address to,
+        uint256 tokenId
+    ) public {
+        mint(tokenId, to);
+    }
+
+    /**
+    @dev Returns true if owner is the contract owner, and either (a) operator is
+    the OpenSea Wyver proxy for the owner; or (b) operator == owner. This is
+    required to comply with OpenSea's overriding of the use of the ERC721
+    interface. See comment on transferFrom().
+     */
+    function isApprovedForAll(address owner, address operator)
+        public
+        view
+        returns (bool)
+    {
+        return
+            owner == Ownable.owner() &&
+            (owner == operator ||
+                OpenSeaGasFreeListing.isApprovedForAll(owner, operator));
+    }
+
+    /**
+    @dev Always returns the contract owner. This is required to comply with
+    OpenSea's overriding of the use of the ERC721 interface.
+     */
+    function ownerOf(uint256) public view returns (address) {
+        return owner();
     }
 }
