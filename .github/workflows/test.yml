@@ -40,4 +40,4 @@ jobs:
           sudo apt-get install -y solc abigen
 
       - name: Run tests
-        run: npm run testverbose
+        run: npm run test:verbose
