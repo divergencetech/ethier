@@ -3,10 +3,14 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../../contracts/erc721/ERC721CommonEnumerable.sol";
+import "../../contracts/erc721/BaseTokenURI.sol";
 
 /// @notice Exposes a functions modified with the modifiers under test.
-contract TestableERC721CommonEnumerable is ERC721CommonEnumerable {
-    constructor() ERC721CommonEnumerable("Token", "JRR") {}
+contract TestableERC721CommonEnumerable is
+    ERC721CommonEnumerable,
+    BaseTokenURI
+{
+    constructor() ERC721CommonEnumerable("Token", "JRR") BaseTokenURI("") {}
 
     function mint(uint256 tokenId) public {
         ERC721._safeMint(msg.sender, tokenId);
@@ -20,4 +24,13 @@ contract TestableERC721CommonEnumerable is ERC721CommonEnumerable {
         public
         onlyApprovedOrOwner(tokenId)
     {}
+
+    function _baseURI()
+        internal
+        view
+        override(ERC721, BaseTokenURI)
+        returns (string memory)
+    {
+        return BaseTokenURI._baseURI();
+    }
 }

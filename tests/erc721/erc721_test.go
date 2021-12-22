@@ -14,7 +14,7 @@ import (
 
 // Actors in the tests
 const (
-	owner = iota
+	deployer = iota
 	tokenOwner
 	approved
 	vandal
@@ -33,7 +33,7 @@ func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721CommonEnume
 	t.Helper()
 
 	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
-	_, _, nft, err := DeployTestableERC721CommonEnumerable(sim.Acc(owner), sim)
+	_, _, nft, err := DeployTestableERC721CommonEnumerable(sim.Acc(deployer), sim)
 	if err != nil {
 		t.Fatalf("DeployTestableERC721CommonEnumerable() error %v", err)
 	}
@@ -135,13 +135,13 @@ func TestOpenSeaProxyApproval(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := nft.IsApprovedForAll(nil, sim.Addr(owner), sim.Addr(proxy))
+			got, err := nft.IsApprovedForAll(nil, sim.Addr(deployer), sim.Addr(proxy))
 			if err != nil || got != tt.want {
 				t.Errorf("IsApprovedForAll([owner], [proxy]) got %t, err = %v; want %t, nil err", got, err, tt.want)
 			}
 		})
 
-		openseatest.SetProxyTB(t, sim, sim.Addr(owner), sim.Addr(proxy))
+		openseatest.SetProxyTB(t, sim, sim.Addr(deployer), sim.Addr(proxy))
 	}
 }
 
@@ -196,4 +196,33 @@ func TestEnumerableInterface(t *testing.T) {
 		enum.TokenOfOwnerByIndex,
 		enum.TokenByIndex,
 	}
+}
+
+func TestBaseTokenURI(t *testing.T) {
+	sim, nft := deploy(t)
+
+	for _, id := range []int64{1, 42, 101010} {
+		sim.Must(t, "Mint(%d)", id)(nft.Mint(sim.Acc(deployer), big.NewInt(id)))
+	}
+
+	wantURI := func(t *testing.T, id int64, want string) {
+		t.Helper()
+		got, err := nft.TokenURI(nil, big.NewInt(id))
+		if err != nil || got != want {
+			t.Errorf("tokenURI(%d) got %q, err = %v; want %q, nil err", id, got, err, want)
+		}
+	}
+
+	// OpenZeppelin's ERC721 returns an empty string if no base is set.
+	wantURI(t, 1, "")
+	if diff := revert.OnlyOwner.Diff(nft.SetBaseTokenURI(sim.Acc(vandal), "bad")); diff != "" {
+		t.Errorf("SetBaseTokenURI([as vandal]) %s", diff)
+	}
+	wantURI(t, 1, "")
+	wantURI(t, 42, "")
+
+	const base = "good/"
+	sim.Must(t, "SetBaseTokenURI(%q)", base)(nft.SetBaseTokenURI(sim.Acc(deployer), base))
+	wantURI(t, 42, "good/42")
+	wantURI(t, 101010, "good/101010")
 }
