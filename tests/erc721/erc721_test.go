@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/divergencetech/ethier/ethtest"
+	"github.com/divergencetech/ethier/ethtest/openseatest"
+	"github.com/divergencetech/ethier/ethtest/revert"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/h-fam/errdiff"
 )
@@ -16,6 +18,9 @@ const (
 	tokenOwner
 	approved
 	vandal
+	proxy
+
+	numAccounts // last account + 1 ;)
 )
 
 // Token IDs
@@ -27,7 +32,7 @@ const (
 func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721CommonEnumerable) {
 	t.Helper()
 
-	sim := ethtest.NewSimulatedBackendTB(t, 4)
+	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
 	_, _, nft, err := DeployTestableERC721CommonEnumerable(sim.Acc(owner), sim)
 	if err != nil {
 		t.Fatalf("DeployTestableERC721CommonEnumerable() error %v", err)
@@ -75,6 +80,7 @@ func TestModifiers(t *testing.T) {
 
 func TestOnlyApprovedOrOwner(t *testing.T) {
 	sim, nft := deploy(t)
+	openseatest.DeployProxyRegistryTB(t, sim)
 
 	tests := []struct {
 		name           string
@@ -94,7 +100,7 @@ func TestOnlyApprovedOrOwner(t *testing.T) {
 		{
 			name:           "vandal",
 			account:        sim.Acc(vandal),
-			errDiffAgainst: "ERC721Common: Not approved nor owner",
+			errDiffAgainst: string(revert.ERC721ApproveOrOwner),
 		},
 	}
 
@@ -105,6 +111,37 @@ func TestOnlyApprovedOrOwner(t *testing.T) {
 				t.Errorf("MustBeApprovedOrOwner([%s]), modified with onlyApprovedOrOwner(); %s", tt.name, diff)
 			}
 		})
+	}
+}
+
+func TestOpenSeaProxyApproval(t *testing.T) {
+	sim, nft := deploy(t)
+	openseatest.DeployProxyRegistryTB(t, sim)
+
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{
+			name: "before setting proxy",
+			want: false,
+		},
+		// Note that the proxy is set between the tests
+		{
+			name: "after setting proxy",
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := nft.IsApprovedForAll(nil, sim.Addr(owner), sim.Addr(proxy))
+			if err != nil || got != tt.want {
+				t.Errorf("IsApprovedForAll([owner], [proxy]) got %t, err = %v; want %t, nil err", got, err, tt.want)
+			}
+		})
+
+		openseatest.SetProxyTB(t, sim, sim.Addr(owner), sim.Addr(proxy))
 	}
 }
 

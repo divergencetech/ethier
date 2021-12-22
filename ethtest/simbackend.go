@@ -2,7 +2,9 @@
 package ethtest
 
 import (
+	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"testing"
@@ -25,6 +27,9 @@ type SimulatedBackend struct {
 
 	AutoCommit bool
 	accounts   []*bind.TransactOpts
+
+	// See comment on MockedEntity.
+	mockAccounts map[MockedEntity]*bind.TransactOpts
 }
 
 var _ bind.ContractBackend = (*SimulatedBackend)(nil)
@@ -34,7 +39,8 @@ var _ bind.ContractBackend = (*SimulatedBackend)(nil)
 // must be called to free resources after use.
 func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 	sb := &SimulatedBackend{
-		AutoCommit: true,
+		AutoCommit:   true,
+		mockAccounts: make(map[MockedEntity]*bind.TransactOpts),
 	}
 	alloc := make(core.GenesisAlloc)
 
@@ -46,21 +52,44 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 		}
 	}
 
+	createAccount := func(key *ecdsa.PrivateKey) (*bind.TransactOpts, error) {
+		txOpts, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+		if err != nil {
+			return nil, fmt.Errorf("NewKeyedTransactorWithChainID(<new key>, sim-backend-id=1337): %v", err)
+		}
+		alloc[txOpts.From] = core.GenesisAccount{
+			Balance: eth.Ether(100),
+		}
+		return txOpts, nil
+	}
+
 	for i := 0; i < numAccounts; i++ {
 		key, err := crypto.GenerateKey()
 		if err != nil {
 			return nil, fmt.Errorf("crypto.GenerateKey(): %v", err)
 		}
 
-		txOpts, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+		txOpts, err := createAccount(key)
 		if err != nil {
-			return nil, fmt.Errorf("NewKeyedTransactorWithChainID(<new key>, sim-backend-id=1337): %v", err)
+			return nil, err
 		}
 		sb.accounts = append(sb.accounts, txOpts)
+	}
 
-		alloc[txOpts.From] = core.GenesisAccount{
-			Balance: eth.Ether(100),
+	// These accounts need to be deterministic so that any contracts they deploy
+	// have deterministic addresses.
+	for _, mock := range []MockedEntity{OpenSea} {
+		entropy := bytes.NewReader(crypto.Keccak512([]byte(mock)))
+		key, err := ecdsa.GenerateKey(crypto.S256(), entropy)
+		if err != nil {
+			return nil, fmt.Errorf("ecdsa.GenerateKey(crypto.S256, [deterministic entropy; Keccak512(%q)]): %v", mock, err)
 		}
+
+		txOpts, err := createAccount(key)
+		if err != nil {
+			return nil, err
+		}
+		sb.mockAccounts[mock] = txOpts
 	}
 
 	sb.SimulatedBackend = backends.NewSimulatedBackend(alloc, 3e7)
@@ -71,7 +100,7 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 	return sb, nil
 }
 
-// NewSimulatedBackendT calls NewSimulatedBackend(), reports any errors with
+// NewSimulatedBackendTB calls NewSimulatedBackend(), reports any errors with
 // tb.Fatal, and calls Close() with tb.Cleanup().
 func NewSimulatedBackendTB(tb testing.TB, numAccounts int) *SimulatedBackend {
 	tb.Helper()
@@ -128,6 +157,29 @@ func (sb *SimulatedBackend) CallFrom(account int) *bind.CallOpts {
 	return &bind.CallOpts{
 		From: sb.accounts[account].From,
 	}
+}
+
+// A MockedEntity mocks a real-world entity such as Uniswap or Opensea with
+// deterministically generated accounts (and therefore contract addresses).
+type MockedEntity string
+
+// Mocked entities.
+const (
+	OpenSea = MockedEntity("OpenSea")
+)
+
+// AsMockedEntity calls the provided function with the mocked entity's account
+// if it is supported, propagating any returned error.
+//
+// MockedEntity accounts SHOULD NOT be used in general tests; prefer provided
+// packages like openseatest to using AsMockedEntity() directly.
+func (sb *SimulatedBackend) AsMockedEntity(mock MockedEntity, fn func(*bind.TransactOpts) error) error {
+	a, ok := sb.mockAccounts[mock]
+	if !ok {
+		return fmt.Errorf("unsupported %T %q", mock, mock)
+	}
+
+	return fn(a)
 }
 
 // BalanceOf returns the current balance of the address, calling tb.Fatalf on

@@ -22,8 +22,9 @@ const (
 
 // Checkers for ethier modifiers.
 const (
-	NotStarted = Checker("LinearDutchAuction: Not started")
-	SoldOut    = Checker("Seller: Sold out")
+	ERC721ApproveOrOwner = Checker("ERC721Common: Not approved nor owner")
+	NotStarted           = Checker("LinearDutchAuction: Not started")
+	SoldOut              = Checker("Seller: Sold out")
 )
 
 // Diff returns a message describing the difference between err and the Checker

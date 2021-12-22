@@ -1,14 +1,14 @@
 {
   "name": "@divergencetech/ethier",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Golang and Solidity SDK to make Ethereum development ethier",
   "main": "\"\"",
   "scripts": {
     "build": "go build -o build/ethier ethier/*.go",
     "generate": "PATH=\"$(readlink -f build):${PATH}\" go generate ./...",
-    "testlight": "go test ./...",
     "test": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./...",
-    "testverbose": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./... -test.v"
+    "test:light": "go test ./...",
+    "test:verbose": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./... -test.v"
   },
   "repository": {
     "type": "git",
@@ -16,7 +16,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@openzeppelin/contracts": "^4.4.0"
+    "@openzeppelin/contracts": "^4.4.1"
   },
   "directories": {
     "test": "tests"
