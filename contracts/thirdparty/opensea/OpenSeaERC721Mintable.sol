@@ -18,23 +18,19 @@ abstract contract OpenSeaERC721Mintable {
     /// @notice Factory contract deployed by this one's constructor.
     OpenSeaERC721Factory public factory;
 
-    /// @notice Number of options made available to the factory contract.
-    uint256 public numFactoryOptions;
-
     constructor(
         string memory factoryName,
         string memory factorySymbol,
-        uint256 _numFactoryOptions,
+        uint256 numFactoryOptions,
         string memory baseOptionURI
     ) {
         factory = new OpenSeaERC721Factory(
             factoryName,
             factorySymbol,
-            baseOptionURI
+            baseOptionURI,
+            msg.sender,
+            numFactoryOptions
         );
-        factory.transferOwnership(msg.sender);
-
-        numFactoryOptions = _numFactoryOptions;
     }
 
     /**
@@ -87,15 +83,38 @@ contract OpenSeaERC721Factory is Ownable {
     /// @notice Base URI for constructing tokenURI values for options.
     string private baseOptionURI;
 
+    /**
+    @notice Standard ERC721 Transfer event, used to trigger OpenSea into
+    recognising the existence of the factory.
+     */
+    event Transfer(
+        address indexed from,
+        address indexed to,
+        uint256 indexed tokenId
+    );
+
+    uint256 private immutable NUM_OPTIONS;
+
+    /**
+    @param owner Initial contract owner as it will be deployed by another
+    contract but ownership should be transferred to an EOA.
+     */
     constructor(
         string memory _name,
         string memory _symbol,
-        string memory _baseOptionURI
+        string memory _baseOptionURI,
+        address owner,
+        uint256 _numOptions
     ) {
         _name = name_;
         _symbol = symbol_;
         token = OpenSeaERC721Mintable(msg.sender);
         setBaseOptionURI(_baseOptionURI);
+
+        NUM_OPTIONS = _numOptions;
+
+        super.transferOwnership(owner);
+        emitTransfers(address(0), owner);
     }
 
     /// @notice Sets the base URI for constructing tokenURI values for options.
@@ -118,7 +137,30 @@ contract OpenSeaERC721Factory is Ownable {
     contract that deployed this factory.
      */
     function numOptions() external view returns (uint256) {
-        return token.numFactoryOptions();
+        return NUM_OPTIONS;
+    }
+
+    /**
+    @notice Emits standard ERC721.Transfer events for all of the option "tokens"
+    to induce correct OpenSea behaviour. These are first emitted upon contract
+    deployment to signal "creation" of the option tokens, and on any ownership
+    transfer of the contract.
+
+     */
+    function emitTransfers(address from, address to) internal {
+        for (uint256 i = 0; i < NUM_OPTIONS; i++) {
+            emit Transfer(from, to, i);
+        }
+    }
+
+    /**
+    @notice Transfers contract ownership just as with OpenZeppelin's Ownable,
+    but also triggers Transfer events as OpenSea expects the option "tokens" to
+    be owned by the contract owner.
+     */
+    function transferOwnership(address to) public override onlyOwner {
+        emitTransfers(super.owner(), to);
+        super.transferOwnership(to);
     }
 
     /**
@@ -126,9 +168,7 @@ contract OpenSeaERC721Factory is Ownable {
     the factoryCanMint() method of the contract that deployed this factory.
      */
     function canMint(uint256 optionId) external view returns (bool) {
-        return
-            optionId < token.numFactoryOptions() &&
-            token.factoryCanMint(optionId);
+        return optionId < NUM_OPTIONS && token.factoryCanMint(optionId);
     }
 
     /**
@@ -189,7 +229,7 @@ contract OpenSeaERC721Factory is Ownable {
         returns (bool)
     {
         return
-            owner == Ownable.owner() &&
+            owner == super.owner() &&
             (owner == operator ||
                 OpenSeaGasFreeListing.isApprovedForAll(owner, operator));
     }

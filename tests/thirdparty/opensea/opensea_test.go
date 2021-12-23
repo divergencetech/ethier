@@ -12,12 +12,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/h-fam/errdiff"
 )
 
 const (
 	deployer = iota
 	proxy
+	newOwner
 	vandal
 	recipient0
 	recipient1
@@ -67,14 +69,15 @@ func TestFactoryReadOnly(t *testing.T) {
 	})
 
 	t.Run("canMint propagated from primary contract", func(t *testing.T) {
-		for i := int64(0); i < numOptions; i++ {
+		for i := int64(0); i < numOptions+5; i++ {
 			can := i%2 == 0
 			sim.Must(t, "SetCanMint(%d, %t)", i, can)(nft.SetCanMint(sim.Acc(deployer), big.NewInt(i), can))
 
-			// Although set on the NFT contract, test that the factory propagates
-			// this.
+			// Although set on the NFT contract, test that the factory
+			// propagates this but also limits to the number of available
+			// options regardless of what the primary contract returns.
 			got, err := factory.CanMint(nil, big.NewInt(i))
-			if want := can; err != nil || got != want {
+			if want := can && i < numOptions; err != nil || got != want {
 				t.Errorf("%T.CanMint(%d) after setting on primary contract; got %t, err = %v; want %t, nil err", factory, i, got, err, want)
 			}
 		}
@@ -97,6 +100,55 @@ func TestFactoryReadOnly(t *testing.T) {
 			t.Errorf("%T.Owner() got %v, err = %v; want %v (deploying address, not primary contract), nil err", factory, got, err, want)
 		}
 	})
+}
+
+func TestTransferEvents(t *testing.T) {
+	const numOptions = 5
+	sim, _, factory := deploy(t, numOptions, "")
+
+	sim.Must(t, "TransferOwnership()")(factory.TransferOwnership(sim.Acc(deployer), sim.Addr(newOwner)))
+
+	iter, err := factory.FilterTransfer(nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("%T.FilterTransfer(nil, nil, nil, nil) error %v", factory, err)
+	}
+	defer iter.Close()
+
+	var got, want []*OpenSeaERC721FactoryTransfer
+	for iter.Next() {
+		got = append(got, iter.Event)
+	}
+	if err := iter.Error(); err != nil {
+		t.Fatalf("%T.Error(): %v", iter, err)
+	}
+
+	// Contract deployment must trigger a single Transfer event per option, from
+	// the zero address to the EOA deployer of the contracts (not to the NFT
+	// contract that actually deploys the factory).
+	for i := int64(0); i < numOptions; i++ {
+		want = append(want, &OpenSeaERC721FactoryTransfer{
+			From:    common.Address{}, // initially from address(0),
+			To:      sim.Addr(deployer),
+			TokenId: big.NewInt(i),
+		})
+	}
+	// Ownership transfer must also result in Transfer events to the new owner.
+	for i := int64(0); i < numOptions; i++ {
+		want = append(want, &OpenSeaERC721FactoryTransfer{
+			From:    sim.Addr(deployer),
+			To:      sim.Addr(newOwner),
+			TokenId: big.NewInt(i),
+		})
+	}
+
+	ignore := append(
+		ethtest.Comparers(),
+		cmpopts.IgnoreFields(OpenSeaERC721FactoryTransfer{}, "Raw"),
+	)
+
+	if diff := cmp.Diff(want, got, ignore...); diff != "" {
+		t.Errorf("After %T deployment and single ownership transfer; Transfer events diff (-want +got):\n%s", factory, diff)
+	}
 }
 
 func TestMint(t *testing.T) {
