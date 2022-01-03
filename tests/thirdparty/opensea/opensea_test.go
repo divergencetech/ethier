@@ -8,6 +8,7 @@ import (
 
 	"github.com/divergencetech/ethier/ethtest"
 	"github.com/divergencetech/ethier/ethtest/openseatest"
+	"github.com/divergencetech/ethier/ethtest/revert"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -23,6 +24,7 @@ const (
 	vandal
 	recipient0
 	recipient1
+	recipient2
 
 	numAccounts
 )
@@ -207,6 +209,20 @@ func TestMint(t *testing.T) {
 			mintOption: 2,
 			mintTo:     sim.Addr(recipient1),
 		},
+		{
+			// This is how OpenSea has hacked the ERC721 standard + Wyvern
+			// protocol to mint directly on their site. A standard listing of a
+			// factory token results in a call to transferFrom(owner, buyer)
+			// that results in a new mint for the buyer.
+			name:     "factory.transferFrom() propagates to mint()",
+			contract: factory,
+			mint: func(opts *bind.TransactOpts, optionID *big.Int, to common.Address) (*types.Transaction, error) {
+				return factory.TransferFrom(opts, common.Address{}, to, optionID)
+			},
+			mintAs:     sim.Acc(proxy),
+			mintOption: 3,
+			mintTo:     sim.Addr(recipient2),
+		},
 	}
 
 	// Value will be checked iff all tests pass so we know that the contract is
@@ -219,6 +235,10 @@ func TestMint(t *testing.T) {
 		{
 			OptionId: big.NewInt(2),
 			To:       sim.Addr(recipient1),
+		},
+		{
+			OptionId: big.NewInt(3),
+			To:       sim.Addr(recipient2),
 		},
 	}
 
@@ -254,6 +274,24 @@ func TestMint(t *testing.T) {
 
 	if diff := cmp.Diff(wantMinted, gotMinted, ethtest.Comparers()...); diff != "" {
 		t.Errorf("All %T.Mints() after successful and blocked mints; (-want +got) diff:\n%s", nft, diff)
+	}
+}
+
+func TestMintPausing(t *testing.T) {
+	sim, _, factory := deploy(t, 1, "")
+
+	mint := func() (*types.Transaction, error) {
+		return factory.Mint(sim.Acc(deployer), big.NewInt(0), sim.Addr(recipient0))
+	}
+
+	sim.Must(t, "factory.Pause()")(factory.Pause(sim.Acc(deployer)))
+	if diff := revert.Paused.Diff(mint()); diff != "" {
+		t.Errorf("%T.Mint() when paused; %s", factory, diff)
+	}
+
+	sim.Must(t, "factory.Unpause()")(factory.Unpause(sim.Acc(deployer)))
+	if _, err := mint(); err != nil {
+		t.Errorf("%T.Mint() when not paused; error %v", factory, err)
 	}
 }
 

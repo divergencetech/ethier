@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "./OpenSeaGasFreeListing.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "../../utils/OwnerPausable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
@@ -70,7 +70,7 @@ abstract contract OpenSeaERC721Mintable {
 @dev There is likely no need to use this contract directly; intead, inherit from
 OpenSeaERC721Mintable and implement the necessary virtual functions.
  */
-contract OpenSeaERC721Factory is Ownable {
+contract OpenSeaERC721Factory is OwnerPausable {
     using Strings for uint256;
 
     /// @notice Contract that deployed this factory.
@@ -168,7 +168,10 @@ contract OpenSeaERC721Factory is Ownable {
     the factoryCanMint() method of the contract that deployed this factory.
      */
     function canMint(uint256 optionId) external view returns (bool) {
-        return optionId < NUM_OPTIONS && token.factoryCanMint(optionId);
+        return
+            !paused() &&
+            optionId < NUM_OPTIONS &&
+            token.factoryCanMint(optionId);
     }
 
     /**
@@ -193,7 +196,7 @@ contract OpenSeaERC721Factory is Ownable {
     Wyvern proxy, then proxies the call to the factoryMint() method of the
     contract that deployed this factory.
      */
-    function mint(uint256 optionId, address to) public {
+    function mint(uint256 optionId, address to) public whenNotPaused {
         require(
             msg.sender == owner() ||
                 msg.sender == OpenSeaGasFreeListing.proxyFor(owner()),
