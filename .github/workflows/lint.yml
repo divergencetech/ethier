@@ -31,11 +31,11 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ./node_modules
-          key: modules-${{ hashFiles('package-lock.json') }}
+          key: modules-${{ hashFiles('yarn.lock') }}
 
-      - name: Install npm dependencies
+      - name: Install yarn dependencies
         if: steps.cache.outputs.cache-hit != 'true'
-        run: npm ci --ignore-scripts
+        run: rm -rf node_modules && yarn install --frozen-lockfile
 
       - name: Check Solidity code formatting
         run: npx prettier '**/*.sol' --check
