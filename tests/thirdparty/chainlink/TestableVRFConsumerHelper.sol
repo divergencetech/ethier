@@ -4,12 +4,16 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "../../../contracts/thirdparty/chainlink/Chainlink.sol";
 import "../../../contracts/thirdparty/chainlink/VRFConsumerHelper.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
 @notice A testable version of VRFConsumerHelper that (a) confirms plumbing of
 functions, and (b) allows testing of the ethier chainlinktest VRF fake.
+@dev Although the contract doesn't have to be Ownable, the exposed withdrawLINK
+function may be copy-pasted as an example code, so ensure that it has the
+onlyOwner modifier.
  */
-contract TestableVRFConsumerHelper is VRFConsumerHelper {
+contract TestableVRFConsumerHelper is Ownable, VRFConsumerHelper {
     /**
     @notice Values required by VRFConsumerBase and stored here to allow us to
     benchmark gas usage of Chainlink library vs regular approach of reading
@@ -61,5 +65,13 @@ contract TestableVRFConsumerHelper is VRFConsumerHelper {
      */
     function standardRequestRandomness() external {
         lastRequestId = VRFConsumerBase.requestRandomness(keyHash, fee);
+    }
+
+    /// @notice Exposes the internal _withdrawLINK function.
+    function withdrawLINK(address recipient, uint256 amount)
+        external
+        onlyOwner
+    {
+        _withdrawLINK(recipient, amount);
     }
 }

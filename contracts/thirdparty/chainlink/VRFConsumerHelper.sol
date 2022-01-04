@@ -4,7 +4,6 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "./Chainlink.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
@@ -13,7 +12,7 @@ know constants such as contract addresses.
 @dev This contract should be used in an identical manner to Chainlink's standard
 VRFConsumerBase, along with all the same best practices.
  */
-abstract contract VRFConsumerHelper is Ownable, VRFConsumerBase {
+abstract contract VRFConsumerHelper is VRFConsumerBase {
     constructor()
         VRFConsumerBase(Chainlink.vrfCoordinator(), Chainlink.linkToken())
     {}
@@ -28,10 +27,7 @@ abstract contract VRFConsumerHelper is Ownable, VRFConsumerBase {
     }
 
     /// @notice Withdraws LINK tokens, sending them to the recipient.
-    function withdrawLINK(address recipient, uint256 amount)
-        external
-        onlyOwner
-    {
+    function _withdrawLINK(address recipient, uint256 amount) internal {
         require(
             IERC20(Chainlink.linkToken()).transfer(recipient, amount),
             "VRFConsumerHelper: withdrawal failed"
