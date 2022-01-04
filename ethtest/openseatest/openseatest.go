@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// rroxyRegistry is the address at which the simulated ProxyRegistry is deployed
+// proxyRegistry is the address at which the simulated ProxyRegistry is deployed
 // by DeployProxyRegistry(). This is deterministic because mocked entities in
 // ethtest.SimulatedBackend have deterministic keys.
 var proxyRegistry = common.HexToAddress("E1a2bbc877b29ADBC56D2659DBcb0ae14ee62071")

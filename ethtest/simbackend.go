@@ -78,7 +78,7 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 
 	// These accounts need to be deterministic so that any contracts they deploy
 	// have deterministic addresses.
-	for _, mock := range []MockedEntity{OpenSea} {
+	for _, mock := range []MockedEntity{OpenSea, Chainlink} {
 		entropy := bytes.NewReader(crypto.Keccak512([]byte(mock)))
 		key, err := ecdsa.GenerateKey(crypto.S256(), entropy)
 		if err != nil {
@@ -165,7 +165,8 @@ type MockedEntity string
 
 // Mocked entities.
 const (
-	OpenSea = MockedEntity("OpenSea")
+	OpenSea   = MockedEntity("OpenSea")
+	Chainlink = MockedEntity("Chainlink")
 )
 
 // AsMockedEntity calls the provided function with the mocked entity's account
