@@ -7,6 +7,7 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@chainlink/contracts/src/v0.8/VRFRequestIDBase.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**
 @notice Deploys simulated Chainlink assets for a VRF mock compatible with the
@@ -33,14 +34,8 @@ contract SimulatedChainlink {
 }
 
 /// @notice A minimal contract to mock the LINK token for VRFConsumerBase.
-contract SimulatedLinkToken {
-    using Strings for uint256;
-
-    SimulatedChainlink private immutable deployer;
-
-    constructor() {
-        deployer = SimulatedChainlink(msg.sender);
-    }
+contract SimulatedLinkToken is ERC20 {
+    constructor() ERC20("ChainLink Token", "LINK") {}
 
     /**
     @notice Emitted on a valid call to transferAndCall(); will be watched by the
@@ -55,7 +50,7 @@ contract SimulatedLinkToken {
         bytes calldata data
     ) external returns (bool success) {
         require(
-            to == address(deployer.vrfCoordinator()),
+            to == address(Chainlink.vrfCoordinator()),
             "Simulated LINK token: incorrect VRF Coordinator"
         );
         require(
@@ -74,34 +69,9 @@ contract SimulatedLinkToken {
         return true;
     }
 
-    mapping(address => uint256) public balanceOf;
-
-    /**
-    @notice Transfers the amount to the recipient from the message sender.
-     */
-    function transfer(address recipient, uint256 amount) public returns (bool) {
-        require(
-            balanceOf[msg.sender] >= amount,
-            string(
-                abi.encodePacked(
-                    uint256(uint160(msg.sender)).toHexString(20),
-                    " has insufficient balance ",
-                    (balanceOf[msg.sender] / 1e14).toString(),
-                    "e14 to transfer ",
-                    (amount / 1e14).toString(),
-                    "e14 to ",
-                    uint256(uint160(recipient)).toHexString(20)
-                )
-            )
-        );
-        balanceOf[msg.sender] -= amount;
-        balanceOf[recipient] += amount;
-        return true;
-    }
-
     /// @notice Increases the recipient's balance by the specified amount.
     function faucet(address recipient, uint256 amount) external {
-        balanceOf[recipient] += amount;
+        _mint(recipient, amount);
     }
 }
 

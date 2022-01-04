@@ -26,11 +26,11 @@ abstract contract VRFConsumerHelper is VRFConsumerBase {
             super.requestRandomness(Chainlink.vrfKeyHash(), Chainlink.vrfFee());
     }
 
-    /// @notice Withdraws LINK tokens, sending them to the recipient.
-    function _withdrawLINK(address recipient, uint256 amount) internal {
+    /// @notice Transfers LINK tokens to the recipient.
+    function transferLINK(address recipient, uint256 amount) internal {
         require(
             IERC20(Chainlink.linkToken()).transfer(recipient, amount),
-            "VRFConsumerHelper: withdrawal failed"
+            "VRFConsumerHelper: transfer failed"
         );
     }
 }
