@@ -179,7 +179,7 @@ func TestWithdraw(t *testing.T) {
 			wantBefore:     chainlinktest.Fee(10),
 			withdraw:       big.NewInt(1),
 			wantAfter:      chainlinktest.Fee(10),
-			errDiffAgainst: "insufficient balance",
+			errDiffAgainst: "ERC20: transfer amount exceeds balance",
 		},
 	}
 
