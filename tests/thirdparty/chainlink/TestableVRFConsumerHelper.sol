@@ -67,11 +67,11 @@ contract TestableVRFConsumerHelper is Ownable, VRFConsumerHelper {
         lastRequestId = VRFConsumerBase.requestRandomness(keyHash, fee);
     }
 
-    /// @notice Exposes the link transfer helper method
-    function transferLink_(address recipient, uint256 amount)
+    /// @notice Exposes the internal _withdrawLINK function.
+    function withdrawLINK(address recipient, uint256 amount)
         external
         onlyOwner
     {
-        transferLINK(recipient, amount);
+        _withdrawLINK(recipient, amount);
     }
 }

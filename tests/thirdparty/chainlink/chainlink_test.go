@@ -134,7 +134,7 @@ func TestMultipleConsumers(t *testing.T) {
 	vrf.WaitFulfilledTB(t)
 }
 
-func TestTransfer(t *testing.T) {
+func TestWithdraw(t *testing.T) {
 	const faucet = 10
 	sim, _, rand := deploy(t, faucet)
 
@@ -152,32 +152,32 @@ func TestTransfer(t *testing.T) {
 	}
 
 	tests := []struct {
-		wantBefore, transfer, wantAfter *big.Int
+		wantBefore, withdraw, wantAfter *big.Int
 		errDiffAgainst                  interface{}
 	}{
 		{
 			wantBefore: big.NewInt(0),
-			transfer:   chainlinktest.Fee(1),
+			withdraw:   chainlinktest.Fee(1),
 			wantAfter:  chainlinktest.Fee(1),
 		},
 		{
 			wantBefore: chainlinktest.Fee(1),
-			transfer:   chainlinktest.Fee(2),
+			withdraw:   chainlinktest.Fee(2),
 			wantAfter:  chainlinktest.Fee(3),
 		},
 		{
 			wantBefore: chainlinktest.Fee(3),
-			transfer:   chainlinktest.Fee(3),
+			withdraw:   chainlinktest.Fee(3),
 			wantAfter:  chainlinktest.Fee(6),
 		},
 		{
 			wantBefore: chainlinktest.Fee(6),
-			transfer:   chainlinktest.Fee(4),
+			withdraw:   chainlinktest.Fee(4),
 			wantAfter:  chainlinktest.Fee(10),
 		},
 		{
 			wantBefore:     chainlinktest.Fee(10),
-			transfer:       big.NewInt(1),
+			withdraw:       big.NewInt(1),
 			wantAfter:      chainlinktest.Fee(10),
 			errDiffAgainst: "ERC20: transfer amount exceeds balance",
 		},
@@ -186,9 +186,9 @@ func TestTransfer(t *testing.T) {
 	for _, tt := range tests {
 		wantBalance(t, tt.wantBefore)
 
-		_, err := rand.TransferLink(sim.Acc(0), sim.Addr(0), tt.transfer)
+		_, err := rand.WithdrawLINK(sim.Acc(0), sim.Addr(0), tt.withdraw)
 		if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
-			t.Errorf("TransferLink(%d) %s", tt.transfer, diff)
+			t.Errorf("WithdrawLINK(%d) %s", tt.withdraw, diff)
 		}
 
 		wantBalance(t, tt.wantAfter)
