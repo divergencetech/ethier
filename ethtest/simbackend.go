@@ -37,6 +37,9 @@ var _ bind.ContractBackend = (*SimulatedBackend)(nil)
 // NewSimulatedBackend returns a new simulated ETH backend with the specified
 // number of accounts. Transactions are automatically committed unless. Close()
 // must be called to free resources after use.
+//
+// Accounts are deterministically generated so have identical addresses between
+// backends, but balances are coupled to the specific instance of the backend.
 func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 	sb := &SimulatedBackend{
 		AutoCommit:   true,
@@ -52,7 +55,13 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 		}
 	}
 
-	createAccount := func(key *ecdsa.PrivateKey) (*bind.TransactOpts, error) {
+	createAccount := func(seed []byte) (*bind.TransactOpts, error) {
+		entropy := bytes.NewReader(crypto.Keccak512(seed))
+		key, err := ecdsa.GenerateKey(crypto.S256(), entropy)
+		if err != nil {
+			return nil, fmt.Errorf("ecdsa.GenerateKey(crypto.S256, [deterministic entropy; Keccak512(%q)]): %v", seed, err)
+		}
+
 		txOpts, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
 		if err != nil {
 			return nil, fmt.Errorf("NewKeyedTransactorWithChainID(<new key>, sim-backend-id=1337): %v", err)
@@ -64,12 +73,7 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 	}
 
 	for i := 0; i < numAccounts; i++ {
-		key, err := crypto.GenerateKey()
-		if err != nil {
-			return nil, fmt.Errorf("crypto.GenerateKey(): %v", err)
-		}
-
-		txOpts, err := createAccount(key)
+		txOpts, err := createAccount([]byte(fmt.Sprintf("account:%d", i)))
 		if err != nil {
 			return nil, err
 		}
@@ -79,13 +83,7 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 	// These accounts need to be deterministic so that any contracts they deploy
 	// have deterministic addresses.
 	for _, mock := range []MockedEntity{OpenSea, Chainlink} {
-		entropy := bytes.NewReader(crypto.Keccak512([]byte(mock)))
-		key, err := ecdsa.GenerateKey(crypto.S256(), entropy)
-		if err != nil {
-			return nil, fmt.Errorf("ecdsa.GenerateKey(crypto.S256, [deterministic entropy; Keccak512(%q)]): %v", mock, err)
-		}
-
-		txOpts, err := createAccount(key)
+		txOpts, err := createAccount([]byte(mock))
 		if err != nil {
 			return nil, err
 		}
