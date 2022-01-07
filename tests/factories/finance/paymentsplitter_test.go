@@ -16,15 +16,15 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-func deploy(t *testing.T, numAccounts, deploymentAcc int) (*ethtest.SimulatedBackend, *PaymentSplitterDeployer, <-chan *PaymentSplitterDeployerPaymentSplitterDeployed) {
+func deploy(t *testing.T, numAccounts, deploymentAcc int) (*ethtest.SimulatedBackend, *PaymentSplitterFactory, <-chan *PaymentSplitterFactoryPaymentSplitterDeployed) {
 	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
 
-	_, _, dep, err := DeployPaymentSplitterDeployer(sim.Acc(deploymentAcc), sim)
+	_, _, dep, err := DeployPaymentSplitterFactory(sim.Acc(deploymentAcc), sim)
 	if err != nil {
-		t.Fatalf("DeployPaymentSplitterDeployer() error %v", err)
+		t.Fatalf("DeployPaymentSplitterFactory() error %v", err)
 	}
 
-	events := make(chan *PaymentSplitterDeployerPaymentSplitterDeployed)
+	events := make(chan *PaymentSplitterFactoryPaymentSplitterDeployed)
 	t.Cleanup(func() { close(events) })
 	if _, err := dep.WatchPaymentSplitterDeployed(nil, events); err != nil {
 		t.Fatalf("%T.WatchPaymentSplitterDeployed() error %v", dep, err)
@@ -91,19 +91,18 @@ func TestPaymentSplitterProxy(t *testing.T) {
 			cloned := ev.ClonedPaymentSplitter
 
 			t.Run("no re-init", func(t *testing.T) {
-				d, err := NewProxiedPaymentSplitter(cloned, sim)
+				d, err := NewDelegatedPaymentSplitter(cloned, sim)
 				if err != nil {
-					t.Fatalf("NewProxiedPaymentSplitter(address from Deploy() event) error %v", err)
+					t.Fatalf("NewDelegatedPaymentSplitter(address from Deploy() event) error %v", err)
 				}
 
-				check := revert.Checker("ProxiedPaymentSplitter: already initialised")
-				if diff := check.Diff(d.Init(sim.Acc(deployer), payees[:2], shares[:2])); diff != "" {
-					t.Errorf("%T.Init() attempt to overwrite payees; %s", d, diff)
+				if diff := revert.AlreadyInitialized.Diff(d.Initialize(sim.Acc(deployer), payees[:2], shares[:2])); diff != "" {
+					t.Errorf("%T.Initialize() when attempting to overwrite payees; %s", d, diff)
 				}
 			})
 
 			// Note that although we have deployed a proxy to a
-			// ProxiedPaymentSplitter, it has an otherwise identical function
+			// DelegatedPaymentSplitter, it has an otherwise identical function
 			// signature so we test with the standard contract.
 			split, err := NewPaymentSplitter(cloned, sim)
 			if err != nil {
@@ -185,9 +184,9 @@ func ExampleGasSaving() {
 		return
 	}
 
-	_, _, dep, err := DeployPaymentSplitterDeployer(sim.Acc(0), sim)
+	_, _, dep, err := DeployPaymentSplitterFactory(sim.Acc(0), sim)
 	if err != nil {
-		fmt.Printf("DeployPaymentSplitterDeployer(): %v", err)
+		fmt.Printf("DeployPaymentSplitterFactory(): %v", err)
 		return
 	}
 
@@ -236,10 +235,10 @@ func ExampleGasSaving() {
 	fmt.Printf("At $%s: $%s", comma(ethToUSD), ethSave.Mul(ethSave, big.NewRat(ethToUSD, 1)).FloatString(2))
 
 	// Output:
-	// Deploy proxy: 285,128 gas
+	// Deploy proxy: 286,982 gas
 	// Deploy full PaymentSplitter: 1,589,010 gas
 	// *** Savings ***
-	// Gas:  1,303,882
+	// Gas:  1,302,028
 	// At 100 gwei: 0.130Ξ
-	// At $3,500: $456.36
+	// At $3,500: $455.71
 }

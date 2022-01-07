@@ -15,9 +15,10 @@ const Any = Checker("execution reverted: ")
 
 // Checkers for OpenZeppelin modifiers.
 const (
-	OnlyOwner = Checker("Ownable: caller is not the owner")
-	Paused    = Checker("Pausable: paused")
-	Reentrant = Checker("ReentrancyGuard: reentrant call")
+	AlreadyInitialized = Checker("Initializable: contract is already initialized")
+	OnlyOwner          = Checker("Ownable: caller is not the owner")
+	Paused             = Checker("Pausable: paused")
+	Reentrant          = Checker("ReentrancyGuard: reentrant call")
 )
 
 // Checkers for ethier modifiers.
