@@ -96,35 +96,11 @@ func (s *Signer) Address() common.Address {
 	return crypto.PubkeyToAddress(s.key.PublicKey)
 }
 
-// RawSign returns an ECDSA signature of buf. USE WITH CAUTION as signed data
-// SHOULD be hashed first to avoid chosen-plaintext attacks. Prefer
-// Signer.Sign().
-func (s *Signer) RawSign(buf []byte) ([]byte, error) {
-	sig, _, err := s.sign(buf, signOpts{
-		raw:       true,
-		compact:   false,
-		personal:  false,
-		withNonce: false,
-	})
-	return sig, err
-}
-
-// Sign returns an ECDSA signature of keccak256(buf).
-func (s *Signer) Sign(buf []byte) ([]byte, error) {
-	sig, _, err := s.sign(buf, signOpts{
-		raw:       false,
-		compact:   false,
-		personal:  false,
-		withNonce: false,
-	})
-	return sig, err
-}
-
-// CompactifySignature converts a signature with the final byte, the y parity
+// CompactSignature converts a signature with the final byte, the y parity
 // (always 0 or 1), carried in the highest bit of the s parameter, as per
 // EIP-2098. Using compact signatures reduces gas by removing a word from
 // calldata, and is compatible with OpenZeppelin's ECDSA.recover() helper.
-func CompactifySignature(rsv []byte) ([]byte, error) {
+func CompactSignature(rsv []byte) ([]byte, error) {
 	// Convert the 65-byte signature returned by Sign() into a 64-byte
 	// compressed version, as described in
 	// https://eips.ethereum.org/EIPS/eip-2098.
@@ -157,6 +133,79 @@ func ToEthPersonalSignedMessage(message []byte) []byte {
 	return append(prefix, message...)
 }
 
+type signOpts struct {
+	raw, compact, personal, withNonce bool
+}
+
+// sign signs a given buffer depending on the chosen options:
+// withNonce = true, appends a nonce to the message
+// compact = true, returns a compactified version of the signature according to
+// EIP-2098.
+// personal = true, adds a prefix to the message to conform to the EIP-191
+// personal message standard.
+// raw = false, the message is hashed before signing
+func (s *Signer) sign(buf []byte, opts signOpts) ([]byte, *[32]byte, error) {
+	var nonce *[32]byte
+	var err error
+
+	if opts.withNonce {
+		var n [32]byte
+		buf, n, err = AppendRandomNonce(buf)
+		nonce = &n
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if opts.personal {
+		buf = ToEthPersonalSignedMessage(buf)
+	}
+
+	if !opts.raw {
+		buf = crypto.Keccak256(buf)
+	}
+
+	sig, err := crypto.Sign(buf, s.key)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if !opts.compact {
+		return sig, nonce, nil
+	}
+
+	sig, err = CompactSignature(sig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return sig, nonce, nil
+}
+
+// RawSign returns an ECDSA signature of buf. USE WITH CAUTION as signed data
+// SHOULD be hashed first to avoid chosen-plaintext attacks. Prefer
+// Signer.Sign().
+func (s *Signer) RawSign(buf []byte) ([]byte, error) {
+	sig, _, err := s.sign(buf, signOpts{
+		raw:       true,
+		compact:   false,
+		personal:  false,
+		withNonce: false,
+	})
+	return sig, err
+}
+
+// Sign returns an ECDSA signature of keccak256(buf).
+func (s *Signer) Sign(buf []byte) ([]byte, error) {
+	sig, _, err := s.sign(buf, signOpts{
+		raw:       false,
+		compact:   false,
+		personal:  false,
+		withNonce: false,
+	})
+	return sig, err
+}
+
 // PersonalSign returns an EIP-191 conform personal ECDSA signature of buf
 // Convenience wrapper for s.CompactSign(toEthPersonalSignedMessage(buf))
 func (s *Signer) PersonalSign(buf []byte) ([]byte, error) {
@@ -180,48 +229,6 @@ func (s *Signer) PersonalSignWithNonce(buf []byte) ([]byte, [32]byte, error) {
 	})
 	return sig, *nonce, err
 
-}
-
-type signOpts struct {
-	raw, compact, personal, withNonce bool
-}
-
-// sign signs a given buffer depending on the chosen options:
-// withNonce = true, appends a nonce to the message
-// compact = true, returns a compactified version of the signature according to
-// EIP-2098.
-// personal = true, adds a prefix to the message to conform to the EIP-191
-// personal message standard.
-// raw = false, the message is hashed before signing
-func (s *Signer) sign(buf []byte, opts signOpts) ([]byte, *[32]byte, error) {
-	var nonce [32]byte
-	var err error
-
-	if opts.withNonce {
-		buf, nonce, err = AppendRandomNonce(buf)
-	}
-
-	if opts.personal {
-		buf = ToEthPersonalSignedMessage(buf)
-	}
-
-	if !opts.raw {
-		buf = crypto.Keccak256(buf)
-	}
-
-	sig, err := crypto.Sign(buf, s.key)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if opts.compact {
-		sig, err = CompactifySignature(sig)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	return sig, &nonce, nil
 }
 
 // SignAddress is a convenience wrapper for s.PersonalSign(addr.Bytes()).
