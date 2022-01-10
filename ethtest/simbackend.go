@@ -82,7 +82,7 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 
 	// These accounts need to be deterministic so that any contracts they deploy
 	// have deterministic addresses.
-	for _, mock := range []MockedEntity{OpenSea, Chainlink} {
+	for _, mock := range []MockedEntity{OpenSea, Chainlink, Ethier} {
 		txOpts, err := createAccount([]byte(mock))
 		if err != nil {
 			return nil, err
@@ -165,6 +165,7 @@ type MockedEntity string
 const (
 	OpenSea   = MockedEntity("OpenSea")
 	Chainlink = MockedEntity("Chainlink")
+	Ethier    = MockedEntity("Ethier")
 )
 
 // AsMockedEntity calls the provided function with the mocked entity's account

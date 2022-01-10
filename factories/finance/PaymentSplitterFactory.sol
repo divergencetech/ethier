@@ -2,6 +2,7 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
+import "../../contracts/factories/IPaymentSplitterFactory.sol";
 import "./DelegatedPaymentSplitter.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
@@ -15,7 +16,7 @@ deployments will be published on github.com/divergencetech/ethier.
 NOTE: there is likely no need to import this contract directly; instead see the
 ethier documentation for the deployed factory addresses.
  */
-contract PaymentSplitterFactory {
+contract PaymentSplitterFactory is IPaymentSplitterFactory {
     using Clones for address;
 
     /**
@@ -31,7 +32,7 @@ contract PaymentSplitterFactory {
     /// @notice Emitted when a new PaymentSplitter is deployed.
     event PaymentSplitterDeployed(address clonedPaymentSplitter);
 
-    /// @notice Deploy a minimal contract proxy to a PaymentSplitter.
+    /// @notice Deploys a minimal contract proxy to a PaymentSplitter.
     function deploy(address[] memory payees, uint256[] memory shares)
         external
         returns (address)
@@ -42,7 +43,7 @@ contract PaymentSplitterFactory {
     }
 
     /**
-    @notice Deploy a minimal contract proxy to a PaymentSplitter, at a
+    @notice Deploys a minimal contract proxy to a PaymentSplitter, at a
     deterministic address.
     @dev Use predictDeploymentAddress() with the same salt to predit the address
     before calling deployDeterministic(). See OpenZeppelin's proxy/Clones.sol

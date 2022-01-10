@@ -143,10 +143,7 @@ func TestTransferEvents(t *testing.T) {
 		})
 	}
 
-	ignore := append(
-		ethtest.Comparers(),
-		cmpopts.IgnoreFields(OpenSeaERC721FactoryTransfer{}, "Raw"),
-	)
+	ignore := ethtest.Comparers(cmpopts.IgnoreFields(OpenSeaERC721FactoryTransfer{}, "Raw"))
 
 	if diff := cmp.Diff(want, got, ignore...); diff != "" {
 		t.Errorf("After %T deployment and single ownership transfer; Transfer events diff (-want +got):\n%s", factory, diff)

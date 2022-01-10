@@ -9,11 +9,15 @@ import (
 
 	"github.com/divergencetech/ethier/eth"
 	"github.com/divergencetech/ethier/ethtest"
+	"github.com/divergencetech/ethier/ethtest/factorytest"
 	"github.com/divergencetech/ethier/ethtest/revert"
 	"github.com/dustin/go-humanize"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func deploy(t *testing.T, numAccounts, deploymentAcc int) (*ethtest.SimulatedBackend, *PaymentSplitterFactory, <-chan *PaymentSplitterFactoryPaymentSplitterDeployed) {
@@ -241,4 +245,65 @@ func ExampleGasSaving() {
 	// Gas:  1,302,028
 	// At 100 gwei: 0.130Ξ
 	// At $3,500: $455.71
+}
+
+func TestChainAgnosticLibrary(t *testing.T) {
+	ctx := context.Background()
+	sim := ethtest.NewSimulatedBackendTB(t, 3)
+
+	// Deploys an instance of the PaymentSplitterFactory to a deterministic
+	// address, similarly to how there will be known addresses of main- and
+	// test-net deployments. All of these addresses are made available in the
+	// PaymentSplitterDeployer library, which determines the correct address
+	// based on the chain ID.
+	factorytest.DeployPaymentSplitterFactoryTB(t, sim)
+
+	// Deploys a contract that uses the aforementioned library.
+	_, _, deployer, err := DeployTestablePaymentSplitterDeployer(sim.Acc(0), sim)
+	if err != nil {
+		t.Fatalf("DeployTestablePaymentSplitterDeployer() error %v", err)
+	}
+
+	var salt [32]byte
+	addr, err := deployer.PredictDeploymentAddress(nil, salt)
+	if err != nil {
+		t.Fatalf("%T.PredictDeploymentAddress(%#x) error %v", deployer, salt, err)
+	}
+
+	tx, err := deployer.DeployDeterministic(sim.Acc(0), salt, []common.Address{sim.Addr(1), sim.Addr(2)}, []*big.Int{big.NewInt(1), big.NewInt(2)})
+	if err != nil {
+		t.Fatalf("%T.DeployDeterministic(salt %#x) error %v", deployer, salt, err)
+	}
+	rcpt, err := bind.WaitMined(ctx, sim, tx)
+	if err != nil {
+		t.Fatalf("bind.WaitMined(transaction from deployment with library) error %v", err)
+	}
+	got := rcpt.Logs
+
+	topics := func(event string) []common.Hash {
+		h := common.BytesToHash(crypto.Keccak256([]byte(event)))
+		t.Logf("Event %q -> topic hash %v", event, h)
+		return []common.Hash{h}
+	}
+
+	want := []*types.Log{
+		{
+			Topics: topics("PayeeAdded(address,uint256)"),
+			Data:   append(common.LeftPadBytes(sim.Addr(1).Bytes(), 32), common.LeftPadBytes([]byte{1}, 32)...),
+		},
+		{
+			Topics: topics("PayeeAdded(address,uint256)"),
+			Data:   append(common.LeftPadBytes(sim.Addr(2).Bytes(), 32), common.LeftPadBytes([]byte{2}, 32)...),
+		},
+		{
+			Topics: topics("PaymentSplitterDeployed(address)"),
+			Data:   common.LeftPadBytes(addr.Bytes(), 32),
+		},
+	}
+
+	ignore := cmpopts.IgnoreFields(types.Log{}, "Address", "BlockHash", "BlockNumber", "Index", "TxHash")
+
+	if diff := cmp.Diff(want, got, ignore); diff != "" {
+		t.Errorf("Events emitted by %T.DeployDeterministic(salt %#x) (-want +got) diff:\n%s", deployer, salt, diff)
+	}
 }

@@ -45,9 +45,11 @@ func LogGas(tb testing.TB, tx *types.Transaction, prefix string) {
 	tb.Logf("[%s] %s = %s%s @ %d gwei", prefix, humanize.Comma(int64(tx.Gas())), cost.FloatString(4), eth.Symbol, GasPrice)
 }
 
-// Comparers returns common comparison Options for cmp.Diff(); e.g. for big.Int.
-func Comparers() []cmp.Option {
-	return []cmp.Option{
+// Comparers returns `extra`, appended with common comparison Options for
+// cmp.Diff(); e.g. for big.Int,
+func Comparers(extra ...cmp.Option) []cmp.Option {
+	return append(
+		extra,
 		cmp.Comparer(func(a, b *big.Int) bool {
 			switch {
 			case a == nil && b == nil:
@@ -58,5 +60,5 @@ func Comparers() []cmp.Option {
 				return a.Cmp(b) == 0
 			}
 		}),
-	}
+	)
 }
