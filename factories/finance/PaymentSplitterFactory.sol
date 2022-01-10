@@ -12,7 +12,7 @@ exposes functions to deploy such proxies to random or deterministic addresses.
 @dev As only a single instance of this contract need exist, the addresses of
 deployments will be published on github.com/divergencetech/ethier.
 
-NOTE: there is likely no need to use this contract directly; instead see the
+NOTE: there is likely no need to import this contract directly; instead see the
 ethier documentation for the deployed factory addresses.
  */
 contract PaymentSplitterFactory {

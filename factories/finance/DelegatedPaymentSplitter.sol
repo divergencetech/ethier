@@ -12,7 +12,7 @@ required for cloning with an EIP-1677 minimal contract proxy.
 @dev Cloning only replicates the implementation logic, but not the data
 associated with each clone. See EIP-1677 for details.
 
-NOTE: there is likely no need to use this contract directly; instead see the
+NOTE: there is likely no need to import this contract directly; instead see the
 ethier documentation for the deployed factory addresses.
  */
 contract DelegatedPaymentSplitter is PaymentSplitterUpgradeable {
