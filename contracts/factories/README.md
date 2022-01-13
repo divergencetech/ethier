@@ -59,5 +59,5 @@ contract LookMaNoAddress {
 ### Verified Factories
 
 * `PaymentSplitter`
-  * (Mainnet)[https://etherscan.io/address/0xf034d6a4b1a64f0e6038632d87746ca24b79d325#code]
-  * (Rinkeby)[https://rinkeby.etherscan.io/address/0x633dc916D9f59cf4aA117dE2Bb8edF7752270EC0#code]
+  * [Mainnet](https://etherscan.io/address/0xf034d6a4b1a64f0e6038632d87746ca24b79d325#code)
+  * [Rinkeby](https://rinkeby.etherscan.io/address/0x633dc916D9f59cf4aA117dE2Bb8edF7752270EC0#code)
