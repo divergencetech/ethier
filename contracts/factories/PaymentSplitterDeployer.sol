@@ -23,9 +23,11 @@ library PaymentSplitterDeployer {
             switch chainid()
             case 1 {
                 // mainnet
+                factory := 0xf034d6a4b1a64f0e6038632d87746ca24b79d325
             }
             case 4 {
                 // Rinkeby
+                factory := 0x633dc916D9f59cf4aA117dE2Bb8edF7752270EC0
             }
             case 1337 {
                 // The geth SimulatedBackend iff used with the ethier
