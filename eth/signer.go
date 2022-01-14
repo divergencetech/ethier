@@ -126,9 +126,9 @@ func appendRandomNonce(buf []byte) ([]byte, [32]byte, error) {
 	return append(buf, nonce[:]...), nonce, nil
 }
 
-// ToEthSignedMessageHash converts a given message to conform to the signed data
+// WithPersonalMessagePrefix converts a given message to conform to the signed data
 // standard according to EIP-191.
-func ToEthPersonalSignedMessage(message []byte) []byte {
+func WithPersonalMessagePrefix(message []byte) []byte {
 	prefix := []byte(fmt.Sprintf("\x19Ethereum Signed Message:\n%d", len(message)))
 	return append(prefix, message...)
 }
@@ -158,7 +158,7 @@ func (s *Signer) sign(buf []byte, opts signOpts) ([]byte, *[32]byte, error) {
 	}
 
 	if opts.personal {
-		buf = ToEthPersonalSignedMessage(buf)
+		buf = WithPersonalMessagePrefix(buf)
 	}
 
 	if !opts.raw {
@@ -207,7 +207,7 @@ func (s *Signer) Sign(buf []byte) ([]byte, error) {
 }
 
 // PersonalSign returns an EIP-191 conform personal ECDSA signature of buf
-// Convenience wrapper for s.CompactSign(toEthPersonalSignedMessage(buf))
+// Convenience wrapper for s.CompactSign(WithPersonalMessagePrefix(buf))
 func (s *Signer) PersonalSign(buf []byte) ([]byte, error) {
 	sig, _, err := s.sign(buf, signOpts{
 		raw:       false,
