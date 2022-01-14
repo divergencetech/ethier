@@ -117,7 +117,7 @@ func CompactSignature(rsv []byte) ([]byte, error) {
 
 // AppendRandomNonce appends random 32 bytes to the buffer, commonly used in
 // signature nonces.
-func AppendRandomNonce(buf []byte) ([]byte, [32]byte, error) {
+func appendRandomNonce(buf []byte) ([]byte, [32]byte, error) {
 	var nonce [32]byte
 	if n, err := rand.Read(nonce[:]); n != 32 || err != nil {
 		return nil, nonce, fmt.Errorf("read 32 random bytes: got %d bytes with err %v", n, err)
@@ -150,7 +150,7 @@ func (s *Signer) sign(buf []byte, opts signOpts) ([]byte, *[32]byte, error) {
 
 	if opts.withNonce {
 		var n [32]byte
-		buf, n, err = AppendRandomNonce(buf)
+		buf, n, err = appendRandomNonce(buf)
 		nonce = &n
 		if err != nil {
 			return nil, nil, err
