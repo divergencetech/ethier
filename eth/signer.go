@@ -227,6 +227,9 @@ func (s *Signer) PersonalSignWithNonce(buf []byte) ([]byte, [32]byte, error) {
 		personal:  true,
 		withNonce: true,
 	})
+	if err != nil {
+		return nil, [32]byte{}, err
+	}
 	return sig, *nonce, err
 
 }
