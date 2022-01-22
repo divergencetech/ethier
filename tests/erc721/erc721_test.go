@@ -23,6 +23,23 @@ const (
 	numAccounts // last account + 1 ;)
 )
 
+func accountName(id int) string {
+	switch id {
+	case deployer:
+		return "contract deployer"
+	case tokenOwner:
+		return "token owner"
+	case approved:
+		return "approved for token"
+	case vandal:
+		return "evil villain"
+	case proxy:
+		return "OpenSea proxy"
+	default:
+		return "unknown account"
+	}
+}
+
 // Token IDs
 const (
 	exists = iota
