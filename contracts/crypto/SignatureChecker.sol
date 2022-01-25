@@ -105,6 +105,6 @@ library SignatureChecker {
         pure
         returns (bytes32)
     {
-        return keccak256(data);
+        return ECDSA.toEthSignedMessageHash(data);
     }
 }

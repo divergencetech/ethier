@@ -110,9 +110,9 @@ func TestSingleUseSignature(t *testing.T) {
 
 	for _, tt := range signatureTestCases() {
 		t.Run(tt.name, func(t *testing.T) {
-			sig, nonce, err := tt.signer.SignWithNonce(tt.signedData)
+			sig, nonce, err := tt.signer.PersonalSignWithNonce(tt.signedData)
 			if err != nil {
-				t.Fatalf("%T.SignWithNonce(%v) error %v", tt.signer, tt.signedData, err)
+				t.Fatalf("%T.PersonalSignWithNonce(%v) error %v", tt.signer, tt.signedData, err)
 			}
 
 			_, got := checker.NeedsSignature(sim.Acc(0), tt.sentData, nonce, sig)
@@ -137,9 +137,9 @@ func TestReusableSignature(t *testing.T) {
 
 	for _, tt := range signatureTestCases() {
 		t.Run(tt.name, func(t *testing.T) {
-			sig, err := tt.signer.CompactSign(tt.signedData)
+			sig, err := tt.signer.PersonalSign(tt.signedData)
 			if err != nil {
-				t.Fatalf("%T.CompactSign(%v) error %v", tt.signer, tt.signedData, err)
+				t.Fatalf("%T.PersonalSign(%v) error %v", tt.signer, tt.signedData, err)
 			}
 
 			for i := 0; i < 2; i++ {
@@ -165,9 +165,9 @@ func TestAddressSignature(t *testing.T) {
 		t.Helper()
 		addr := sim.Addr(party)
 
-		sig, err := signer.SignAddress(addr)
+		sig, err := signer.PersonalSignAddress(addr)
 		if err != nil {
-			t.Fatalf("%T.SignAddress(%v) error %v", signer, addr, err)
+			t.Fatalf("%T.PersonalSignAddress(%v) error %v", signer, addr, err)
 		}
 		return sig
 	}
