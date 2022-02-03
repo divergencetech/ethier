@@ -23,10 +23,18 @@ contract TestableArbitraryPriceSeller is ArbitraryPriceSeller {
     }
 
     /**
+    @notice Emitted by accidentalFreePurchase() to stop solc from suggesting
+    that it be marked as view because we want to test that the transaction
+    reverts.
+     */
+    event Event();
+
+    /**
     @notice The convenience _purchase() function is deliberately disabled to
     avoid accidentally giving something away for free. This will always revert.
      */
-    function accidentalFreePurchase() external view {
+    function accidentalFreePurchase() external {
+        emit Event();
         _purchase(msg.sender, 1);
     }
 
