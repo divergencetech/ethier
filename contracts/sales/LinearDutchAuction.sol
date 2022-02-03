@@ -102,8 +102,12 @@ abstract contract LinearDutchAuction is Seller {
         dutchAuctionConfig.startPoint = startPoint;
     }
 
-    /// @notice Override of Seller.cost() with Dutch-auction logic.
-    function cost(uint256 n) public view override returns (uint256) {
+    /**
+    @notice Override of Seller.cost() with Dutch-auction logic.
+    @dev The second parameter, metadata propagated from the call to _purchase(),
+    is ignored.
+    **/
+    function cost(uint256 n, uint256) public view override returns (uint256) {
         DutchAuctionConfig storage cfg = dutchAuctionConfig;
 
         uint256 current;

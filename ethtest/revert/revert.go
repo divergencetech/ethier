@@ -11,7 +11,7 @@ import (
 // nil error.
 type Checker string
 
-const Any = Checker("execution reverted: ")
+const Any = Checker("execution reverted")
 
 // Checkers for OpenZeppelin modifiers.
 const (

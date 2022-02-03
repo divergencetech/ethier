@@ -3,7 +3,6 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "./Seller.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @notice A Seller with fixed per-item price.
 abstract contract FixedPriceSeller is Seller {
@@ -27,8 +26,12 @@ abstract contract FixedPriceSeller is Seller {
         price = _price;
     }
 
-    /// @notice Override of Seller.cost() with fixed price.
-    function cost(uint256 n) public view override returns (uint256) {
+    /**
+    @notice Override of Seller.cost() with fixed price.
+    @dev The second parameter, metadata propagated from the call to _purchase(),
+    is ignored.
+     */
+    function cost(uint256 n, uint256) public view override returns (uint256) {
         return n * price;
     }
 }

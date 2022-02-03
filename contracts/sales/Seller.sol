@@ -94,8 +94,16 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
     or, for example, decreasing for a Dutch auction or increasing for a bonding
     curve.
     @param n The number of items being purchased.
+    @param metadata Arbitrary data, propagated by the call to _purchase() that
+    can be used to charge different prices. This value is a uint256 instead of
+    bytes as this allows simple passing of a set cost (see
+    ArbitraryPriceSeller).
      */
-    function cost(uint256 n) public view virtual returns (uint256);
+    function cost(uint256 n, uint256 metadata)
+        public
+        view
+        virtual
+        returns (uint256);
 
     /**
     @dev Called by both _purchase() and purchaseFreeOfCharge() after all limits
@@ -189,18 +197,28 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
     }
 
     /**
+    @notice Convenience function for calling _purchase() with empty costMetadata
+    when unneeded.
+     */
+    function _purchase(address to, uint256 requested) internal virtual {
+        _purchase(to, requested, 0);
+    }
+
+    /**
     @notice Enforces all purchase limits (counts and costs) before calling
     _handlePurchase(), after which the received funds are disbursed to the
     beneficiary, less any required refunds.
     @param to The final recipient of the item(s).
     @param requested The number of items requested for purchase, which MAY be
     reduced when passed to _handlePurchase().
+    @param costMetadata Arbitrary data, propagated in the call to cost(), to be
+    optionally used in determining the price.
      */
-    function _purchase(address to, uint256 requested)
-        internal
-        nonReentrant
-        whenNotPaused
-    {
+    function _purchase(
+        address to,
+        uint256 requested,
+        uint256 costMetadata
+    ) internal nonReentrant whenNotPaused {
         /**
          * ##### CHECKS
          */
@@ -245,7 +263,7 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
             }
         }
 
-        uint256 _cost = cost(n);
+        uint256 _cost = cost(n, costMetadata);
         if (msg.value < _cost) {
             revert(
                 string(

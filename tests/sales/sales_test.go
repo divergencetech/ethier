@@ -260,7 +260,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 
 			sim.FastForward(big.NewInt(startBlock - 1))
 			t.Run("before start", func(t *testing.T) {
-				if diff := revert.NotStarted.Diff(auction.Cost(nil, big.NewInt(1))); diff != "" {
+				if diff := revert.NotStarted.Diff(auction.Cost(nil, big.NewInt(1), big.NewInt(0))); diff != "" {
 					t.Errorf("Cost() before auction start; %s", diff)
 				}
 			})
@@ -271,7 +271,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 
 			for _, w := range tt.want {
 				sim.FastForward(big.NewInt(w.point))
-				got, err := auction.Cost(nil, w.num)
+				got, err := auction.Cost(nil, w.num, big.NewInt(0))
 				if err != nil {
 					t.Errorf("Cost(%d) at block %d; error %v", w.num, sim.BlockNumber(), err)
 					continue
@@ -357,7 +357,7 @@ func TestTimeBasedDecrease(t *testing.T) {
 				want = new(big.Int).Sub(cfg.StartPrice, new(big.Int).Mul(cfg.DecreaseSize, big.NewInt(numDecreases)))
 			}
 
-			got, err := auction.Cost(nil, big.NewInt(1))
+			got, err := auction.Cost(nil, big.NewInt(1), big.NewInt(0))
 			if diff := errdiff.Check(err, errDiffAgainst); diff != "" {
 				t.Fatalf("Cost() %s", diff)
 			}
@@ -474,7 +474,7 @@ func TestZeroStartToDisable(t *testing.T) {
 	const startBlock = 10
 	sim.FastForward(big.NewInt(startBlock))
 
-	if diff := revert.NotStarted.Diff(auction.Cost(nil, big.NewInt(1))); diff != "" {
+	if diff := revert.NotStarted.Diff(auction.Cost(nil, big.NewInt(1), big.NewInt(0))); diff != "" {
 		t.Errorf("Cost() when StartPoint==0; %s", diff)
 	}
 
@@ -482,7 +482,7 @@ func TestZeroStartToDisable(t *testing.T) {
 		t.Fatalf("SetAuctionStartPoint() error %v", err)
 	}
 
-	got, err := auction.Cost(nil, big.NewInt(1))
+	got, err := auction.Cost(nil, big.NewInt(1), big.NewInt(0))
 	if err != nil {
 		t.Fatalf("Cost() when StartPoint!=0; error %v", err)
 	}
@@ -911,7 +911,7 @@ func TestFixedPriceSeller(t *testing.T) {
 			}
 
 			for n, want := range tt.wantCosts {
-				got, err := seller.Cost(nil, big.NewInt(n))
+				got, err := seller.Cost(nil, big.NewInt(n), big.NewInt(0))
 				if err != nil {
 					t.Errorf("Cost(%d) error %v", n, err)
 					continue
@@ -922,6 +922,78 @@ func TestFixedPriceSeller(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestArbitraryPriceSeller(t *testing.T) {
+	ctx := context.Background()
+
+	deploy := func(t *testing.T, inventory int64) (*ethtest.SimulatedBackend, *TestableArbitraryPriceSeller) {
+		t.Helper()
+		sim := ethtest.NewSimulatedBackendTB(t, 1)
+
+		_, _, seller, err := DeployTestableArbitraryPriceSeller(sim.Acc(0), sim, big.NewInt(inventory))
+		if err != nil {
+			t.Fatalf("DeployTestableArbitraryPriceSeller(%d) error %v", inventory, err)
+		}
+		return sim, seller
+	}
+
+	tests := []struct {
+		numToPurchase      int64
+		costEach, wantPaid *big.Int
+	}{
+		{
+			numToPurchase: 1,
+			costEach:      eth.Ether(2),
+			wantPaid:      eth.Ether(2),
+		},
+		{
+			numToPurchase: 2,
+			costEach:      eth.Ether(1),
+			wantPaid:      eth.Ether(2),
+		},
+		{
+			numToPurchase: 3,
+			costEach:      eth.Ether(2),
+			wantPaid:      eth.Ether(6),
+		},
+		{
+			numToPurchase: 5,
+			costEach:      eth.EtherFraction(2, 5),
+			wantPaid:      eth.Ether(2),
+		},
+		{
+			numToPurchase: 4,
+			costEach:      eth.EtherFraction(256, 1000),
+			wantPaid:      eth.EtherFraction(1024, 1000),
+		},
+	}
+
+	for _, tt := range tests {
+		sim, seller := deploy(t, tt.numToPurchase)
+
+		// An address out of our control so its balance can only increase in value.
+		beneficiary := common.HexToAddress("0x0123456789abcdef")
+		sim.Must(t, "SetBeneficiary()")(seller.SetBeneficiary(sim.Acc(0), beneficiary))
+
+		if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(big.NewInt(0)) != 0 {
+			t.Fatalf("Bad test setup; before purchase %T.BalanceOf(beneficiary) got %d; want 0", seller, got)
+		}
+
+		acc := sim.WithValueFrom(0, tt.wantPaid)
+		sim.Must(t, "Purchase(%d, %d)", tt.numToPurchase, tt.costEach)(seller.Purchase(acc, big.NewInt(tt.numToPurchase), tt.costEach))
+
+		if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(tt.wantPaid) != 0 {
+			t.Errorf("After purchase of %d items for %d each; BalanceOf(beneficiary) got %d; want %d", tt.numToPurchase, tt.costEach, got, tt.wantPaid)
+		}
+	}
+
+	t.Run("no accidental free purchase", func(t *testing.T) {
+		sim, seller := deploy(t, 1)
+		if diff := revert.Any.Diff(seller.AccidentalFreePurchase(sim.Acc(0))); diff != "" {
+			t.Errorf("%T.AccidentalFreePurchase() %s", seller, diff)
+		}
+	})
 }
 
 func TestPausing(t *testing.T) {
