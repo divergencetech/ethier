@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/google/tink/go/prf"
 )
 
 // A Signer abstracts signing of arbitrary messages by wrapping an ECDSA private
@@ -78,6 +79,37 @@ func (hdp HDPathPrefix) SignerFromSeedPhrase(mnemonic, password string, account 
 		return nil, fmt.Errorf("obtain private key: %v", err)
 	}
 	return &Signer{key, mnemonic}, nil
+}
+
+// SignerFromPRF deterministically derives a private key from the pseudo-random
+// function and the input bytes. By definition, the output of a PRF is
+// indistinguishable from a random function.
+//
+// The input parameter allows for different sets of HD wallets to be derived
+// from the same underlying PRF key. Only the PRF key need be secret.
+//
+// SignerFromPRF can be thought of as a method for securely creating new
+// mnemonic seed phrases from a single underlying key and different input
+// parameters. Although the resulting mnemonic is accessible, SignerFromPRF is
+// intended for use in an automated environment, which is why it relies on
+// Google Tink.
+func (hdp HDPathPrefix) SignerFromPRF(src prf.PRF, input []byte, account uint) (*Signer, error) {
+	entropy, err := src.ComputePRF(input, 32)
+	if err != nil {
+		return nil, fmt.Errorf("compute entropy from PRF: %v", err)
+	}
+	mn, err := hdwallet.NewMnemonicFromEntropy(entropy)
+	if err != nil {
+		return nil, fmt.Errorf("derive mnemonic from entropy: %v", err)
+	}
+	return hdp.SignerFromSeedPhrase(mn, "", account)
+}
+
+// SignerFromPRFSet returns hdp.SifnerFromPRF() using the set's primary PRF.
+// This is simply a convenience function as the prf package doesn't accomodate
+// direct creation of a prf.PRF.
+func (hdp HDPathPrefix) SignerFromPRFSet(set *prf.Set, input []byte, account uint) (*Signer, error) {
+	return hdp.SignerFromPRF(set.PRFs[set.PrimaryID], input, account)
 }
 
 // String returns s.Address() as a string.
