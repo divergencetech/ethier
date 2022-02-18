@@ -26,7 +26,7 @@ contract ERC721CommonEnumerable is ERC721Common, ERC721Enumerable {
         public
         view
         virtual
-        override(ERC721, ERC721Common)
+        override(ERC721, ERC721Common, IERC721)
         returns (bool)
     {
         return ERC721Common.isApprovedForAll(owner, operator);
