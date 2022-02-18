@@ -4,12 +4,14 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/interfaces/IERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/structs/BitMaps.sol";
 
 /**
 @notice Allows holders of ERC721 tokens to redeem rights to some claim; for
 example, the right to mint a token of some other collection.
 */
 library ERC721Redeemer {
+    using BitMaps for BitMaps.BitMap;
     using Strings for uint256;
 
     /**
@@ -26,6 +28,20 @@ library ERC721Redeemer {
     }
 
     /**
+    @notice Storage value to track already-claimed redemptions for a specific
+    token collection, given that there is only a single claim allowed per
+    tokenId.
+     */
+    struct SingleClaims {
+        /**
+        @dev This field MUST NOT be considered part of the public API. Instead,
+        prefer `using ERC721Redeemer for ERC721Redeemer.SingleClaims` and
+        utilise the provided functions.
+         */
+        BitMaps.BitMap _claimed;
+    }
+
+    /**
     @notice Emitted when a token's claim is redeemed.
      */
     event Redemption(
@@ -37,7 +53,7 @@ library ERC721Redeemer {
 
     /**
     @notice Checks that the redeemer is allowed to redeem the claims for the
-    tokenIds by being either the owner or approved address for all tokens, and
+    tokenIds by being either the owner or approved address for all tokenIds, and
     updates the Claims to reflect this.
     @dev For more efficient gas usage, recurring values in tokenIds SHOULD be
     adjacent to one another as this will batch expensive operations. The
@@ -48,7 +64,7 @@ library ERC721Redeemer {
     @return The number of redeemed claims; either 0 or tokenIds.length;
      */
     function redeem(
-        Claims storage claimed,
+        Claims storage claims,
         uint256 maxAllowance,
         address redeemer,
         IERC721 token,
@@ -67,15 +83,7 @@ library ERC721Redeemer {
 
         ) {
             uint256 tokenId = tokenIds[i];
-            if (
-                token.ownerOf(tokenId) != redeemer &&
-                token.getApproved(tokenId) != redeemer
-            ) {
-                revertWithTokenId(
-                    "ERC721Redeemer: not approved nor owner of",
-                    tokenId
-                );
-            }
+            requireOwnerOrApproved(token, tokenId, redeemer);
 
             uint256 n = 1;
             if (multi) {
@@ -93,8 +101,8 @@ library ERC721Redeemer {
                 n = endSameId - i;
             }
 
-            claimed._total[tokenId] += n;
-            if (claimed._total[tokenId] > maxAllowance) {
+            claims._total[tokenId] += n;
+            if (claims._total[tokenId] > maxAllowance) {
                 revertWithTokenId(
                     "ERC721Redeemer: over allowance for",
                     tokenId
@@ -106,6 +114,60 @@ library ERC721Redeemer {
         }
 
         return tokenIds.length;
+    }
+
+    /**
+    @notice Checks that the redeemer is allowed to redeem the single claim for
+    each of the tokenIds by being either the owner or approved address for all
+    tokenIds, and updates the SingleClaims to reflect this.
+    @param tokenIds The token IDs for which the claims are being redeemed. Only
+    a single claim can be made against a tokenId.
+    @return The number of redeemed claims; either 0 or tokenIds.length;
+     */
+    function redeem(
+        SingleClaims storage claims,
+        address redeemer,
+        IERC721 token,
+        uint256[] calldata tokenIds
+    ) internal returns (uint256) {
+        if (tokenIds.length == 0) {
+            return 0;
+        }
+
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 tokenId = tokenIds[i];
+            requireOwnerOrApproved(token, tokenId, redeemer);
+
+            if (claims._claimed.get(tokenId)) {
+                revertWithTokenId(
+                    "ERC721Redeemer: over allowance for",
+                    tokenId
+                );
+            }
+
+            claims._claimed.set(tokenId);
+            emit Redemption(token, redeemer, tokenId, 1);
+        }
+        return tokenIds.length;
+    }
+
+    /**
+    @dev Reverts if neither the owner nor approved for the tokenId.
+     */
+    function requireOwnerOrApproved(
+        IERC721 token,
+        uint256 tokenId,
+        address redeemer
+    ) private view {
+        if (
+            token.ownerOf(tokenId) != redeemer &&
+            token.getApproved(tokenId) != redeemer
+        ) {
+            revertWithTokenId(
+                "ERC721Redeemer: not approved nor owner of",
+                tokenId
+            );
+        }
     }
 
     /**
@@ -121,13 +183,24 @@ library ERC721Redeemer {
     }
 
     /**
-    @notice Returns the number of unclaimed redemptions for the token.
+    @notice Returns the number of claimed redemptions for the token.
      */
-    function unclaimed(
-        Claims storage claimed,
-        uint256 maxAllowance,
-        uint256 tokenId
-    ) internal view returns (uint256) {
-        return maxAllowance - claimed._total[tokenId];
+    function claimed(Claims storage claims, uint256 tokenId)
+        internal
+        view
+        returns (uint256)
+    {
+        return claims._total[tokenId];
+    }
+
+    /**
+    @notice Returns whether the token has had a claim made against it.
+     */
+    function claimed(SingleClaims storage claims, uint256 tokenId)
+        internal
+        view
+        returns (bool)
+    {
+        return claims._claimed.get(tokenId);
     }
 }
