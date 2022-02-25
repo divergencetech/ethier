@@ -18,20 +18,6 @@ contract ERC721CommonEnumerable is ERC721Common, ERC721Enumerable {
         ERC721Common(name, symbol)
     {}
 
-    /**
-    // @notice Returns ERC721Common.isApprovedForAll() to guarantee use of OpenSea
-    // gas-free listing functionality.
-    // */
-    // function isApprovedForAll(address owner, address operator)
-    //     public
-    //     view
-    //     virtual
-    //     override(ERC721, ERC721Common)
-    //     returns (bool)
-    // {
-    //     return ERC721Common.isApprovedForAll(owner, operator);
-    // }
-
     /// @notice Overrides _beforeTokenTransfer as required by inheritance.
     function _beforeTokenTransfer(
         address from,
