@@ -19,18 +19,18 @@ contract ERC721CommonEnumerable is ERC721Common, ERC721Enumerable {
     {}
 
     /**
-    @notice Returns ERC721Common.isApprovedForAll() to guarantee use of OpenSea
-    gas-free listing functionality.
-    */
-    function isApprovedForAll(address owner, address operator)
-        public
-        view
-        virtual
-        override(ERC721, ERC721Common, IERC721)
-        returns (bool)
-    {
-        return ERC721Common.isApprovedForAll(owner, operator);
-    }
+    // @notice Returns ERC721Common.isApprovedForAll() to guarantee use of OpenSea
+    // gas-free listing functionality.
+    // */
+    // function isApprovedForAll(address owner, address operator)
+    //     public
+    //     view
+    //     virtual
+    //     override(ERC721, ERC721Common)
+    //     returns (bool)
+    // {
+    //     return ERC721Common.isApprovedForAll(owner, operator);
+    // }
 
     /// @notice Overrides _beforeTokenTransfer as required by inheritance.
     function _beforeTokenTransfer(
@@ -50,5 +50,23 @@ contract ERC721CommonEnumerable is ERC721Common, ERC721Enumerable {
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
+    }
+
+    function setApprovalForAll(address operator, bool approved)
+        public
+        virtual
+        override(ERC721Common, ERC721)
+    {
+        ERC721Common.setApprovalForAll(operator, approved);
+    }
+
+    function isApprovedForAll(address owner, address operator)
+        public
+        view
+        virtual
+        override(ERC721Common, ERC721)
+        returns (bool)
+    {
+        return ERC721Common.isApprovedForAll(owner, operator);
     }
 }
