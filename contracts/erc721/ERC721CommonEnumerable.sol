@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
+// Copyright (c) 2022 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
 import "./ERC721Common.sol";
@@ -26,7 +26,7 @@ contract ERC721CommonEnumerable is ERC721Common, ERC721Enumerable {
         public
         view
         virtual
-        override(ERC721, ERC721Common, IERC721)
+        override(ERC721Common, ERC721, IERC721)
         returns (bool)
     {
         return ERC721Common.isApprovedForAll(owner, operator);

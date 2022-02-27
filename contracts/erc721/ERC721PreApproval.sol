@@ -23,7 +23,7 @@ abstract contract ERC721PreApproval is ERC721 {
         Inactive
     }
 
-    /// @notice The state of the pre-approval for a given address
+    /// @notice The state of the pre-approval for a given owner
     mapping(address => State) private state;
 
     /// @dev Returns true if either standard `isApprovedForAll()` or if the
@@ -40,11 +40,9 @@ abstract contract ERC721PreApproval is ERC721 {
             return true;
         }
 
-        if (state[owner] == State.Active) {
-            return OpenSeaGasFreeListing.isApprovedForAll(owner, operator);
-        }
-
-        return false;
+        return
+            state[owner] == State.Active &&
+            OpenSeaGasFreeListing.isApprovedForAll(owner, operator);
     }
 
     /// @dev Uses the standard `setApprovalForAll` or toggles the pre-approval
@@ -72,20 +70,22 @@ abstract contract ERC721PreApproval is ERC721 {
     ) internal virtual override {
         super._beforeTokenTransfer(from, to, tokenId);
 
-        // Exclude burns
-        if (to != address(0) && state[to] == State.Active) {
-            address operator = OpenSeaGasFreeListing.proxyFor(to);
+        // Exclude burns and inactive pre-approvals
+        if (to == address(0) || state[to] == State.Inactive) {
+            return;
+        }
 
-            // Disable if `to` has no proxy
-            if (operator == address(0)) {
-                state[to] = State.Inactive;
-                return;
-            }
+        address operator = OpenSeaGasFreeListing.proxyFor(to);
 
-            // Avoid emitting unnecessary events.
-            if (balanceOf(to) == 0) {
-                emit ApprovalForAll(to, operator, true);
-            }
+        // Disable if `to` has no proxy
+        if (operator == address(0)) {
+            state[to] = State.Inactive;
+            return;
+        }
+
+        // Avoid emitting unnecessary events.
+        if (balanceOf(to) == 0) {
+            emit ApprovalForAll(to, operator, true);
         }
     }
 }
