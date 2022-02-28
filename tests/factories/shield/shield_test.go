@@ -1,4 +1,4 @@
-package escrow
+package shield
 
 import (
 	"bytes"
@@ -9,12 +9,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-//go:generate ethier gen ../../../factories/escrow/ColdEscrowFactory.sol ./MockERC721.sol
+//go:generate ethier gen ../../../factories/shield/ShieldFactory.sol ./MockTokens.sol
 
 // Actors in the tests
 const (
 	deployer = iota
-	fallbackOwner
+	creator
 	owner0
 	owner1
 	owner2
@@ -23,12 +23,12 @@ const (
 
 var owners = []int{owner0, owner1, owner2}
 
-func TestColdEscrow(t *testing.T) {
+func TestShield(t *testing.T) {
 	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
 
-	_, _, factory, err := DeployColdEscrowFactory(sim.Acc(deployer), sim)
+	_, _, factory, err := DeployShieldFactory(sim.Acc(deployer), sim)
 	if err != nil {
-		t.Fatalf("DeployColdEscrowFactory() error %v", err)
+		t.Fatalf("DeployShieldFactory() error %v", err)
 	}
 
 	type nft struct {
@@ -51,20 +51,20 @@ func TestColdEscrow(t *testing.T) {
 		}
 	}
 
-	sim.Must(t, "Deploy()")(factory.Deploy(sim.Acc(deployer), sim.Addr(fallbackOwner)))
+	sim.Must(t, "Deploy()")(factory.Deploy(sim.Acc(creator)))
 
-	it, err := factory.FilterColdEscrowDeployed(nil, nil)
+	it, err := factory.FilterShieldDeployed(nil, nil)
 	if err != nil {
-		t.Fatalf("FilterColdEscrowDeployed() error %v", err)
+		t.Fatalf("FilterShieldDeployed() error %v", err)
 	}
 	if !it.Next() {
 		t.Fatalf("Got no %T events after %T.Deploy(); want 1", it.Event, factory)
 	}
 
-	escrowAddr := it.Event.ClonedColdEscrow
-	escrow, err := NewColdEscrow(escrowAddr, sim)
+	shieldAddr := it.Event.ClonedShield
+	shield, err := NewShield(shieldAddr, sim)
 	if err != nil {
-		t.Fatalf("NewColdEscrow([address from factory event]) error %v", err)
+		t.Fatalf("NewShield([address from factory event]) error %v", err)
 	}
 	if it.Next() {
 		t.Errorf("Got second %T event after %T.Deploy(); want 1", it.Event, factory)
@@ -73,20 +73,20 @@ func TestColdEscrow(t *testing.T) {
 		t.Errorf("%T.Error() got %v; want nil", it, err)
 	}
 
-	if got, err := escrow.Controller(nil); err != nil || !bytes.Equal(got.Bytes(), sim.Addr(fallbackOwner).Bytes()) {
-		t.Errorf("Controller() got %v, err = %v; want address passed to %T.Deploy() = %v, nil error", got, err, factory, sim.Addr(fallbackOwner))
+	if got, err := shield.Creator(nil); err != nil || !bytes.Equal(got.Bytes(), sim.Addr(creator).Bytes()) {
+		t.Errorf("Creator() got %v, err = %v; want address that called %T.Deploy() = %v, nil error", got, err, factory, sim.Addr(creator))
 	}
 
 	// TODO(aschlosberg): flesh out these tests and abstract all checks for
 	// address equality; currently only for proof of concept.
-	sim.Must(t, "")(nfts[0].m.SafeTransferFrom(sim.Acc(owner0), sim.Addr(owner0), escrowAddr, big.NewInt(0)))
-	if got, err := escrow.Erc721Owners(nil, nfts[0].addr, big.NewInt(0)); err != nil || !bytes.Equal(got.Bytes(), sim.Addr(owner0).Bytes()) {
-		t.Errorf("Erc721Owners() got %v, err = %v; want %v, nil err", got, err, sim.Addr(owner0))
+	sim.Must(t, "")(nfts[0].m.SafeTransferFrom(sim.Acc(owner0), sim.Addr(owner0), shieldAddr, big.NewInt(0)))
+	if got, err := shield.OwnerOf(nil, nfts[0].addr, big.NewInt(0)); err != nil || !bytes.Equal(got.Bytes(), sim.Addr(owner0).Bytes()) {
+		t.Errorf("OwnerOf() got %v, err = %v; want %v, nil err", got, err, sim.Addr(owner0))
 	}
-	if got, err := nfts[0].m.OwnerOf(nil, big.NewInt(0)); err != nil || !bytes.Equal(got.Bytes(), escrowAddr.Bytes()) {
-		t.Errorf("OwnerOf() got %v, err = %v; want escrow contract = %v, nil err", got, err, escrowAddr)
+	if got, err := nfts[0].m.OwnerOf(nil, big.NewInt(0)); err != nil || !bytes.Equal(got.Bytes(), shieldAddr.Bytes()) {
+		t.Errorf("OwnerOf() got %v, err = %v; want shield contract = %v, nil err", got, err, shieldAddr)
 	}
-	sim.Must(t, "")(escrow.Reclaim(sim.Acc(owner0), nfts[0].addr, big.NewInt(0)))
+	sim.Must(t, "")(shield.ReclaimERC721(sim.Acc(owner0), nfts[0].addr, big.NewInt(0), []byte{}))
 	if got, err := nfts[0].m.OwnerOf(nil, big.NewInt(0)); err != nil || !bytes.Equal(got.Bytes(), sim.Addr(owner0).Bytes()) {
 		t.Errorf("OwnerOf() got %v, err = %v; want EOA owner = %v, nil err", got, err, sim.Addr(owner0))
 	}
