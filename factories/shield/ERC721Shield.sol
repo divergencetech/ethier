@@ -2,14 +2,16 @@
 // Copyright (c) 2022 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
+import "./ShieldLib.sol";
 import "@openzeppelin/contracts/interfaces/IERC721.sol";
 import "@openzeppelin/contracts/interfaces/IERC721Receiver.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
 @dev The ERC721 component of a Shield contract.
  */
 contract ERC721Shield is IERC721Receiver {
+    using ShieldLib for ShieldLib.ReleaseCriteria;
+
     /**
     @notice True owners of ERC721 tokens transferred to this contract with the
     safeTransferFrom() method.
@@ -17,31 +19,9 @@ contract ERC721Shield is IERC721Receiver {
     mapping(IERC721 => mapping(uint256 => address)) private erc721Owners;
 
     /**
-    @dev The value to which the release block is set when an asset is frozen;
-    i.e. (2^256 - 1).
-     */
-    uint256 private constant FROZEN = ~uint256(0);
-
-    // TODO(aschlosberg): abstract ReleaseCriteria and associated functionality
-    // (i.e. freeze / unfreeze / restrictions) into ShieldLib for sharing across
-    // ERC20/721/1155.
-
-    /**
-    @dev Criteria dictating when an asset MAY be reclaimed. When an asset is in
-    a frozen state, earliestBlock is set to max(uint256), completely locking it
-    within this contract. When an asset is unfrozen it begins a thawing period
-    and earliestBlock is set to (block.number + thawPeriod). Reclaiming an asset
-    MUST NOT be allowed if block.number < earliestBlock.
-     */
-    struct ReleaseCriteria {
-        uint256 earliestBlock;
-        uint256 thawPeriod;
-    }
-
-    /**
     @dev Criteria for release of a specific token.
      */
-    mapping(IERC721 => mapping(uint256 => ReleaseCriteria))
+    mapping(IERC721 => mapping(uint256 => ShieldLib.ReleaseCriteria))
         public erc721Release;
 
     /**
@@ -89,6 +69,10 @@ contract ERC721Shield is IERC721Receiver {
     ) public override returns (bytes4) {
         erc721Owners[IERC721(msg.sender)][tokenId] = from;
         emit ERC721Shielded(IERC721(msg.sender), from, tokenId);
+
+        // TODO(aschlosberg): devise a strategy for immediate freezing using
+        // the data parameter.
+
         return this.onERC721Received.selector;
     }
 
@@ -103,15 +87,31 @@ contract ERC721Shield is IERC721Receiver {
         _;
     }
 
-    // TODO(aschlosberg): events for ERC721Frozen and ERC721Unfrozen.
+    /**
+    @notice Emitted by freeze().
+     */
+    event ERC721Frozen(
+        IERC721 indexed token,
+        uint256 tokenId,
+        uint256 thawPeriod
+    );
 
     /**
-    @notice Sets the token's release block to effectively infinite (2^256 - 1)
-    and stores the thawing period for when unfreeze() is called.
+    @notice Emitted by unfreeze().
+     */
+    event ERC721Unfrozen(
+        IERC721 indexed token,
+        uint256 tokenId,
+        uint256 earliestReleaseBlock
+    );
+
+    /**
+    @notice Sets the assets's earliest release block to max(uint256) and stores
+    the thawing period for when unfreeze() is called.
     @dev freeze() can be called at any time, even while already frozen or during
     the thaw period, but it MUST NOT reduce the shortest time to release and
     will otherwise revert.
-    @param thawPeriod When unfreeze() is called, the token's release block will
+    @param thawPeriod When unfreeze() is called, the asset's release block will
     be set to (block.number + thawPeriod).
      */
     function freeze(
@@ -119,30 +119,21 @@ contract ERC721Shield is IERC721Receiver {
         uint256 tokenId,
         uint256 thawPeriod
     ) external onlyERC721Owner(token, tokenId) {
-        ReleaseCriteria memory release = erc721Release[token][tokenId];
-        uint256 soonest = release.earliestBlock == FROZEN
-            ? release.thawPeriod
-            : release.earliestBlock - block.number;
-        require(thawPeriod >= soonest, "ERC721Shield: thaw reduction");
-
-        erc721Release[token][tokenId] = ReleaseCriteria({
-            earliestBlock: FROZEN,
-            thawPeriod: thawPeriod
-        });
+        erc721Release[token][tokenId].freeze(thawPeriod);
+        emit ERC721Frozen(token, tokenId, thawPeriod);
     }
 
     /**
-    @notice Sets the token's release block to current plus `thawPeriod` as
-    passed to freeze(). After that many blocks, the token can be transfered to
+    @notice Sets the assets's release block to current plus `thawPeriod` as
+    passed to freeze(). After that many blocks, the asset can be transfered to
     its rightful owner via reclaimERC721().
      */
     function unfreeze(IERC721 token, uint256 tokenId)
         external
         onlyERC721Owner(token, tokenId)
     {
-        ReleaseCriteria storage release = erc721Release[token][tokenId];
-        require(release.earliestBlock == FROZEN, "ERC721Shield: not frozen");
-        release.earliestBlock = block.number + release.thawPeriod;
+        uint256 earliestReleaseBlock = erc721Release[token][tokenId].unfreeze();
+        emit ERC721Unfrozen(token, tokenId, earliestReleaseBlock);
     }
 
     /**
@@ -157,10 +148,7 @@ contract ERC721Shield is IERC721Receiver {
         bytes memory data
     ) external onlyERC721Owner(token, tokenId) {
         // CHECKS
-        require(
-            erc721Release[token][tokenId].earliestBlock <= block.number,
-            "ERC721Shield: frozen"
-        );
+        erc721Release[token][tokenId].requireThawed();
         // EFFECTS
         erc721Owners[token][tokenId] = address(0);
         // INTERACTIONS
