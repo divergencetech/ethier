@@ -9,21 +9,20 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /**
 @notice A bare-minimum escrow contract for holding assets that can only be
-reclaimed by their rightful owner, thus shielding them. This acts as a forced
-vault wallet that programatically requires the token owner to adhere to best
-practice of storing assets in an address that does not perform transactions
-unrelated to the assets themselves. The contract is also unaware of external
-protocols, e.g. Wyvern, so shields from external vulnerabilities.
+reclaimed by their rightful owner. This acts as a forced vault wallet that
+programatically requires the token owner to adhere to best practice of storing
+assets in an address that does not perform transactions unrelated to the assets
+themselves. The contract is also unaware of external protocols, e.g. Wyvern, so
+shields from external vulnerabilities.
 @dev Assets MUST be transferred into escrow with the safeTransferFrom() methods
 as this allows for automated accounting of ownership. ERC721 and ERC1155 MUST
 use their standard safeTransferFrom() methods on the respective contracts, and
-ERC20 MUST approve this contract for spending before using
-safeTransferERC20From(). NOTE THAT ALL ASSETS TRANFERRED BY A DIFFERENT MEANS
-WILL BE PERMANENTLY LOCKED.
+ERC20 MUST approve this contract for spending before using safeTransferERC20().
+NOTE THAT ALL ASSETS TRANFERRED BY A DIFFERENT MEANS WILL BE PERMANENTLY LOCKED.
 @dev Under this model it is safe for multiple true beneficial owners to share
-the same Shield. Howev this may be difficult to communicate to end users who are
-accustomed to the "not your keys, not your tokens" mantra. To overcome this, the
-contract can be cheaply cloned with a minimal proxy contract.
+the same Shield. However this may be difficult to communicate to end users who
+are accustomed to the "not your keys, not your tokens" mantra. To overcome this,
+the contract can be cheaply cloned with a minimal proxy contract.
  */
 contract Shield is Initializable, ERC20Shield, ERC721Shield, ERC1155Shield {
     /**

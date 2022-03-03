@@ -53,7 +53,7 @@ contract ERC20Shield {
     @dev This contract MUST already be approved to spend the message sender's
     balance of the token.
      */
-    function safeTransferERC20From(IERC20 token, uint256 amount) external {
+    function safeTransferERC20(IERC20 token, uint256 amount) external {
         token.transferFrom(msg.sender, address(this), amount);
         erc20Balances[token][msg.sender] += amount;
         emit ERC20Shielded(token, msg.sender, amount);
