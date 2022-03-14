@@ -8,7 +8,8 @@ NOTE: this file is intended purely for testing.
 Copied from
 https://etherscan.io/address/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2#code
 and modified to (a) add IwETH to confirm correctness of the interface used by
-the ethier WETH library; and (b) make it compatible with Solidity 0.8.
+the ethier WETH library; (b) make it compatible with Solidity 0.8; and (c) add
+revert messages for improved testing.
 
 *****************************************************/
 
@@ -58,7 +59,10 @@ contract WETH9 is IwETH {
     }
 
     function withdraw(uint256 wad) public {
-        require(balanceOf[msg.sender] >= wad);
+        require(
+            balanceOf[msg.sender] >= wad,
+            "WETH9Test: insufficient balance to withdraw"
+        );
         balanceOf[msg.sender] -= wad;
         payable(msg.sender).transfer(wad);
         emit Withdrawal(msg.sender, wad);
@@ -83,14 +87,20 @@ contract WETH9 is IwETH {
         address dst,
         uint256 wad
     ) public returns (bool) {
-        require(balanceOf[src] >= wad);
+        require(
+            balanceOf[src] >= wad,
+            "WETH9Test: insufficient balance to transfer"
+        );
 
         uint256 infinite;
         assembly {
             infinite := not(0)
         }
         if (src != msg.sender && allowance[src][msg.sender] != infinite) {
-            require(allowance[src][msg.sender] >= wad);
+            require(
+                allowance[src][msg.sender] >= wad,
+                "WETH9Test: insufficient allowance"
+            );
             allowance[src][msg.sender] -= wad;
         }
 

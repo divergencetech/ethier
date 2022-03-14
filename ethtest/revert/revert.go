@@ -28,6 +28,14 @@ const (
 	SoldOut              = Checker("Seller: Sold out")
 )
 
+// Checkers for wETH test double. Use the wethtest package to deploy a modified
+// wETH contract that includes these revert messages.
+const (
+	WETHWithdraw  = Checker("WETH9Test: insufficient balance to withdraw")
+	WETHTransfer  = Checker("WETH9Test: insufficient balance to transfer")
+	WETHAllowance = Checker("WETH9Test: insufficient allowance")
+)
+
 // Diff returns a message describing the difference between err and the Checker
 // string, using substring matching. The empty-string Checker is treated as
 // DefaultChecker.
