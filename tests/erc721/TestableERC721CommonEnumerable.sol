@@ -16,6 +16,10 @@ contract TestableERC721CommonEnumerable is
         ERC721._safeMint(msg.sender, tokenId);
     }
 
+    function burn(uint256 tokenId) public {
+        ERC721._burn(tokenId);
+    }
+
     /// @dev For testing the tokenExists() modifier.
     function mustExist(uint256 tokenId) public view tokenExists(tokenId) {}
 
