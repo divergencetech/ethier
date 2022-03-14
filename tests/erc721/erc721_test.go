@@ -9,6 +9,9 @@ import (
 	"github.com/divergencetech/ethier/ethtest/openseatest"
 	"github.com/divergencetech/ethier/ethtest/revert"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/h-fam/errdiff"
 )
 
@@ -16,6 +19,7 @@ import (
 const (
 	deployer = iota
 	tokenOwner
+	tokenReceiver
 	approved
 	vandal
 	proxy
@@ -46,11 +50,13 @@ const (
 	notExists
 )
 
-func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721CommonEnumerable) {
+func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721CommonEnumerable, *ERC721Filterer) {
 	t.Helper()
 
 	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
-	_, _, nft, err := DeployTestableERC721CommonEnumerable(sim.Acc(deployer), sim)
+	openseatest.DeployProxyRegistryTB(t, sim)
+
+	addr, _, nft, err := DeployTestableERC721CommonEnumerable(sim.Acc(deployer), sim)
 	if err != nil {
 		t.Fatalf("DeployTestableERC721CommonEnumerable() error %v", err)
 	}
@@ -62,11 +68,16 @@ func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721CommonEnume
 		t.Fatalf("Approve(<approved account>, %d) error %v", exists, err)
 	}
 
-	return sim, nft
+	filter, err := NewERC721Filterer(addr, sim)
+	if err != nil {
+		t.Fatalf("NewERC721RedeemerFilterer() error %v", err)
+	}
+
+	return sim, nft, filter
 }
 
 func TestModifiers(t *testing.T) {
-	_, nft := deploy(t)
+	_, nft, _ := deploy(t)
 
 	tests := []struct {
 		name           string
@@ -96,8 +107,7 @@ func TestModifiers(t *testing.T) {
 }
 
 func TestOnlyApprovedOrOwner(t *testing.T) {
-	sim, nft := deploy(t)
-	openseatest.DeployProxyRegistryTB(t, sim)
+	sim, nft, _ := deploy(t)
 
 	tests := []struct {
 		name           string
@@ -132,8 +142,7 @@ func TestOnlyApprovedOrOwner(t *testing.T) {
 }
 
 func TestOpenSeaProxyApproval(t *testing.T) {
-	sim, nft := deploy(t)
-	openseatest.DeployProxyRegistryTB(t, sim)
+	sim, nft, _ := deploy(t)
 
 	tests := []struct {
 		name string
@@ -162,10 +171,382 @@ func TestOpenSeaProxyApproval(t *testing.T) {
 	}
 }
 
+func diffApprovalForAllEvents(t *testing.T, filter *ERC721Filterer, start uint64, want []*ERC721ApprovalForAll) string {
+	ignore := ethtest.Comparers(cmpopts.IgnoreFields(ERC721ApprovalForAll{}, "Raw"))
+	filterOpts := bind.FilterOpts{
+		Start:   start + 1,
+		End:     nil,
+		Context: nil,
+	}
+
+	iter, err := filter.FilterApprovalForAll(&filterOpts, nil, nil)
+	if err != nil {
+		t.Fatalf("FilterApprovalForAll(%v, nil, nil) error %v", filterOpts, err)
+	}
+	defer func() {
+		err := iter.Close()
+		if err != nil {
+			t.Fatalf("Closing iterator FilterApprovalForAll(%v, nil, nil) error %v", filterOpts, err)
+		}
+	}()
+
+	var gotEvents []*ERC721ApprovalForAll
+	for iter.Next() {
+		gotEvents = append(gotEvents, iter.Event)
+	}
+	if iter.Error() != nil {
+		t.Fatalf("Iterating over FilterApprovalForAll(%v, nil, nil) error %v", filterOpts, err)
+	}
+
+	return cmp.Diff(want, gotEvents, ignore...)
+}
+
+func TestOpenSeaProxyPreApproval(t *testing.T) {
+	sim, _, _ := deploy(t)
+
+	const zeroAddressID = -1
+
+	tests := []struct {
+		name            string
+		fromAccountId   int
+		toAccountId     int
+		hasProxy        bool
+		wantPreApproved bool
+		wantEvents      []*ERC721ApprovalForAll
+	}{
+		{
+			name:            "mint without proxy",
+			fromAccountId:   zeroAddressID,
+			toAccountId:     tokenReceiver,
+			hasProxy:        false,
+			wantPreApproved: false,
+			wantEvents:      nil,
+		},
+		{
+			name:            "mint with proxy",
+			fromAccountId:   zeroAddressID,
+			toAccountId:     tokenReceiver,
+			hasProxy:        true,
+			wantPreApproved: true,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: true,
+				},
+			},
+		},
+		{
+			name:            "transfer without proxy",
+			fromAccountId:   tokenOwner,
+			toAccountId:     tokenReceiver,
+			hasProxy:        false,
+			wantPreApproved: false,
+			wantEvents:      nil,
+		},
+		{
+			name:            "transfer with proxy",
+			fromAccountId:   tokenOwner,
+			toAccountId:     tokenReceiver,
+			hasProxy:        true,
+			wantPreApproved: true,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: true,
+				},
+			},
+		},
+		{
+			name:            "burn without proxy",
+			fromAccountId:   tokenOwner,
+			toAccountId:     zeroAddressID,
+			hasProxy:        false,
+			wantPreApproved: false,
+			wantEvents:      nil,
+		},
+		{
+			name:            "burn with proxy",
+			fromAccountId:   tokenOwner,
+			toAccountId:     zeroAddressID,
+			hasProxy:        false,
+			wantPreApproved: false,
+			wantEvents:      nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sim, nft, filter := deploy(t)
+			start := sim.BlockNumber().Uint64()
+
+			var to common.Address
+			if tt.toAccountId != zeroAddressID {
+				to = sim.Addr(tt.toAccountId)
+			}
+
+			if tt.hasProxy {
+				openseatest.SetProxyTB(t, sim, to, sim.Addr(proxy))
+			}
+
+			switch {
+			case tt.fromAccountId == zeroAddressID:
+				// mint
+				sim.Must(t, "Mint(%d)", notExists)(nft.Mint(sim.Acc(tt.toAccountId), big.NewInt(notExists)))
+			case tt.toAccountId == zeroAddressID:
+				// burn
+				sim.Must(t, "Burn(%d)", exists)(nft.Burn(sim.Acc(tt.fromAccountId), big.NewInt(exists)))
+			default:
+				// transfer
+				sim.Must(t, "TransferFrom(%d)", exists)(nft.TransferFrom(sim.Acc(tt.fromAccountId), sim.Addr(tt.fromAccountId), to, big.NewInt(exists)))
+			}
+
+			if diff := diffApprovalForAllEvents(t, filter, start, tt.wantEvents); diff != "" {
+				t.Errorf("ApprovalForAll events diff (-want +got):\n%s", diff)
+			}
+
+			if got, err := nft.IsApprovedForAll(nil, to, sim.Addr(proxy)); err != nil || got != tt.wantPreApproved {
+				t.Errorf("IsApprovedForAll([owner], [proxy]) got %t, err = %v; want %t, nil err", got, err, tt.wantPreApproved)
+			}
+		})
+	}
+}
+
+func TestOpenSeaProxyPreApprovalOptInOut(t *testing.T) {
+	sim, _, _ := deploy(t)
+
+	tests := []struct {
+		name                 string
+		hasProxyBeforeMint   bool
+		mints                bool
+		createProxyAfterMint bool
+		hasProxyAfterMint    bool
+		doSetApproved        bool
+		setApprovedTo        bool
+		wantApproved         bool
+		wantEvents           []*ERC721ApprovalForAll
+	}{
+		{
+			name:                 "opt in with proxy after mint",
+			hasProxyBeforeMint:   true,
+			mints:                true,
+			createProxyAfterMint: false,
+			doSetApproved:        true,
+			setApprovedTo:        true,
+			wantApproved:         true,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: true,
+				},
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: true,
+				},
+			},
+		},
+		{
+			name:                 "opt out with proxy after mint",
+			hasProxyBeforeMint:   true,
+			mints:                true,
+			createProxyAfterMint: false,
+			doSetApproved:        true,
+			setApprovedTo:        false,
+			wantApproved:         false,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: true,
+				},
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: false,
+				},
+			},
+		},
+		{
+			name:                 "opt in with proxy",
+			hasProxyBeforeMint:   true,
+			mints:                false,
+			createProxyAfterMint: false,
+			doSetApproved:        true,
+			setApprovedTo:        true,
+			wantApproved:         true,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: true,
+				},
+			},
+		},
+		{
+			name:                 "opt out with proxy",
+			hasProxyBeforeMint:   true,
+			mints:                false,
+			createProxyAfterMint: false,
+			doSetApproved:        true,
+			setApprovedTo:        false,
+			wantApproved:         false,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: false,
+				},
+			},
+		},
+		{
+			name:                 "opt in after mint",
+			hasProxyBeforeMint:   false,
+			mints:                true,
+			createProxyAfterMint: false,
+			doSetApproved:        true,
+			setApprovedTo:        true,
+			wantApproved:         true,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: true,
+				},
+			},
+		},
+		{
+			name:                 "opt out after mint",
+			hasProxyBeforeMint:   false,
+			mints:                true,
+			createProxyAfterMint: false,
+			doSetApproved:        true,
+			setApprovedTo:        false,
+			wantApproved:         false,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: false,
+				},
+			},
+		},
+		{
+			name:                 "opt in",
+			hasProxyBeforeMint:   false,
+			mints:                false,
+			createProxyAfterMint: false,
+			doSetApproved:        true,
+			setApprovedTo:        true,
+			wantApproved:         true,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: true,
+				},
+			},
+		},
+		{
+			name:                 "opt out",
+			hasProxyBeforeMint:   false,
+			mints:                false,
+			createProxyAfterMint: false,
+			doSetApproved:        true,
+			setApprovedTo:        false,
+			wantApproved:         false,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: false,
+				},
+			},
+		},
+		{
+			name:                 "opt in with proxy after minting without proxy",
+			hasProxyBeforeMint:   false,
+			mints:                true,
+			createProxyAfterMint: true,
+			doSetApproved:        true,
+			setApprovedTo:        true,
+			wantApproved:         true,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: true,
+				},
+			},
+		},
+		{
+			name:                 "opt out with proxy after minting without proxy",
+			hasProxyBeforeMint:   false,
+			mints:                true,
+			createProxyAfterMint: true,
+			doSetApproved:        true,
+			setApprovedTo:        false,
+			wantApproved:         false,
+			wantEvents: []*ERC721ApprovalForAll{
+				{
+					Owner:    sim.Addr(tokenReceiver),
+					Operator: sim.Addr(proxy),
+					Approved: false,
+				},
+			},
+		},
+		{
+			name:                 "creating proxy after minting without proxy",
+			hasProxyBeforeMint:   false,
+			mints:                true,
+			createProxyAfterMint: true,
+			doSetApproved:        false,
+			wantApproved:         false,
+			wantEvents:           nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sim, nft, filter := deploy(t)
+			start := sim.BlockNumber().Uint64()
+
+			if tt.hasProxyBeforeMint {
+				openseatest.SetProxyTB(t, sim, sim.Addr(tokenReceiver), sim.Addr(proxy))
+			}
+
+			if tt.mints {
+				sim.Must(t, "Mint(%d)", notExists)(nft.Mint(sim.Acc(tokenReceiver), big.NewInt(notExists)))
+			}
+
+			if tt.createProxyAfterMint {
+				openseatest.SetProxyTB(t, sim, sim.Addr(tokenReceiver), sim.Addr(proxy))
+			}
+
+			if tt.doSetApproved {
+				sim.Must(t, "%T.setApprovalForAll(proxy,%v)", nft, tt.setApprovedTo)(
+					nft.SetApprovalForAll(sim.Acc(tokenReceiver), sim.Addr(proxy), tt.setApprovedTo),
+				)
+			}
+
+			got, err := nft.IsApprovedForAll(nil, sim.Addr(tokenReceiver), sim.Addr(proxy))
+			if err != nil || got != tt.wantApproved {
+				t.Errorf("IsApprovedForAll([owner], [proxy]) got %t, err = %v; want %t, nil err", got, err, tt.wantApproved)
+			}
+
+			if diff := diffApprovalForAllEvents(t, filter, start, tt.wantEvents); diff != "" {
+				t.Errorf("ApprovalForAll events diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestEnumerableInterface(t *testing.T) {
 	enumerableMethods := []string{"TotalSupply", "TokenOfOwnerByIndex", "TokenByIndex"}
 	// Common methods, expected on both, are used as a control because there is
-	// significant embedding by abigen so we need to know which type actually
+	// significant embedding by abigen so we need toAccountId know which type actually
 	// has the methods.
 	commonMethods := []string{"BalanceOf", "OwnerOf", "IsApprovedForAll"}
 
@@ -216,7 +597,7 @@ func TestEnumerableInterface(t *testing.T) {
 }
 
 func TestBaseTokenURI(t *testing.T) {
-	sim, nft := deploy(t)
+	sim, nft, _ := deploy(t)
 
 	for _, id := range []int64{1, 42, 101010} {
 		sim.Must(t, "Mint(%d)", id)(nft.Mint(sim.Acc(deployer), big.NewInt(id)))
