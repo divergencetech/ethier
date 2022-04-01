@@ -39,3 +39,12 @@ jobs:
 
       - name: Check Solidity code formatting
         run: npx prettier '**/*.sol' --check
+
+      - name: Run solhint on production contracts
+        run: npx solhint 'contracts/**/*.sol'
+
+      - name: Run solhint on factory contracts
+        run: npx solhint 'factories/**/*.sol'
+
+      - name: Run solhint on test contracts
+        run: npx solhint 'tests/**/*.sol'
