@@ -21,9 +21,10 @@ const (
 	Reentrant          = Checker("ReentrancyGuard: reentrant call")
 )
 
-// Checkers for ethier modifiers.
+// Checkers for ethier libraries and contracts.
 const (
 	ERC721ApproveOrOwner = Checker("ERC721Common: Not approved nor owner")
+	InvalidSignature     = Checker("SignatureChecker: Invalid signature")
 	NotStarted           = Checker("LinearDutchAuction: Not started")
 	SoldOut              = Checker("Seller: Sold out")
 )

@@ -3,25 +3,19 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../../contracts/crypto/SignatureChecker.sol";
+import "../../contracts/crypto/SignerManager.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
 @notice Exposes functions allowing testing of SignatureChecker.
  */
-contract TestableSignatureChecker {
+contract TestableSignatureChecker is SignerManager {
     using EnumerableSet for EnumerableSet.AddressSet;
     // SignatureChecker adds additional functionality to an AddressSet, allowing
     // for a signature from any set member.
     using SignatureChecker for EnumerableSet.AddressSet;
 
-    EnumerableSet.AddressSet private signers;
     mapping(bytes32 => bool) private usedMessages;
-
-    constructor(address[] memory _signers) {
-        for (uint256 i = 0; i < _signers.length; i++) {
-            signers.add(_signers[i]);
-        }
-    }
 
     /// @dev Reverts if the signature is invalid or the nonce is already used.
     function needsSignature(

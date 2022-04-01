@@ -7,10 +7,13 @@ import (
 
 	"github.com/h-fam/errdiff"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/divergencetech/ethier/eth"
 	"github.com/divergencetech/ethier/ethtest"
+	"github.com/divergencetech/ethier/ethtest/revert"
 )
 
 // As signing is a pure function we can reuse the same set of signers across all
@@ -19,6 +22,14 @@ var (
 	goodSigners     []*eth.Signer
 	goodSignerAddrs []common.Address
 	badSigner       *eth.Signer
+)
+
+// Accounts in the tests.
+const (
+	deployer = iota
+	vandal
+	arbitrary
+	numAccounts
 )
 
 func TestMain(m *testing.M) {
@@ -47,10 +58,15 @@ func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableSignatureChecker)
 	t.Helper()
 	sim := ethtest.NewSimulatedBackendTB(t, 3)
 
-	_, _, checker, err := DeployTestableSignatureChecker(sim.Acc(0), sim, goodSignerAddrs)
+	_, _, checker, err := DeployTestableSignatureChecker(sim.Acc(deployer), sim)
 	if err != nil {
 		t.Fatalf("DeployTestableSignatureChecker() error %v", err)
 	}
+
+	for _, a := range goodSignerAddrs {
+		sim.Must(t, "AddSigner()")(checker.AddSigner(sim.Acc(deployer), a))
+	}
+
 	return sim, checker
 }
 
@@ -63,7 +79,7 @@ type signatureTest struct {
 	errDiffAgainst       interface{}
 }
 
-const invalidSigMsg = "SignatureChecker: Invalid signature"
+const invalidSigMsg = string(revert.InvalidSignature)
 
 func signatureTestCases() []signatureTest {
 	return []signatureTest{
@@ -115,8 +131,8 @@ func TestSingleUseSignature(t *testing.T) {
 				t.Fatalf("%T.PersonalSignWithNonce(%v) error %v", tt.signer, tt.signedData, err)
 			}
 
-			_, got := checker.NeedsSignature(sim.Acc(0), tt.sentData, nonce, sig)
-			if diff := errdiff.Check(got, tt.errDiffAgainst); diff != "" {
+			_, err = checker.NeedsSignature(sim.Acc(0), tt.sentData, nonce, sig)
+			if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
 				t.Errorf("NeedsSignature() on first call; %s", diff)
 			}
 
@@ -124,8 +140,8 @@ func TestSingleUseSignature(t *testing.T) {
 				return
 			}
 
-			_, gotRepeat := checker.NeedsSignature(sim.Acc(0), tt.sentData, nonce, sig)
-			if diff := errdiff.Check(gotRepeat, "SignatureChecker: Message already used"); diff != "" {
+			_, err = checker.NeedsSignature(sim.Acc(0), tt.sentData, nonce, sig)
+			if diff := errdiff.Check(err, "SignatureChecker: Message already used"); diff != "" {
 				t.Errorf("NeedsSignature() on second call with same message; %s", diff)
 			}
 		})
@@ -143,8 +159,8 @@ func TestReusableSignature(t *testing.T) {
 			}
 
 			for i := 0; i < 2; i++ {
-				_, got := checker.NeedsReusableSignature(nil, tt.sentData, sig)
-				if diff := errdiff.Check(got, tt.errDiffAgainst); diff != "" {
+				_, err := checker.NeedsReusableSignature(nil, tt.sentData, sig)
+				if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
 					t.Errorf("NeedsReusableSignature() call #%d; %s", i+1, diff)
 				}
 			}
@@ -196,8 +212,8 @@ func TestAddressSignature(t *testing.T) {
 	t.Run("stolen signatures", func(t *testing.T) {
 		for _, sigs := range goodSigs {
 			for _, sig := range sigs {
-				_, got := checker.NeedsSenderSignature(sim.CallFrom(eve), sig)
-				if diff := errdiff.Substring(got, invalidSigMsg); diff != "" {
+				_, err := checker.NeedsSenderSignature(sim.CallFrom(eve), sig)
+				if diff := errdiff.Substring(err, invalidSigMsg); diff != "" {
 					t.Errorf("NeedsSenderSignature() with stolen signature; %s", diff)
 				}
 			}
@@ -206,9 +222,42 @@ func TestAddressSignature(t *testing.T) {
 
 	t.Run("malicious signatures from bad signer", func(t *testing.T) {
 		sig := signAddr(badSigner, eve)
-		_, got := checker.NeedsSenderSignature(sim.CallFrom(eve), sig)
-		if diff := errdiff.Substring(got, invalidSigMsg); diff != "" {
+		_, err := checker.NeedsSenderSignature(sim.CallFrom(eve), sig)
+		if diff := errdiff.Substring(err, invalidSigMsg); diff != "" {
 			t.Errorf("NeedsSenderSignature() with valid malicious signer; %s", diff)
 		}
 	})
+}
+
+func TestSignerManagement(t *testing.T) {
+	sim, checker := deploy(t)
+
+	t.Run("only owner", func(t *testing.T) {
+		tests := map[string](func(*bind.TransactOpts, common.Address) (*types.Transaction, error)){
+			"AddSigner":    checker.AddSigner,
+			"RemoveSigner": checker.RemoveSigner,
+		}
+
+		for name, fn := range tests {
+			if diff := revert.OnlyOwner.Diff(fn(sim.Acc(vandal), common.Address{})); diff != "" {
+				t.Errorf("%s() as non-owner; %s", name, diff)
+			}
+		}
+	})
+
+	s := goodSigners[0]
+	sig, err := s.PersonalSignAddress(sim.Addr(arbitrary))
+	if err != nil {
+		t.Fatalf("%T.PersonalSignAddress([arbitrary addr]) error %v", s, err)
+	}
+
+	if _, err := checker.NeedsSenderSignature(sim.CallFrom(arbitrary), sig); err != nil {
+		t.Errorf("%T.NeedsSenderSignature([valid]) got err %v", checker, err)
+	}
+
+	sim.Must(t, "RemoveSigner()")(checker.RemoveSigner(sim.Acc(deployer), s.Address()))
+
+	if diff := revert.InvalidSignature.Diff(checker.NeedsSenderSignature(sim.CallFrom(arbitrary), sig)); diff != "" {
+		t.Errorf("%T.NeedsSenderSignature([signer removed]) %s", checker, diff)
+	}
 }
