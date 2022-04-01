@@ -3,7 +3,6 @@ package finance
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/divergencetech/ethier/ethtest"
 	"github.com/divergencetech/ethier/ethtest/factorytest"
 	"github.com/divergencetech/ethier/ethtest/revert"
-	"github.com/dustin/go-humanize"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -177,74 +175,6 @@ func TestDeterministicDeploymentAddress(t *testing.T) {
 			t.Errorf("%T.DeployDeterministic(%#x) got deployed address %v; want %v as returned by PredictDeploymentAddress()", dep, salt, got, predicted)
 		}
 	}
-}
-
-func ExampleGasSaving() {
-	ctx := context.Background()
-
-	sim, err := ethtest.NewSimulatedBackend(3)
-	if err != nil {
-		fmt.Printf("NewSimulatedBacked(1): %v", err)
-		return
-	}
-
-	_, _, dep, err := DeployPaymentSplitterFactory(sim.Acc(0), sim)
-	if err != nil {
-		fmt.Printf("DeployPaymentSplitterFactory(): %v", err)
-		return
-	}
-
-	payees := []common.Address{sim.Addr(0), sim.Addr(1), sim.Addr(2)}
-	one := big.NewInt(1)
-	shares := []*big.Int{one, one, one}
-
-	gas := func(desc string, tx *types.Transaction) uint64 {
-		rcpt, err := bind.WaitMined(ctx, sim, tx)
-		if err != nil {
-			fmt.Printf("bind.WaitMined(%s): %v", desc, err)
-			return 0
-		}
-		return rcpt.GasUsed
-	}
-
-	tx, err := dep.Deploy(sim.Acc(0), payees, shares)
-	if err != nil {
-		fmt.Printf("%T.Deploy(): %v", dep, err)
-		return
-	}
-	proxy := gas("deploy proxy", tx)
-
-	_, tx, _, err = DeployPaymentSplitter(sim.Acc(0), sim, payees, shares)
-	if err != nil {
-		fmt.Printf("DeployPaymentSplitter() error %v", err)
-		return
-	}
-	full := gas("deploy full PaymentSplitter", tx)
-
-	saving := full - proxy
-
-	comma := func(i uint64) string { return humanize.Comma(int64(i)) }
-
-	fmt.Println("Deploy proxy:", comma(proxy), "gas")
-	fmt.Println("Deploy full PaymentSplitter:", comma(full), "gas")
-	fmt.Println("*** Savings ***")
-	fmt.Println("Gas: ", comma(saving))
-
-	const (
-		priceInGwei = 100
-		ethToUSD    = 3500
-	)
-	ethSave := big.NewRat(int64(saving), 1e9/priceInGwei)
-	fmt.Printf("At %d gwei: %s%s\n", priceInGwei, ethSave.FloatString(3), eth.Symbol)
-	fmt.Printf("At $%s: $%s", comma(ethToUSD), ethSave.Mul(ethSave, big.NewRat(ethToUSD, 1)).FloatString(2))
-
-	// Output:
-	// Deploy proxy: 286,982 gas
-	// Deploy full PaymentSplitter: 1,589,010 gas
-	// *** Savings ***
-	// Gas:  1,302,028
-	// At 100 gwei: 0.130Ξ
-	// At $3,500: $455.71
 }
 
 func TestChainAgnosticLibrary(t *testing.T) {
