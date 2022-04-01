@@ -15,7 +15,7 @@ VRFConsumerBase, along with all the same best practices.
 abstract contract VRFConsumerHelper is VRFConsumerBase {
     constructor()
         VRFConsumerBase(Chainlink.vrfCoordinator(), Chainlink.linkToken())
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     /**
     @notice Calls standard VRFConsumerBase.requestRandomness() with

@@ -13,6 +13,7 @@ OpenSea's example code. TODO: it's likely that the above mapping can be changed
 to address => address without affecting anything, but further investigation is
 needed (i.e. is there a subtle reason that OpenSea released it like this?).
  */
+// solhint-disable-next-line no-empty-blocks
 contract OwnableDelegateProxy {
 
 }

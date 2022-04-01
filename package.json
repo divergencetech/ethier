@@ -6,7 +6,7 @@
   "scripts": {
     "build": "go build -o build/ethier ethier/*.go",
     "generate": "PATH=\"$(readlink -f build):${PATH}\" go generate ./...",
-    "solhint": "npx solhint 'contracts/**/*.sol' && npx solhint 'tests/**/*.sol' && npx solhint 'factories/**/*.sol'",
+    "solhint": "solhint -w 0 '**/*.sol'",
     "test": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./...",
     "test:light": "go test ./...",
     "test:verbose": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./... -test.v"

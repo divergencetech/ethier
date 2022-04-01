@@ -35,6 +35,7 @@ contract SimulatedChainlink {
 
 /// @notice A minimal contract to mock the LINK token for VRFConsumerBase.
 contract SimulatedLinkToken is ERC20 {
+    // solhint-disable-next-line no-empty-blocks
     constructor() ERC20("ChainLink Token", "LINK") {}
 
     /**

@@ -97,7 +97,7 @@ library ERC721Redeemer {
                     endSameId < tokenIds.length &&
                         tokenIds[endSameId] == tokenId;
                     endSameId++
-                ) {}
+                ) {} // solhint-disable-line no-empty-blocks
                 n = endSameId - i;
             }
 

@@ -23,7 +23,7 @@ contract TestableDutchAuction is LinearDutchAuction {
             sellerConfig,
             beneficiary
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     uint256 private total;
     mapping(address => uint256) public own;
@@ -59,6 +59,7 @@ contract TestableDutchAuction is LinearDutchAuction {
 
     /// @dev Returns the current timestamp for testing of time-based auctions.
     function timestamp() public view returns (uint256) {
+        // solhint-disable-next-line not-rely-on-time
         return block.timestamp;
     }
 }
@@ -91,6 +92,7 @@ contract ReentrantProxyPurchaser {
 
     receive() external payable {
         // Attempt reentrance when receiving a refund.
+        // solhint-disable-next-line avoid-tx-origin
         auction.buy{value: msg.value}(tx.origin, 1);
     }
 }

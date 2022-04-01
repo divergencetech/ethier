@@ -6,6 +6,7 @@ import "../../contracts/random/NextShuffler.sol";
 import "../../contracts/random/PRNG.sol";
 
 contract TestableNextShuffler is NextShuffler {
+    // solhint-disable-next-line no-empty-blocks
     constructor(uint256 numToShuffle) NextShuffler(numToShuffle) {}
 
     uint256[] public permutation;
@@ -16,7 +17,7 @@ contract TestableNextShuffler is NextShuffler {
 
     function permute(bytes32 seed) public {
         PRNG.Source src = PRNG.newSource(seed);
-        for (uint256 i = 0; i < NextShuffler.NUM_TO_SHUFFLE; i++) {
+        for (uint256 i = 0; i < NextShuffler.numToShuffle; i++) {
             permutation.push(NextShuffler._next(src));
         }
     }
