@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../../contracts/erc721/ERC721CommonEnumerable.sol";
-import "../../contracts/erc721/ERC721AutoIncrement.sol";
+import "../../contracts/erc721/ERC721CommonAutoIncrement.sol";
 import "../../contracts/erc721/BaseTokenURI.sol";
 
 /// @notice Exposes a functions modified with the modifiers under test.
