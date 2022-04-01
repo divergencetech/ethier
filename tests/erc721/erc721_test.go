@@ -19,6 +19,7 @@ import (
 const (
 	deployer = iota
 	tokenOwner
+	tokenOwner2
 	tokenReceiver
 	approved
 	vandal
@@ -623,4 +624,82 @@ func TestBaseTokenURI(t *testing.T) {
 	sim.Must(t, "SetBaseTokenURI(%q)", base)(nft.SetBaseTokenURI(sim.Acc(deployer), base))
 	wantURI(t, 42, "good/42")
 	wantURI(t, 101010, "good/101010")
+}
+
+func TestAutoIncrement(t *testing.T) {
+	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
+	openseatest.DeployProxyRegistryTB(t, sim)
+
+	_, _, nft, err := DeployTestableERC721AutoIncrement(sim.Acc(deployer), sim)
+	if err != nil {
+		t.Fatalf("DeployTestableERC721AutoIncrement() error %v", err)
+	}
+
+	const (
+		o1 = tokenOwner
+		o2 = tokenOwner2
+	)
+
+	tests := []struct {
+		toAccountIndex   int
+		n                int64
+		wantOwnerIndices []int
+		wantTotalSupply  int64
+	}{
+		{
+			toAccountIndex:   o1,
+			n:                2,
+			wantOwnerIndices: []int{o1, o1},
+			wantTotalSupply:  2,
+		},
+		{
+			toAccountIndex:   o2,
+			n:                0,
+			wantOwnerIndices: []int{o1, o1},
+			wantTotalSupply:  2,
+		},
+		{
+			toAccountIndex:   o2,
+			n:                1,
+			wantOwnerIndices: []int{o1, o1, o2},
+			wantTotalSupply:  3,
+		},
+		{
+			toAccountIndex:   o2,
+			n:                3,
+			wantOwnerIndices: []int{o1, o1, o2, o2, o2, o2},
+			wantTotalSupply:  6,
+		},
+		{
+			toAccountIndex:   o1,
+			n:                1,
+			wantOwnerIndices: []int{o1, o1, o2, o2, o2, o2, o1},
+			wantTotalSupply:  7,
+		},
+	}
+
+	for _, tt := range tests {
+		to := sim.Addr(tt.toAccountIndex)
+		sim.Must(t, "safeMintN(%v, %d)", to, tt.n)(nft.SafeMintN(sim.Acc(deployer), to, big.NewInt(tt.n)))
+
+		t.Run("owners", func(t *testing.T) {
+			gotOwners, err := nft.AllOwners(nil)
+			if err != nil {
+				t.Fatalf("AllOwners() error %v", err)
+			}
+
+			var wantOwners []common.Address
+			for _, i := range tt.wantOwnerIndices {
+				wantOwners = append(wantOwners, sim.Addr(i))
+			}
+
+			if diff := cmp.Diff(wantOwners, gotOwners); diff != "" {
+				t.Errorf("AllOwners() diff (-want +got):\n%s", diff)
+			}
+		})
+
+		if got, err := nft.TotalSupply(nil); err != nil || got.Cmp(big.NewInt(tt.wantTotalSupply)) != 0 {
+			t.Errorf("TotalSupply() got %d, err = %v; want %d, nil err", got, err, tt.wantTotalSupply)
+		}
+	}
 }
