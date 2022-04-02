@@ -114,6 +114,7 @@ abstract contract LinearDutchAuction is Seller {
         if (cfg.unit == AuctionIntervalUnit.Block) {
             current = block.number;
         } else if (cfg.unit == AuctionIntervalUnit.Time) {
+            // solhint-disable-next-line not-rely-on-time
             current = block.timestamp;
         }
 

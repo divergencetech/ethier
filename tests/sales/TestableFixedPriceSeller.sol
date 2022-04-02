@@ -12,11 +12,11 @@ contract TestableFixedPriceSeller is FixedPriceSeller {
             SellerConfig(0, 0, 0, 0, false, false, false),
             payable(0)
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     function _handlePurchase(
         address,
         uint256,
         bool
-    ) internal override {}
+    ) internal override {} // solhint-disable-line no-empty-blocks
 }

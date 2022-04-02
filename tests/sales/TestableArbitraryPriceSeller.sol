@@ -11,7 +11,7 @@ contract TestableArbitraryPriceSeller is ArbitraryPriceSeller {
             SellerConfig(totalInventory, 0, 0, 0, false, false, false),
             payable(0)
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     /**
     @notice Allow purchasing at any price; exposed only for testing.
@@ -42,5 +42,5 @@ contract TestableArbitraryPriceSeller is ArbitraryPriceSeller {
         address,
         uint256,
         bool
-    ) internal override {}
+    ) internal override {} // solhint-disable-line no-empty-blocks
 }

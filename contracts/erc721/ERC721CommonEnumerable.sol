@@ -16,7 +16,7 @@ See: https://shiny.mirror.xyz/OUampBbIz9ebEicfGnQf5At_ReMHlZy0tB4glb9xQ0E
 contract ERC721CommonEnumerable is ERC721Common, ERC721Enumerable {
     constructor(string memory name, string memory symbol)
         ERC721Common(name, symbol)
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     /**
     @notice Returns ERC721Common.isApprovedForAll() to guarantee use of OpenSea

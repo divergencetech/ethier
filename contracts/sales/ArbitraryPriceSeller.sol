@@ -19,7 +19,7 @@ abstract contract ArbitraryPriceSeller is Seller {
     constructor(
         Seller.SellerConfig memory sellerConfig,
         address payable _beneficiary
-    ) Seller(sellerConfig, _beneficiary) {}
+    ) Seller(sellerConfig, _beneficiary) {} // solhint-disable-line no-empty-blocks
 
     /**
     @notice Block accidental usage of the convenience function that would

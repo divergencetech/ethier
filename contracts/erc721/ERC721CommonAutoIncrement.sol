@@ -14,7 +14,7 @@ contract ERC721CommonAutoIncrement is ERC721Common {
 
     constructor(string memory name, string memory symbol)
         ERC721Common(name, symbol)
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     /**
     @notice Total number of tokens minted.

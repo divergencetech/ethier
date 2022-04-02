@@ -93,7 +93,7 @@ contract OpenSeaERC721Factory is OwnerPausable {
         uint256 indexed tokenId
     );
 
-    uint256 private immutable NUM_OPTIONS;
+    uint256 public immutable numOptions;
 
     /**
     @param owner Initial contract owner as it will be deployed by another
@@ -111,7 +111,7 @@ contract OpenSeaERC721Factory is OwnerPausable {
         token = OpenSeaERC721Mintable(msg.sender);
         setBaseOptionURI(_baseOptionURI);
 
-        NUM_OPTIONS = _numOptions;
+        numOptions = _numOptions;
 
         super.transferOwnership(owner);
         emitTransfers(address(0), owner);
@@ -133,14 +133,6 @@ contract OpenSeaERC721Factory is OwnerPausable {
     }
 
     /**
-    @notice Returns the number of minting options available, read from the
-    contract that deployed this factory.
-     */
-    function numOptions() external view returns (uint256) {
-        return NUM_OPTIONS;
-    }
-
-    /**
     @notice Emits standard ERC721.Transfer events for all of the option "tokens"
     to induce correct OpenSea behaviour. These are first emitted upon contract
     deployment to signal "creation" of the option tokens, and on any ownership
@@ -148,7 +140,7 @@ contract OpenSeaERC721Factory is OwnerPausable {
 
      */
     function emitTransfers(address from, address to) internal {
-        for (uint256 i = 0; i < NUM_OPTIONS; i++) {
+        for (uint256 i = 0; i < numOptions; i++) {
             emit Transfer(from, to, i);
         }
     }
@@ -170,7 +162,7 @@ contract OpenSeaERC721Factory is OwnerPausable {
     function canMint(uint256 optionId) external view returns (bool) {
         return
             !paused() &&
-            optionId < NUM_OPTIONS &&
+            optionId < numOptions &&
             token.factoryCanMint(optionId);
     }
 
