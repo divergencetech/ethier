@@ -15,7 +15,7 @@ jobs:
 
       - name: Check Go code formatting
         run: test -z $(goimports -l .)
-        
+
   lint_sol:
     runs-on: ubuntu-latest
     steps:
@@ -25,7 +25,7 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: 14.x
-      
+
       - name: Cache dependencies
         id: cache
         uses: actions/cache@v2
@@ -39,3 +39,6 @@ jobs:
 
       - name: Check Solidity code formatting
         run: npx prettier '**/*.sol' --check
+
+      - name: Run solhint
+        run: yarn solhint

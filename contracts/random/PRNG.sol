@@ -155,7 +155,8 @@ library PRNG {
     ) internal pure returns (uint256 result) {
         // Discard results >= n and try again because using % will bias towards
         // lower values; e.g. if n = 13 and we read 4 bits then {13, 14, 15}%13
-        // will select {0, 1, 2} twice as often as the other values.
+        // will select {0, 1, 2} twice as often as the other values.\
+        // solhint-disable-next-line no-empty-blocks
         for (result = n; result >= n; result = read(src, bits)) {}
     }
 

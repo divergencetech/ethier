@@ -11,6 +11,7 @@ contract TestableERC721CommonEnumerable is
     ERC721CommonEnumerable,
     BaseTokenURI
 {
+    // solhint-disable-next-line no-empty-blocks
     constructor() ERC721CommonEnumerable("Token", "JRR") BaseTokenURI("") {}
 
     function mint(uint256 tokenId) public {
@@ -22,13 +23,14 @@ contract TestableERC721CommonEnumerable is
     }
 
     /// @dev For testing the tokenExists() modifier.
+    // solhint-disable-next-line no-empty-blocks
     function mustExist(uint256 tokenId) public view tokenExists(tokenId) {}
 
     /// @dev For testing the onlyApprovedOrOwner() modifier.
     function mustBeApprovedOrOwner(uint256 tokenId)
         public
         onlyApprovedOrOwner(tokenId)
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     function _baseURI()
         internal
@@ -43,6 +45,7 @@ contract TestableERC721CommonEnumerable is
 contract TestableERC721AutoIncrement is ERC721CommonAutoIncrement {
     using Monotonic for Monotonic.Increaser;
 
+    // solhint-disable-next-line no-empty-blocks
     constructor() ERC721CommonAutoIncrement("", "") {}
 
     function safeMintN(address to, uint256 n) external {

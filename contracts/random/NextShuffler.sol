@@ -18,11 +18,11 @@ contract NextShuffler {
     using PRNG for PRNG.Source;
 
     /// @notice Total number of elements to shuffle.
-    uint256 public immutable NUM_TO_SHUFFLE;
+    uint256 public immutable numToShuffle;
 
-    /// @param numToShuffle Total number of elements to shuffle.
-    constructor(uint256 numToShuffle) {
-        NUM_TO_SHUFFLE = numToShuffle;
+    /// @param numToShuffle_ Total number of elements to shuffle.
+    constructor(uint256 numToShuffle_) {
+        numToShuffle = numToShuffle_;
     }
 
     /**
@@ -68,9 +68,9 @@ contract NextShuffler {
     thereof) of deterministic shuffling.
      */
     function _next(PRNG.Source src) internal returns (uint256) {
-        require(shuffled < NUM_TO_SHUFFLE, "NextShuffler: finished");
+        require(shuffled < numToShuffle, "NextShuffler: finished");
 
-        uint256 j = src.readLessThan(NUM_TO_SHUFFLE - shuffled) + shuffled;
+        uint256 j = src.readLessThan(numToShuffle - shuffled) + shuffled;
         emit ShuffledWith(shuffled, j);
 
         uint256 chosen = _get(j);

@@ -15,7 +15,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 contract ERC721Common is ERC721Pausable, ERC721PreApproval, OwnerPausable {
     constructor(string memory name, string memory symbol)
         ERC721(name, symbol)
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     /// @notice Requires that the token exists.
     modifier tokenExists(uint256 tokenId) {

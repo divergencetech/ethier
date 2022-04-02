@@ -8,7 +8,7 @@ import "../../../contracts/thirdparty/opensea/OpenSeaERC721Mintable.sol";
 contract TestableOpenSeaMintable is OpenSeaERC721Mintable {
     constructor(uint256 _numFactoryOptions, string memory baseOptionURI)
         OpenSeaERC721Mintable("", "", _numFactoryOptions, baseOptionURI)
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     /**
     @notice Required override to indicate if an option can currently be minted.
@@ -49,5 +49,6 @@ contract TestableOpenSeaMintable is OpenSeaERC721Mintable {
     @dev Workaround for a bug in geth's abigen / bind package that doesn't
     create types unless they're used in function signatures.
      */
+    // solhint-disable-next-line no-empty-blocks
     function abigenBugHack(Mint memory) external pure {}
 }

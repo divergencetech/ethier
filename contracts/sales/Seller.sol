@@ -244,6 +244,7 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
 
         if (config.maxPerAddress > 0) {
             bool alsoLimitSender = _msgSender() != to;
+            // solhint-disable-next-line avoid-tx-origin
             bool alsoLimitOrigin = tx.origin != _msgSender() && tx.origin != to;
 
             n = _capExtra(n, to, "Buyer limit");
@@ -251,6 +252,7 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
                 n = _capExtra(n, _msgSender(), "Sender limit");
             }
             if (alsoLimitOrigin) {
+                // solhint-disable-next-line avoid-tx-origin
                 n = _capExtra(n, tx.origin, "Origin limit");
             }
 
@@ -259,6 +261,7 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
                 _bought[_msgSender()] += n;
             }
             if (alsoLimitOrigin) {
+                // solhint-disable-next-line avoid-tx-origin
                 _bought[tx.origin] += n;
             }
         }
@@ -306,6 +309,7 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
             // reentrancy, but we want to expose it to allow for more precise
             // testing. This otherwise uses the exact same pattern as
             // Address.sendValue().
+            // solhint-disable-next-line avoid-low-level-calls
             (bool success, bytes memory returnData) = reimburse.call{
                 value: refund
             }("");
