@@ -1,3 +1,3 @@
 package erc721
 
-//go:generate ethier gen TestableERC721CommonEnumerable.sol TestableERC721Redeemer.sol
+//go:generate ethier gen TestableERC721ACommon.sol TestableERC721Redeemer.sol
