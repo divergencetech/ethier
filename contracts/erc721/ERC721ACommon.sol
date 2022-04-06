@@ -4,7 +4,6 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "./ERC721APreApproval.sol";
 import "../utils/OwnerPausable.sol";
-import "erc721a/contracts/ERC721A.sol";
 
 /**
 @notice An ERC721A contract with common functionality:
