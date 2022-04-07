@@ -2,7 +2,6 @@ package erc721
 
 import (
 	"math/big"
-	"reflect"
 	"testing"
 
 	"github.com/divergencetech/ethier/ethtest"
@@ -51,18 +50,18 @@ const (
 	notExists
 )
 
-func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721CommonEnumerable, *ERC721Filterer) {
+func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721ACommon, *ERC721Filterer) {
 	t.Helper()
 
 	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
 	openseatest.DeployProxyRegistryTB(t, sim)
 
-	addr, _, nft, err := DeployTestableERC721CommonEnumerable(sim.Acc(deployer), sim)
+	addr, _, nft, err := DeployTestableERC721ACommon(sim.Acc(deployer), sim)
 	if err != nil {
-		t.Fatalf("DeployTestableERC721CommonEnumerable() error %v", err)
+		t.Fatalf("TestableERC721ACommon() error %v", err)
 	}
 
-	if _, err := nft.Mint(sim.Acc(tokenOwner), big.NewInt(exists)); err != nil {
+	if _, err := nft.Mint(sim.Acc(tokenOwner)); err != nil {
 		t.Fatalf("Mint(%d) error %v", exists, err)
 	}
 	if _, err := nft.Approve(sim.Acc(tokenOwner), sim.Addr(approved), big.NewInt(exists)); err != nil {
@@ -93,7 +92,7 @@ func TestModifiers(t *testing.T) {
 		{
 			name:           "non-existent token",
 			tokenID:        notExists,
-			errDiffAgainst: "ERC721Common: Token doesn't exist",
+			errDiffAgainst: "ERC721ACommon: Token doesn't exist",
 		},
 	}
 
@@ -294,7 +293,7 @@ func TestOpenSeaProxyPreApproval(t *testing.T) {
 			switch {
 			case tt.fromAccountId == zeroAddressID:
 				// mint
-				sim.Must(t, "Mint(%d)", notExists)(nft.Mint(sim.Acc(tt.toAccountId), big.NewInt(notExists)))
+				sim.Must(t, "Mint()")(nft.Mint(sim.Acc(tt.toAccountId)))
 			case tt.toAccountId == zeroAddressID:
 				// burn
 				sim.Must(t, "Burn(%d)", exists)(nft.Burn(sim.Acc(tt.fromAccountId), big.NewInt(exists)))
@@ -519,7 +518,7 @@ func TestOpenSeaProxyPreApprovalOptInOut(t *testing.T) {
 			}
 
 			if tt.mints {
-				sim.Must(t, "Mint(%d)", notExists)(nft.Mint(sim.Acc(tokenReceiver), big.NewInt(notExists)))
+				sim.Must(t, "Mint()")(nft.Mint(sim.Acc(tokenReceiver)))
 			}
 
 			if tt.createProxyAfterMint {
@@ -544,65 +543,11 @@ func TestOpenSeaProxyPreApprovalOptInOut(t *testing.T) {
 	}
 }
 
-func TestEnumerableInterface(t *testing.T) {
-	enumerableMethods := []string{"TotalSupply", "TokenOfOwnerByIndex", "TokenByIndex"}
-	// Common methods, expected on both, are used as a control because there is
-	// significant embedding by abigen so we need toAccountId know which type actually
-	// has the methods.
-	commonMethods := []string{"BalanceOf", "OwnerOf", "IsApprovedForAll"}
-
-	tests := []struct {
-		contract interface{}
-		methods  []string
-		want     bool
-	}{
-		{
-			contract: &ERC721CommonCaller{},
-			methods:  commonMethods,
-			want:     true,
-		},
-		{
-			contract: &ERC721CommonEnumerableCaller{},
-			methods:  commonMethods,
-			want:     true,
-		},
-		{
-			contract: &ERC721CommonCaller{},
-			methods:  enumerableMethods,
-			want:     false,
-		},
-		{
-			contract: &ERC721CommonEnumerableCaller{},
-			methods:  enumerableMethods,
-			want:     true,
-		},
-	}
-
-	for _, tt := range tests {
-		typ := reflect.TypeOf(tt.contract)
-		for _, method := range tt.methods {
-			if _, got := typ.MethodByName(method); got != tt.want {
-				t.Errorf("%T has method %q? got %t; want %t", tt.contract, method, got, tt.want)
-			}
-		}
-	}
-
-	// Effectively the same as above but this won't compile if we haven't
-	// inherited properly.
-	var enum ERC721CommonEnumerable
-	_ = []interface{}{
-		enum.TotalSupply,
-		enum.TokenOfOwnerByIndex,
-		enum.TokenByIndex,
-	}
-}
-
 func TestBaseTokenURI(t *testing.T) {
 	sim, nft, _ := deploy(t)
 
-	for _, id := range []int64{1, 42, 101010} {
-		sim.Must(t, "Mint(%d)", id)(nft.Mint(sim.Acc(deployer), big.NewInt(id)))
-	}
+	const quantity = 50
+	sim.Must(t, "MintN(%d)", quantity)(nft.MintN(sim.Acc(deployer), big.NewInt(quantity)))
 
 	wantURI := func(t *testing.T, id int64, want string) {
 		t.Helper()
@@ -622,84 +567,6 @@ func TestBaseTokenURI(t *testing.T) {
 
 	const base = "good/"
 	sim.Must(t, "SetBaseTokenURI(%q)", base)(nft.SetBaseTokenURI(sim.Acc(deployer), base))
+	wantURI(t, 7, "good/7")
 	wantURI(t, 42, "good/42")
-	wantURI(t, 101010, "good/101010")
-}
-
-func TestAutoIncrement(t *testing.T) {
-	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
-	openseatest.DeployProxyRegistryTB(t, sim)
-
-	_, _, nft, err := DeployTestableERC721AutoIncrement(sim.Acc(deployer), sim)
-	if err != nil {
-		t.Fatalf("DeployTestableERC721AutoIncrement() error %v", err)
-	}
-
-	const (
-		o1 = tokenOwner
-		o2 = tokenOwner2
-	)
-
-	tests := []struct {
-		toAccountIndex   int
-		n                int64
-		wantOwnerIndices []int
-		wantTotalSupply  int64
-	}{
-		{
-			toAccountIndex:   o1,
-			n:                2,
-			wantOwnerIndices: []int{o1, o1},
-			wantTotalSupply:  2,
-		},
-		{
-			toAccountIndex:   o2,
-			n:                0,
-			wantOwnerIndices: []int{o1, o1},
-			wantTotalSupply:  2,
-		},
-		{
-			toAccountIndex:   o2,
-			n:                1,
-			wantOwnerIndices: []int{o1, o1, o2},
-			wantTotalSupply:  3,
-		},
-		{
-			toAccountIndex:   o2,
-			n:                3,
-			wantOwnerIndices: []int{o1, o1, o2, o2, o2, o2},
-			wantTotalSupply:  6,
-		},
-		{
-			toAccountIndex:   o1,
-			n:                1,
-			wantOwnerIndices: []int{o1, o1, o2, o2, o2, o2, o1},
-			wantTotalSupply:  7,
-		},
-	}
-
-	for _, tt := range tests {
-		to := sim.Addr(tt.toAccountIndex)
-		sim.Must(t, "safeMintN(%v, %d)", to, tt.n)(nft.SafeMintN(sim.Acc(deployer), to, big.NewInt(tt.n)))
-
-		t.Run("owners", func(t *testing.T) {
-			gotOwners, err := nft.AllOwners(nil)
-			if err != nil {
-				t.Fatalf("AllOwners() error %v", err)
-			}
-
-			var wantOwners []common.Address
-			for _, i := range tt.wantOwnerIndices {
-				wantOwners = append(wantOwners, sim.Addr(i))
-			}
-
-			if diff := cmp.Diff(wantOwners, gotOwners); diff != "" {
-				t.Errorf("AllOwners() diff (-want +got):\n%s", diff)
-			}
-		})
-
-		if got, err := nft.TotalSupply(nil); err != nil || got.Cmp(big.NewInt(tt.wantTotalSupply)) != 0 {
-			t.Errorf("TotalSupply() got %d, err = %v; want %d, nil err", got, err, tt.wantTotalSupply)
-		}
-	}
 }

@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../thirdparty/opensea/OpenSeaGasFreeListing.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "erc721a/contracts/ERC721A.sol";
 
 /// @notice Pre-approval of OpenSea proxies for gas-less listing
 /// @dev This wrapper allows users to revoke the pre-approval of their
@@ -15,7 +15,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 /// @dev This wrapper optimizes for the following scenario:
 /// - The majority of users already have a wyvern proxy
 /// - Most of them want to transfer tokens via wyvern exchanges
-abstract contract ERC721PreApproval is ERC721 {
+abstract contract ERC721APreApproval is ERC721A {
     /// @dev It is important that Active remains at first position, since this
     /// is the scenario that we are trying to optimize for.
     enum State {
@@ -57,18 +57,19 @@ abstract contract ERC721PreApproval is ERC721 {
             state[owner] = approved ? State.Active : State.Inactive;
             emit ApprovalForAll(owner, operator, approved);
         } else {
-            super._setApprovalForAll(owner, operator, approved);
+            super.setApprovalForAll(operator, approved);
         }
     }
 
     /// @dev Checks if the receiver has an existing proxy. If not, the
     /// pre-approval is disabled.
-    function _beforeTokenTransfer(
+    function _beforeTokenTransfers(
         address from,
         address to,
-        uint256 tokenId
+        uint256 startTokenId,
+        uint256 quantity
     ) internal virtual override {
-        super._beforeTokenTransfer(from, to, tokenId);
+        super._beforeTokenTransfers(from, to, startTokenId, quantity);
 
         // Exclude burns and inactive pre-approvals
         if (to == address(0) || state[to] == State.Inactive) {
