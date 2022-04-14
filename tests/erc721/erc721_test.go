@@ -570,3 +570,13 @@ func TestBaseTokenURI(t *testing.T) {
 	wantURI(t, 7, "good/7")
 	wantURI(t, 42, "good/42")
 }
+
+func TestPause(t *testing.T) {
+	sim, nft, _ := deploy(t)
+
+	sim.Must(t, "Pause()")(nft.Pause(sim.Acc(deployer)))
+	check := revert.Checker("ERC721ACommon: paused")
+	if diff := check.Diff(nft.MintN(sim.Acc(deployer), big.NewInt(1))); diff != "" {
+		t.Errorf("MintN() while paused; %s", diff)
+	}
+}
