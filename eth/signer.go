@@ -4,10 +4,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"math/big"
 
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/tyler-smith/go-bip39"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/tink/go/prf"
@@ -269,4 +271,10 @@ func (s *Signer) PersonalSignWithNonce(buf []byte) ([]byte, [32]byte, error) {
 // SignAddress is a convenience wrapper for s.PersonalSign(addr.Bytes()).
 func (s *Signer) PersonalSignAddress(addr common.Address) ([]byte, error) {
 	return s.PersonalSign(addr.Bytes())
+}
+
+// TransactorWithChainID returns bind.NewKeyedTransactorWithChainID(<key>,
+// chainID) where <key> is the Signer's private key.
+func (s *Signer) TransactorWithChainID(chainID *big.Int) (*bind.TransactOpts, error) {
+	return bind.NewKeyedTransactorWithChainID(s.key, chainID)
 }

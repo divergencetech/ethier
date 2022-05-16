@@ -1,14 +1,27 @@
-package eth
+package eth_test
 
 import (
 	"bytes"
+	"context"
+	"math/big"
 	"strings"
 	"testing"
 
+	"github.com/divergencetech/ethier/ethtest"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/tink/go/keyset"
 	"github.com/google/tink/go/prf"
 	"github.com/google/tink/go/tink"
+
+	// These tests require ethtest.SimulatedBackend but that would result in a
+	// cyclical dependency. As this is limited to these tests and not the
+	// package itself, we simply move them from package eth to package eth_test
+	// and dot-import to avoid having to qualify the full package name. This
+	// MUST NOT be considered precedent outside of tests and SHOULD be avoided
+	// where possible.
+	. "github.com/divergencetech/ethier/eth"
 )
 
 const (
@@ -116,4 +129,86 @@ func (nonSecureAEADOnlyForTesting) Encrypt(plaintext, _ []byte) ([]byte, error) 
 
 func (nonSecureAEADOnlyForTesting) Decrypt(ciphertext, _ []byte) ([]byte, error) {
 	return ciphertext, nil
+}
+
+func TestTransactorWithChainID(t *testing.T) {
+	ctx := context.Background()
+
+	// Test that Signer.TransactorWithChainID works by using the resulting TransactOpts
+	// to send funds on the SimulatedBackend.
+
+	sim := ethtest.NewSimulatedBackendTB(t, 1)
+	signer, err := NewSigner(256)
+	if err != nil {
+		t.Fatalf("NewSigner(256) error %v", err)
+	}
+	t.Logf("Faucet: %v", sim.Addr(0))
+	t.Logf("Signer under test: %v", signer.Address())
+
+	wantBalance := func(ctx context.Context, t *testing.T, desc string, addr common.Address, want *big.Int) {
+		t.Helper()
+		t.Run(desc, func(t *testing.T) {
+			got := sim.BalanceOf(ctx, t, addr)
+			if got.Cmp(want) != 0 {
+				t.Errorf("sim.BalanceOf(%v) got %d; want %d", addr, got, want)
+			}
+		})
+	}
+	wantBalance(ctx, t, "faucet at beginning", sim.Addr(0), Ether(100)) // default of SimulatedBackend
+	wantBalance(ctx, t, "signer at beginning", signer.Address(), big.NewInt(0))
+
+	gasPrice := EtherFraction(1, 1e9)
+	const gasLimit = 21000
+	txFee := new(big.Int).Mul(gasPrice, big.NewInt(gasLimit))
+
+	sendEth := func(t *testing.T, opts *bind.TransactOpts, to common.Address, value *big.Int) {
+		t.Helper()
+		unsigned := types.NewTransaction(0, to, value, gasLimit, gasPrice, nil)
+		tx, err := opts.Signer(opts.From, unsigned)
+		if err != nil {
+			t.Fatalf("%T.Signer(%+v) error %v", opts, unsigned, err)
+		}
+		if err := sim.SendTransaction(ctx, tx); err != nil {
+			t.Fatalf("%T.SendTransaction() error %v", sim, err)
+		}
+	}
+
+	sendEth(t, sim.Acc(0), signer.Address(), Ether(42))
+	wantBalance(ctx, t, "faucet after sending 42", sim.Addr(0), new(big.Int).Sub(Ether(100-42), txFee))
+	wantBalance(ctx, t, "signer after receiving 42", signer.Address(), Ether(42))
+
+	t.Run("correct chain ID", func(t *testing.T) {
+		chainID := sim.Blockchain().Config().ChainID
+		opts, err := signer.TransactorWithChainID(chainID)
+		if err != nil {
+			t.Fatalf("%T.TransactorWithChainID(%d) error %v", signer, chainID, err)
+		}
+		sendEth(t, opts, sim.Addr(0), Ether(21))
+		wantBalance(ctx, t, "faucet after sending 42 and receiving 21", sim.Addr(0), new(big.Int).Sub(Ether(100-42+21), txFee))
+		wantBalance(ctx, t, "signer after receiving 42 and sending 21", signer.Address(), new(big.Int).Sub(Ether(42-21), txFee))
+	})
+
+	t.Run("incorrect chain ID", func(t *testing.T) {
+		// The SimulatedBackend panics instead of returning an error when the
+		// chain ID is incorrect. #java
+		defer func() {
+			const wantContains = "invalid chain id"
+			r := recover()
+
+			if err, ok := r.(error); ok && strings.Contains(err.Error(), wantContains) {
+				return
+			}
+			t.Errorf("%T.SendTransaction(%T.TransactorWithChainID(<incorrect ID>)) recovered %T(%v); want panic with error containing %q", sim, signer, r, r, wantContains)
+		}()
+
+		chainID := new(big.Int).Add(sim.Blockchain().Config().ChainID, big.NewInt(1))
+		opts, err := signer.TransactorWithChainID(chainID)
+		if err != nil {
+			t.Fatalf("%T.TransactorWithChainID(%d) error %v", signer, chainID, err)
+		}
+		sendEth(t, opts, sim.Addr(0), Ether(1))
+		// We should never reach here because sendEth results in a panic inside
+		// go-ethereum's SimulatedBackend.
+		t.Errorf("%T.SendTransaction(%T.TransactorWithChainID(<incorrect ID>)) did not panic", sim, signer)
+	})
 }
