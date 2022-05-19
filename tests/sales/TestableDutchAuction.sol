@@ -39,13 +39,13 @@ contract TestableDutchAuction is LinearDutchAuction {
         uint256 n,
         bool freeOfCharge
     ) internal override {
+        total += n;
         // Not standard usage: an additional test to lock in an API guarantee.
         require(
             Seller.totalSold() == total,
-            "Seller.totalSold() API promises to be pre-purchase amount"
+            "Seller.totalSold() API promises to be post-purchase amount"
         );
 
-        total += n;
         own[to] += n;
         if (freeOfCharge) {
             receivedFree[to] += n;

@@ -109,7 +109,9 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
     @dev Called by both _purchase() and purchaseFreeOfCharge() after all limits
     have been put in place; must perform all contract-specific sale logic, e.g.
     ERC721 minting. When _handlePurchase() is called, the value returned by
-    Seller.totalSold() will be the pre-purchase amount.
+    Seller.totalSold() will be the POST-purchase amount to allow for the
+    checks-effects-interactions (ECI) pattern as _handlePurchase() may include
+    an interaction. _handlePurchase() MUST itself implement the CEI pattern.
     @param to The recipient of the item(s).
     @param n The number of items allowed to be purchased, which MAY be less than
     to the number passed to _purchase() but SHALL be greater than zero.
@@ -180,6 +182,10 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
         onlyOwner
         whenNotPaused
     {
+        /**
+         * ##### CHECKS
+         */
+
         uint256 freeQuota = sellerConfig.freeQuota;
         n = Math.min(n, freeQuota - purchasedFreeOfCharge.current());
         require(n > 0, "Seller: Free quota exceeded");
@@ -188,10 +194,16 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
         n = Math.min(n, totalInventory - _totalSold.current());
         require(n > 0, "Seller: Sold out");
 
-        _handlePurchase(to, n, true);
-
+        /**
+         * ##### EFFECTS
+         */
         _totalSold.add(n);
         purchasedFreeOfCharge.add(n);
+
+        /**
+         * ##### INTERACTIONS
+         */
+        _handlePurchase(to, n, true);
         assert(_totalSold.current() <= totalInventory);
         assert(purchasedFreeOfCharge.current() <= freeQuota);
     }
@@ -282,14 +294,16 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
         /**
          * ##### EFFECTS
          */
-
-        _handlePurchase(to, n, false);
         _totalSold.add(n);
         assert(_totalSold.current() <= config.totalInventory);
 
         /**
          * ##### INTERACTIONS
          */
+
+        // As _handlePurchase() is often an ERC721 safeMint(), it constitutes an
+        // interaction.
+        _handlePurchase(to, n, false);
 
         // Ideally we'd be using a PullPayment here, but the user experience is
         // poor when there's a variable cost or the number of items purchased
