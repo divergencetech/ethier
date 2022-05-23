@@ -16,12 +16,12 @@ import (
 )
 
 func init() {
-	const short = "Reads lines from stdin and shuffles them in a verifiable manner; useful for allow-list selection or metadata shuffling."
+	const short = "Reads lines from stdin and shuffles them in a verifiable manner; useful for allow-list selection or metadata shuffling"
 
 	cmd := &cobra.Command{
 		Use:   "shuffle",
 		Short: short,
-		Long: short + `
+		Long: short + `.
 
 By committing to the input data and an entropy source out of one's control, shuffle is both transparent and deterministic so its results can be verified by a third party.
 
