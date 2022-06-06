@@ -43,7 +43,7 @@ contract SourceMapTest0 {
 
 contract SourceMapTest1 {
     event Noop();
-    
+
     function id() external returns (uint256 chainId) {
         assembly {
             chainId := chainid()
