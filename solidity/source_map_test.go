@@ -53,9 +53,7 @@ func TestSourceMap(t *testing.T) {
 	for _, fn := range [](func(*bind.TransactOpts) (*types.Transaction, error)){
 		t0.Id, t0.IdPlusOne, t0.FromLib, t1.Id, t2.Id,
 	} {
-		if _, err := fn(sim.Acc(0)); err != nil {
-			t.Fatal(err)
-		}
+		sim.Must(t, "")(fn(sim.Acc(0)))
 	}
 
 	type pos struct {
@@ -129,7 +127,7 @@ type chainIDInterceptor struct {
 	// contract is updated when a transaction starts so we know which runtime
 	// binary and source map to inspect.
 	contract common.Address
-	got      []solidity.Pos
+	got      []solidity.Location
 }
 
 func (i *chainIDInterceptor) CaptureStart(evm *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
@@ -143,7 +141,7 @@ func (i *chainIDInterceptor) CaptureState(pc uint64, op vm.OpCode, gas, cost uin
 	if pos, ok := i.src.Source(i.contract, pc); ok {
 		i.got = append(i.got, pos)
 	} else {
-		i.got = append(i.got, solidity.Pos{
+		i.got = append(i.got, solidity.Location{
 			Source: fmt.Sprintf("pc %d not found in contract %v", pc, i.contract),
 		})
 	}

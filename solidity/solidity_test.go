@@ -10,7 +10,7 @@ import (
 
 func (cm *contractMap) uncompressed() string {
 	var parts []string
-	for _, p := range cm.mapping {
+	for _, p := range cm.locations {
 		parts = append(parts, fmt.Sprintf("%d:%d:%d:%s:%d", p.Start, p.Length, p.FileIdx, p.Jump, p.ModifierDepth))
 	}
 	return strings.Join(parts, ";")
