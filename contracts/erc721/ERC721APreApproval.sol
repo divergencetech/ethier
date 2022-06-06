@@ -2,6 +2,7 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
+import "@openzeppelin/contracts/utils/Context.sol";
 import "../thirdparty/opensea/OpenSeaGasFreeListing.sol";
 import "erc721a/contracts/ERC721A.sol";
 
@@ -15,7 +16,7 @@ import "erc721a/contracts/ERC721A.sol";
 /// @dev This wrapper optimizes for the following scenario:
 /// - The majority of users already have a wyvern proxy
 /// - Most of them want to transfer tokens via wyvern exchanges
-abstract contract ERC721APreApproval is ERC721A {
+abstract contract ERC721APreApproval is ERC721A, Context {
     /// @dev It is important that Active remains at first position, since this
     /// is the scenario that we are trying to optimize for.
     enum State {
