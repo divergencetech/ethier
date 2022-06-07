@@ -27,7 +27,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ./node_modules
-          key: modules-${{ hashFiles('yarn.lock') }}-x
+          key: modules-${{ hashFiles('yarn.lock') }}
 
       - name: Install yarn dependencies
         if: steps.cache.outputs.cache-hit != 'true'
@@ -40,4 +40,7 @@ jobs:
           sudo apt-get install -y solc abigen
 
       - name: Run tests
-        run: npm run test:verbose
+        run: |
+          solc --version
+          abigen --version
+          npm run test
