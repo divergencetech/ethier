@@ -77,12 +77,10 @@ func TestSourceMap(t *testing.T) {
 			Length: wantLen,
 		},
 		{
-			File: "solidity/srcmaptest/SourceMapTest.sol",
-			Line: 38,
-			Col:  5,
-			// The solc runtime source map, when referring to a library,
-			// references the entire function from which the library was called.
-			Length: 112,
+			File:   "solidity/srcmaptest/SourceMapTest.sol",
+			Line:   14,
+			Col:    24,
+			Length: wantLen,
 		},
 		{
 			File:   "solidity/srcmaptest/SourceMapTest.sol",
@@ -124,25 +122,30 @@ func TestSourceMap(t *testing.T) {
 type chainIDInterceptor struct {
 	src *solidity.SourceMap
 
-	// contract is updated when a transaction starts so we know which runtime
-	// binary and source map to inspect.
-	contract common.Address
-	got      []solidity.Location
+	// contracts are a stack of contract addresses with the last entry of the
+	// slice being the current contract, against which the pc is compared when
+	// inspecting the source map. Without a stack (i.e. always using the
+	// "bottom" contract, to which the tx is initiated) the returned source will
+	// function incorrectly on library calls.
+	contracts []common.Address
+	got       []solidity.Location
 }
 
 func (i *chainIDInterceptor) CaptureStart(evm *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
-	i.contract = to
+	i.contracts = []common.Address{to}
 }
 
 func (i *chainIDInterceptor) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 	if op != vm.CHAINID {
 		return
 	}
-	if pos, ok := i.src.Source(i.contract, pc); ok {
+
+	c := i.contracts[len(i.contracts)-1]
+	if pos, ok := i.src.Source(c, pc); ok {
 		i.got = append(i.got, pos)
 	} else {
 		i.got = append(i.got, solidity.Location{
-			Source: fmt.Sprintf("pc %d not found in contract %v", pc, i.contract),
+			Source: fmt.Sprintf("pc %d not found in contract %v", pc, c),
 		})
 	}
 }
@@ -153,10 +156,13 @@ func (*chainIDInterceptor) CaptureTxEnd(restGas uint64) {}
 
 func (*chainIDInterceptor) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) {}
 
-func (*chainIDInterceptor) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
+func (i *chainIDInterceptor) CaptureEnter(typ vm.OpCode, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
+	i.contracts = append(i.contracts, to)
 }
 
-func (*chainIDInterceptor) CaptureExit(output []byte, gasUsed uint64, err error) {}
+func (i *chainIDInterceptor) CaptureExit(output []byte, gasUsed uint64, err error) {
+	i.contracts = i.contracts[:len(i.contracts)-1]
+}
 
 func (*chainIDInterceptor) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, depth int, err error) {
 }
