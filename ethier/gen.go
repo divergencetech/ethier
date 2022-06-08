@@ -233,11 +233,6 @@ func extendGeneratedCode(generated, combinedJSON *bytes.Buffer) ([]byte, error) 
 			RuntimeSourceMaps[%q].RuntimeCode = strings.Replace(RuntimeSourceMaps[%[2]q].RuntimeCode, "__$%s$__", %s, -1)`,
 			l, matches[1], matches[2], matches[3],
 		)
-		var code []string
-		for k, c := range meta.Contracts {
-			code = append(code, fmt.Sprintf("%s => %s", k, c.RuntimeCode))
-		}
-		panic(fmt.Sprintf("%s\n%s", lines[i], strings.Join(code, "\n")))
 	}
 
 	// Effectively the same as running goimports on the (ugly) generated code.
@@ -259,5 +254,6 @@ func extendGeneratedCode(generated, combinedJSON *bytes.Buffer) ([]byte, error) 
 	if err := format.Node(buf, fset, f); err != nil {
 		return nil, fmt.Errorf("format.Node(%T, %T, %T): %v", buf, fset, f, err)
 	}
+	panic(buf.String())
 	return buf.Bytes(), nil
 }
