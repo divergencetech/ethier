@@ -55,7 +55,7 @@ func signAddresses(_ *cobra.Command, args []string) error {
 
 	for _, address := range addresses {
 		addr := common.HexToAddress(address)
-		sig, err := signer.SignAddress(addr)
+		sig, err := signer.PersonalSignAddress(addr)
 		if err != nil {
 			return fmt.Errorf("signing address %v: %v", address, err)
 		}
