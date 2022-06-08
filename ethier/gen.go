@@ -65,16 +65,22 @@ func gen(_ *cobra.Command, args []string) (retErr error) {
 		"--combined-json", "abi,bin",
 	)
 	solc := exec.Command("solc", args...)
+	solc.Stderr = os.Stderr
 
-	r, w := io.Pipe()
-	solc.Stdout = w
-
+	// TODO: use bind.Bind() directly, instead of piping to abigen, which
+	// requires that it's installed and within PATH. Blocked by
+	// https://github.com/ethereum/go-ethereum/issues/23939 for which we've
+	// submitted a fix.
 	abigen := exec.Command(
 		"abigen",
 		"--combined-json", "/dev/stdin",
 		"--pkg", pkg,
 		"--out", "generated.go",
 	)
+	abigen.Stderr = os.Stderr
+
+	r, w := io.Pipe()
+	solc.Stdout = w
 	abigen.Stdin = r
 
 	if err := solc.Start(); err != nil {

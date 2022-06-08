@@ -1,27 +1,21 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
+// Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../../contracts/crypto/SignatureChecker.sol";
+import "../../contracts/crypto/SignerManager.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
 @notice Exposes functions allowing testing of SignatureChecker.
  */
-contract TestableSignatureChecker {
+contract TestableSignatureChecker is SignerManager {
     using EnumerableSet for EnumerableSet.AddressSet;
     // SignatureChecker adds additional functionality to an AddressSet, allowing
     // for a signature from any set member.
     using SignatureChecker for EnumerableSet.AddressSet;
 
-    EnumerableSet.AddressSet private signers;
-    mapping(bytes32 => bool) private usedNonces;
-
-    constructor(address[] memory _signers) {
-        for (uint256 i = 0; i < _signers.length; i++) {
-            signers.add(_signers[i]);
-        }
-    }
+    mapping(bytes32 => bool) private usedMessages;
 
     /// @dev Reverts if the signature is invalid or the nonce is already used.
     function needsSignature(
@@ -29,7 +23,11 @@ contract TestableSignatureChecker {
         bytes32 nonce,
         bytes calldata signature
     ) external {
-        signers.validateSignature(data, nonce, signature, usedNonces);
+        signers.requireValidSignature(
+            abi.encodePacked(data, nonce),
+            signature,
+            usedMessages
+        );
     }
 
     /// @dev Reverts if the signature is invalid.
@@ -38,17 +36,17 @@ contract TestableSignatureChecker {
         view
         returns (bool)
     {
-        signers.validateSignature(keccak256(data), signature);
+        signers.requireValidSignature(data, signature);
         return true;
     }
 
-    /// @dev Reverts if the signature is not valid for keccak256(msg.sender).
+    /// @dev Reverts if the signature is not valid for msg.sender.
     function needsSenderSignature(bytes calldata signature)
         external
         view
         returns (bool)
     {
-        signers.validateSignature(msg.sender, signature);
+        signers.requireValidSignature(msg.sender, signature);
         return true;
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2021 Divergent Technologies Ltd (github.com/divergencetech)
+// Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../../contracts/sales/LinearDutchAuction.sol";
@@ -13,34 +13,54 @@ constant Seller. Creating only a single Testable contract is simpler.
 contract TestableDutchAuction is LinearDutchAuction {
     constructor(
         LinearDutchAuction.DutchAuctionConfig memory auctionConfig,
+        uint256 expectedReserve,
         Seller.SellerConfig memory sellerConfig,
         address payable beneficiary
-    ) LinearDutchAuction(auctionConfig, sellerConfig, beneficiary) {}
+    )
+        LinearDutchAuction(
+            auctionConfig,
+            expectedReserve,
+            sellerConfig,
+            beneficiary
+        )
+    {} // solhint-disable-line no-empty-blocks
 
     uint256 private total;
     mapping(address => uint256) public own;
+    mapping(address => uint256) public receivedFree;
 
     /**
     @dev Override of Seller._handlePurchase(), called by Seller._purchase()
     after enforcing any caps, iff n > 0. This is where the primary logic of a
     sale is handled, e.g. ERC721 minting.
      */
-    function _handlePurchase(address to, uint256 n) internal override {
+    function _handlePurchase(
+        address to,
+        uint256 n,
+        bool freeOfCharge
+    ) internal override {
         total += n;
-        own[to] += n;
-    }
+        // Not standard usage: an additional test to lock in an API guarantee.
+        require(
+            Seller.totalSold() == total,
+            "Seller.totalSold() API promises to be post-purchase amount"
+        );
 
-    /**
-    @dev Override of Seller.totalSupply(). Usually this would be
-    fulfilled by ERC721Enumerable.
-     */
-    function totalSupply() public view override returns (uint256) {
-        return total;
+        own[to] += n;
+        if (freeOfCharge) {
+            receivedFree[to] += n;
+        }
     }
 
     /// @dev Public API for testing of _purchase().
     function buy(address to, uint256 n) public payable {
         Seller._purchase(to, n);
+    }
+
+    /// @dev Returns the current timestamp for testing of time-based auctions.
+    function timestamp() public view returns (uint256) {
+        // solhint-disable-next-line not-rely-on-time
+        return block.timestamp;
     }
 }
 
@@ -54,5 +74,25 @@ contract ProxyPurchaser {
 
     function buy(address to, uint256 n) public payable {
         auction.buy(to, n);
+    }
+}
+
+/// @notice A malicious contract that attempts to reenter the buy() function.
+/// @dev Naming things is hard. Is Reenterer a word?
+contract ReentrantProxyPurchaser {
+    TestableDutchAuction public auction;
+
+    constructor(address _auction) {
+        auction = TestableDutchAuction(_auction);
+    }
+
+    function buy(address to, uint256 n) public payable {
+        auction.buy{value: msg.value}(to, n);
+    }
+
+    receive() external payable {
+        // Attempt reentrance when receiving a refund.
+        // solhint-disable-next-line avoid-tx-origin
+        auction.buy{value: msg.value}(tx.origin, 1);
     }
 }

@@ -25,7 +25,7 @@ func TestOwnerPausable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Owner() error %v", err)
 	}
-	if want := sim.Acc(owner).From; !cmp.Equal(got, want) {
+	if want := sim.Addr(owner); !cmp.Equal(got, want) {
 		t.Fatalf("Owner() got %s; want %s", got, want)
 	}
 
@@ -64,7 +64,7 @@ func TestOwnerPausable(t *testing.T) {
 		{
 			desc: "TransferOwnership()",
 			action: func() error {
-				_, err := op.TransferOwnership(sim.Acc(owner), sim.Acc(newOwner).From)
+				_, err := op.TransferOwnership(sim.Acc(owner), sim.Addr(newOwner))
 				return err
 			},
 		},
