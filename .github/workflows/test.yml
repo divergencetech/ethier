@@ -40,7 +40,4 @@ jobs:
           sudo apt-get install -y solc abigen
 
       - name: Run tests
-        run: |
-          solc --version
-          abigen --version
-          npm run test
+        run: npm run test
