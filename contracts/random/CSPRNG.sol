@@ -2,24 +2,20 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.9 <0.9.0;
 
-library PRNG {
+library CSPRNG {
     /**
     @notice A source of random numbers.
-    @dev Pointer to a 2-word buffer of {carry || number, remaining unread
+    @dev Pointer to a 4-word buffer of {seed, counter, entropy, remaining unread
     bits}. however, note that this is abstracted away by the API and SHOULD NOT
     be used. This layout MUST NOT be considered part of the public API and
-    therefore not relied upon even within stable versions.
+    therefore not relied upon even within stable versions
      */
     type Source is uint256;
 
-    /// @notice The biggest safe prime for modulus 2**128
-    uint256 private constant MWC_FACTOR = 2**128 - 10408;
-
-    /// @notice Layout within the buffer. 0x00 is the current (carry || number)
-    uint256 private constant REMAIN = 0x20;
-
-    /// @notice Mask for the 128 least significant bits
-    uint256 private constant MASK_128_BITS = 0xffffffffffffffffffffffffffffffff;
+    /// @notice Layout within the buffer. 0x00 is the seed.
+    uint256 private constant COUNTER = 0x20;
+    uint256 private constant ENTROPY = 0x40;
+    uint256 private constant REMAIN = 0x60;
 
     /**
     @notice Returns a new deterministic Source, differentiated only by the seed.
@@ -28,14 +24,12 @@ library PRNG {
     such as Chainlink VRF, or a commit-and-reveal protocol MUST be used if
     unpredictability is required. The latter is only appropriate if the contract
     owner can be trusted within the specified threat model.
-    @dev The 256bit seed is used to initialize carry || number
      */
     function newSource(bytes32 seed) internal pure returns (Source src) {
         assembly {
             src := mload(0x40)
-            mstore(0x40, add(src, 0x40))
+            mstore(0x40, add(src, 0x80))
             mstore(src, seed)
-            mstore(add(src, REMAIN), 128)
         }
         // DO NOT call _refill() on the new Source as newSource() is also used
         // by loadSource(), which implements its own state modifications. The
@@ -44,23 +38,23 @@ library PRNG {
     }
 
     /**
-    @dev Computes the next PRN in entropy using a lag-1 multiply-with-carry
-    algorithm and resets the remaining bits to 128.
-    `nextNumber = (factor * number + carry) mod 2**128`
-    `nextCarry  = (factor * number + carry) //  2**128`
+    @dev Hashes seed||counter, placing it in the entropy word, and resets the
+    remaining bits to 256. Increments the counter BEFORE the refill (ie 0 is
+    never used) as this simplifies round-tripping with store() and loadSource()
+    because the stored counter state is the same as the one used for deriving
+    the entropy pool.
      */
     function _refill(Source src) private pure {
         assembly {
-            let carryAndNumber := mload(src)
-            let rand := and(carryAndNumber, MASK_128_BITS)
-            let carry := shr(128, carryAndNumber)
-            mstore(src, add(mul(MWC_FACTOR, rand), carry))
-            mstore(add(src, REMAIN), 128)
+            let ctr := add(src, COUNTER)
+            mstore(ctr, add(1, mload(ctr)))
+            mstore(add(src, ENTROPY), keccak256(src, 0x40))
+            mstore(add(src, REMAIN), 256)
         }
     }
 
     /**
-    @notice Returns the specified number of bits <= 128 from the Source.
+    @notice Returns the specified number of bits <= 256 from the Source.
     @dev It is safe to cast the returned value to a uint<bits>.
      */
     function read(Source src, uint256 bits)
@@ -68,7 +62,7 @@ library PRNG {
         pure
         returns (uint256 sample)
     {
-        require(bits <= 128, "PRNG: max 128 bits");
+        require(bits <= 256, "PRNG: max 256 bits");
 
         uint256 remain;
         assembly {
@@ -98,11 +92,13 @@ library PRNG {
         returns (uint256 sample)
     {
         assembly {
-            let ent := mload(src)
+            let pool := add(src, ENTROPY)
+            let ent := mload(pool)
+            sample := and(ent, sub(shl(bits, 1), 1))
+
+            mstore(pool, shr(bits, ent))
             let rem := add(src, REMAIN)
-            let remain := mload(rem)
-            sample := shr(sub(256, bits), shl(sub(256, remain), ent))
-            mstore(rem, sub(remain, bits))
+            mstore(rem, sub(mload(rem), bits))
         }
     }
 
@@ -148,7 +144,7 @@ library PRNG {
     number of bits required to capture n; if this is not known, use
     readLessThan(Source, uint) or bitLength(). Although rejections are reduced
     by using twice the number of bits, this increases the rate at which the
-    entropy pool must be refreshed with a call to `_refill`.
+    entropy pool must be refreshed with a call to keccak256().
 
     TODO: benchmark higher number of bits for rejection vs hashing gas cost.
      */
@@ -172,10 +168,17 @@ library PRNG {
     function state(Source src)
         internal
         pure
-        returns (uint256 entropy, uint256 remain)
+        returns (
+            uint256 seed,
+            uint256 counter,
+            uint256 entropy,
+            uint256 remain
+        )
     {
         assembly {
-            entropy := mload(src)
+            seed := mload(src)
+            counter := mload(add(src, COUNTER))
+            entropy := mload(add(src, ENTROPY))
             remain := mload(add(src, REMAIN))
         }
     }
@@ -187,14 +190,21 @@ library PRNG {
     safe to rely on stored Sources _within_ contracts, but not _between_ them.
      */
     function store(Source src, uint256[2] storage stored) internal {
-        uint256 carryAndNumber;
-        uint256 remain;
+        uint256 seed;
+        // Counter will never be as high as 2^247 (because the sun will have
+        // depleted by then) and remain is in [0,256], so pack them to save 20k
+        // gas on an SSTORE.
+        uint256 packed;
         assembly {
-            carryAndNumber := mload(src)
-            remain := mload(add(src, REMAIN))
+            seed := mload(src)
+            packed := add(
+                shl(9, mload(add(src, COUNTER))),
+                mload(add(src, REMAIN))
+            )
         }
-        stored[0] = carryAndNumber;
-        stored[1] = remain;
+        stored[0] = seed;
+        stored[1] = packed;
+        // Not storing the entropy as it can be recalculated later.
     }
 
     /**
@@ -206,12 +216,18 @@ library PRNG {
         returns (Source)
     {
         Source src = newSource(bytes32(stored[0]));
-        uint256 carryAndNumber = stored[0];
-        uint256 remain = stored[1];
+        uint256 packed = stored[1];
+        uint256 counter = packed >> 9;
+        uint256 remain = packed & 511;
 
         assembly {
-            mstore(src, carryAndNumber)
+            mstore(add(src, COUNTER), counter)
             mstore(add(src, REMAIN), remain)
+
+            // Has the same effect on internal state as as _refill() then
+            // read(256-rem).
+            let ent := shr(sub(256, remain), keccak256(src, 0x40))
+            mstore(add(src, ENTROPY), ent)
         }
         return src;
     }
