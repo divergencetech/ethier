@@ -145,8 +145,8 @@ func (cm *contractMap) parseCode(c *compiler.Contract) error {
 		instruction++
 
 		c := vm.OpCode(code[i])
-		if c != vm.PUSH0 && c.IsPush() {
-			i += int(c - vm.PUSH1 + 1)
+		if c.IsPush() {
+			i += int(c - vm.PUSH0)
 		}
 	}
 	cm.pcToInstruction = pcToInstruction
