@@ -14,6 +14,7 @@ import (
 	"github.com/google/tink/go/keyset"
 	"github.com/google/tink/go/prf"
 	"github.com/google/tink/go/tink"
+	"github.com/h-fam/errdiff"
 
 	// These tests require ethtest.SimulatedBackend but that would result in a
 	// cyclical dependency. As this is limited to these tests and not the
@@ -161,19 +162,19 @@ func TestTransactorWithChainID(t *testing.T) {
 	const gasLimit = 21000
 	txFee := new(big.Int).Mul(gasPrice, big.NewInt(gasLimit))
 
-	sendEth := func(t *testing.T, opts *bind.TransactOpts, to common.Address, value *big.Int) {
+	sendEth := func(t *testing.T, opts *bind.TransactOpts, to common.Address, value *big.Int, errDiffAgainst interface{}) {
 		t.Helper()
 		unsigned := types.NewTransaction(0, to, value, gasLimit, gasPrice, nil)
 		tx, err := opts.Signer(opts.From, unsigned)
 		if err != nil {
 			t.Fatalf("%T.Signer(%+v) error %v", opts, unsigned, err)
 		}
-		if err := sim.SendTransaction(ctx, tx); err != nil {
-			t.Fatalf("%T.SendTransaction() error %v", sim, err)
+		if diff := errdiff.Check(sim.SendTransaction(ctx, tx), errDiffAgainst); diff != "" {
+			t.Fatalf("%T.SendTransaction() %s", sim, diff)
 		}
 	}
 
-	sendEth(t, sim.Acc(0), signer.Address(), Ether(42))
+	sendEth(t, sim.Acc(0), signer.Address(), Ether(42), nil)
 	wantBalance(ctx, t, "faucet after sending 42", sim.Addr(0), new(big.Int).Sub(Ether(100-42), txFee))
 	wantBalance(ctx, t, "signer after receiving 42", signer.Address(), Ether(42))
 
@@ -183,32 +184,17 @@ func TestTransactorWithChainID(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%T.TransactorWithChainID(%d) error %v", signer, chainID, err)
 		}
-		sendEth(t, opts, sim.Addr(0), Ether(21))
+		sendEth(t, opts, sim.Addr(0), Ether(21), nil)
 		wantBalance(ctx, t, "faucet after sending 42 and receiving 21", sim.Addr(0), new(big.Int).Sub(Ether(100-42+21), txFee))
 		wantBalance(ctx, t, "signer after receiving 42 and sending 21", signer.Address(), new(big.Int).Sub(Ether(42-21), txFee))
 	})
 
 	t.Run("incorrect chain ID", func(t *testing.T) {
-		// The SimulatedBackend panics instead of returning an error when the
-		// chain ID is incorrect. #java
-		defer func() {
-			const wantContains = "invalid chain id"
-			r := recover()
-
-			if err, ok := r.(error); ok && strings.Contains(err.Error(), wantContains) {
-				return
-			}
-			t.Errorf("%T.SendTransaction(%T.TransactorWithChainID(<incorrect ID>)) recovered %T(%v); want panic with error containing %q", sim, signer, r, r, wantContains)
-		}()
-
 		chainID := new(big.Int).Add(sim.Blockchain().Config().ChainID, big.NewInt(1))
 		opts, err := signer.TransactorWithChainID(chainID)
 		if err != nil {
 			t.Fatalf("%T.TransactorWithChainID(%d) error %v", signer, chainID, err)
 		}
-		sendEth(t, opts, sim.Addr(0), Ether(1))
-		// We should never reach here because sendEth results in a panic inside
-		// go-ethereum's SimulatedBackend.
-		t.Errorf("%T.SendTransaction(%T.TransactorWithChainID(<incorrect ID>)) did not panic", sim, signer)
+		sendEth(t, opts, sim.Addr(0), Ether(1), "invalid chain id")
 	})
 }
