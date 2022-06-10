@@ -37,16 +37,14 @@ func NewSourceMap(sources []*Source, contracts map[string]*compiler.Contract, de
 	// See https://docs.soliditylang.org/en/v0.8.14/internals/source_mappings.html
 
 	sm := &SourceMap{
-		sources:         sources,
-		contracts:       make(map[string]*contractMap),
-		deployed:        deployed,
-		mappersBySource: make(map[string]*offset.Mapper),
+		sources:   sources,
+		contracts: make(map[string]*contractMap),
+		deployed:  deployed,
 	}
 
 	for _, src := range sources {
 		m := offset.NewMapper(src.Code)
 		sm.mappers = append(sm.mappers, m)
-		sm.mappersBySource[src.File] = m
 	}
 
 	isDeployed := make(map[string]bool)
@@ -78,9 +76,7 @@ type SourceMap struct {
 	sources   []*Source
 	contracts map[string]*contractMap
 	deployed  map[common.Address]string
-
-	mappers         []*offset.Mapper
-	mappersBySource map[string]*offset.Mapper
+	mappers   []*offset.Mapper
 }
 
 // Source returns the code location that was compiled into the instruction at
