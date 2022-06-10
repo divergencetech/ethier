@@ -23,14 +23,15 @@ abstract contract LinearDutchAuction is Seller {
     startPrice-numDecrease*decreaseSize.
      */
     struct DutchAuctionConfig {
-        uint256 startPoint;
-        uint256 startPrice;
-        uint256 decreaseInterval;
-        uint256 decreaseSize;
+        uint96 startPrice; // sufficient bits to store up to 1e10 eth
+        uint96 decreaseSize;
+        uint64 totalInventory;
+        uint64 startPoint;
+        uint64 decreaseInterval;
         // From https://docs.soliditylang.org/en/v0.8.10/types.html#enums "Enums
         // cannot have more than 256 members"; presumably they take 8 bits, so
         // use some of the numDecreases space instead.
-        uint248 numDecreases;
+        uint64 numDecreases;
         AuctionIntervalUnit unit;
     }
 
@@ -51,43 +52,36 @@ abstract contract LinearDutchAuction is Seller {
         Time
     }
 
-    /// @param expectedReserve See setAuctionConfig().
-    constructor(
-        DutchAuctionConfig memory config,
-        uint256 expectedReserve,
-        Seller.SellerConfig memory sellerConfig,
-        address payable _beneficiary
-    ) Seller(sellerConfig, _beneficiary) {
-        setAuctionConfig(config, expectedReserve);
-    }
-
     /// @notice Configuration of price changes.
     DutchAuctionConfig public dutchAuctionConfig;
 
+    /// @param expectedReserve See setAuctionConfig().
+    constructor(DutchAuctionConfig memory config, uint256 expectedReserve) {
+        _setAuctionConfig(config, expectedReserve);
+    }
+
     /**
-    @notice Sets the auction config.
-    @param expectedReserve A safety check that the reserve, as calculated from
-    the config, is as expected.
+     * @notice Sets the auction config.
+     * @param expectedReserve A safety check that the reserve, as calculated from
+     * the config, is as expected.
      */
-    function setAuctionConfig(
+    function _setAuctionConfig(
         DutchAuctionConfig memory config,
         uint256 expectedReserve
-    ) public onlyOwner {
-        // Underflow might occur is size/num decreases is too large.
-        unchecked {
-            require(
-                config.startPrice - config.decreaseSize * config.numDecreases ==
-                    expectedReserve,
-                "LinearDutchAuction: incorrect reserve"
-            );
-        }
-        require(
-            config.unit != AuctionIntervalUnit.UNSPECIFIED,
-            "LinearDutchAuction: unspecified unit"
-        );
+    ) internal {
         require(
             config.decreaseInterval > 0,
             "LinearDutchAuction: zero decrease interval"
+        );
+        // Underflow might occur is size/num decreases is too large.
+        require(
+            config.startPrice - config.decreaseSize * config.numDecreases ==
+                expectedReserve,
+            "LinearDutchAuction: incorrect reserve"
+        );
+        require(
+            config.unit != AuctionIntervalUnit.UNSPECIFIED,
+            "LinearDutchAuction: unspecified unit"
         );
         dutchAuctionConfig = config;
     }
@@ -98,7 +92,7 @@ abstract contract LinearDutchAuction is Seller {
     @dev The auction can be toggle on and off with this function, without the
     cost of having to update the entire config.
      */
-    function setAuctionStartPoint(uint256 startPoint) public onlyOwner {
+    function _setAuctionStartPoint(uint64 startPoint) internal {
         dutchAuctionConfig.startPoint = startPoint;
     }
 
@@ -107,7 +101,7 @@ abstract contract LinearDutchAuction is Seller {
     @dev The second parameter, metadata propagated from the call to _purchase(),
     is ignored.
     **/
-    function cost(uint256 n, uint256) public view override returns (uint256) {
+    function _cost(uint256 num) internal view override returns (uint256) {
         DutchAuctionConfig storage cfg = dutchAuctionConfig;
 
         uint256 current;
@@ -127,6 +121,6 @@ abstract contract LinearDutchAuction is Seller {
             (current - cfg.startPoint) / cfg.decreaseInterval,
             cfg.numDecreases
         );
-        return n * (cfg.startPrice - decreases * cfg.decreaseSize);
+        return num * (cfg.startPrice - decreases * cfg.decreaseSize);
     }
 }
