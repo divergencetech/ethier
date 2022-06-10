@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/compiler"
 )
 
@@ -25,15 +26,18 @@ func TestMapDecompression(t *testing.T) {
 		uncompressed = `1:2:1:-:0;1:9:1:-:0;2:1:2:-:0;2:1:2:-:0;2:1:2:-:0`
 	)
 
+	const name = "dummy"
 	in := map[string]*compiler.Contract{
-		"dummy": {
+		name: {
 			RuntimeCode: "0x00",
 			Info: compiler.ContractInfo{
 				SrcMapRuntime: compressed,
 			},
 		},
 	}
-	sm, err := NewSourceMap(nil, in, nil)
+	deployed := map[common.Address]string{{}: name}
+
+	sm, err := NewSourceMap(nil, in, deployed)
 	if err != nil {
 		t.Fatalf("NewSourceMap(%+v): %v", in, err)
 	}

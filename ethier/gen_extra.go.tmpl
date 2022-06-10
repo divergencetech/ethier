@@ -15,10 +15,10 @@ const (
 )
 
 var (
-    // SourceList is the list of source files used by solc when compiling these
+    // SourceList is the list of sources used by solc when compiling these
     // contracts. Their indices correspond to the file numbers in the source
     // maps.
-    SourceList = {{stringSlice .SourceList}}
+    SourceList = {{soliditySourceSlice .SourceList .SourceCode}}
 
     // RuntimeSourceMaps contains, for each compiled contract, the runtime
     // binary and its associated source map. With a program counter pointing to
