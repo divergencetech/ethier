@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-//go:generate ethier gen --experimental_src_map SourceMapTest.sol SourceMapTest2.sol
+//go:generate ethier gen --experimental_src_map SourceMapTest.sol SourceMapTest2.sol CoverageTest.sol
 
 //go:embed *.sol
 var sourceFiles embed.FS

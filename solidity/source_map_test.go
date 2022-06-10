@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bazelbuild/tools_jvm_autodeps/thirdparty/golang/parsers/util/offset"
 	"github.com/divergencetech/ethier/ethtest"
 	"github.com/divergencetech/ethier/solidity"
 	"github.com/divergencetech/ethier/solidity/srcmaptest"
@@ -15,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestSourceMap(t *testing.T) {
@@ -56,63 +56,59 @@ func TestSourceMap(t *testing.T) {
 		sim.Must(t, "")(fn(sim.Acc(0)))
 	}
 
-	type pos struct {
-		File string
-		// Line and Col are 1-indexed as this is how IDEs display them.
-		Line, Col int
-		Length    int
-	}
 	wantLen := len("chainid()")
-	want := []pos{
+	want := []*solidity.Location{
+		// All values were manually determined by inspection in an IDE.
 		{
-			File:   "solidity/srcmaptest/SourceMapTest.sol",
-			Line:   25,
-			Col:    24,
-			Length: wantLen,
+			Source:  "solidity/srcmaptest/SourceMapTest.sol",
+			Start:   706,
+			Length:  wantLen,
+			Line:    25,
+			EndLine: 25,
+			Col:     24,
+			EndCol:  24 + wantLen,
 		},
 		{
-			File:   "solidity/srcmaptest/SourceMapTest.sol",
-			Line:   32,
-			Col:    31,
-			Length: wantLen,
+			Source:  "solidity/srcmaptest/SourceMapTest.sol",
+			Start:   872,
+			Length:  wantLen,
+			Line:    32,
+			EndLine: 32,
+			Col:     31,
+			EndCol:  31 + wantLen,
 		},
 		{
-			File:   "solidity/srcmaptest/SourceMapTest.sol",
-			Line:   14,
-			Col:    24,
-			Length: wantLen,
+			Source:  "solidity/srcmaptest/SourceMapTest.sol",
+			Start:   489,
+			Length:  wantLen,
+			Line:    14,
+			EndLine: 14,
+			Col:     24,
+			EndCol:  24 + wantLen,
 		},
 		{
-			File:   "solidity/srcmaptest/SourceMapTest.sol",
-			Line:   49,
-			Col:    24,
-			Length: wantLen,
+			Source:  "solidity/srcmaptest/SourceMapTest.sol",
+			Start:   1208,
+			Length:  wantLen,
+			Line:    49,
+			EndLine: 49,
+			Col:     24,
+			EndCol:  24 + wantLen,
 		},
 		{
-			File:   "solidity/srcmaptest/SourceMapTest2.sol",
-			Line:   15,
-			Col:    24,
-			Length: wantLen,
+			Source:  "solidity/srcmaptest/SourceMapTest2.sol",
+			Start:   375,
+			Length:  wantLen,
+			Line:    15,
+			EndLine: 15,
+			Col:     24,
+			EndCol:  24 + wantLen,
 		},
 	}
 
-	var got []pos
-	for _, g := range spy.got {
-		// TODO: add this functionality to the *solidity.SourceMap itself.
-		m := offset.NewMapper(string(srcmaptest.ReadSourceFile(t, g.Source)))
-		line, col, err := m.LineAndColumn(g.Start)
-		if err != nil {
-			t.Fatal(err)
-		}
-		got = append(got, pos{
-			File:   g.Source,
-			Line:   line + 1, // 1-indexed like an IDE
-			Col:    col + 1,
-			Length: g.Length,
-		})
-	}
-
-	if diff := cmp.Diff(want, got); diff != "" {
+	ignore := []string{"FileIdx", "Jump"}
+	opt := cmpopts.IgnoreFields(solidity.Location{}, ignore...)
+	if diff := cmp.Diff(want, spy.got, opt); diff != "" {
 		t.Error(diff)
 	}
 }
@@ -128,7 +124,7 @@ type chainIDInterceptor struct {
 	// "bottom" contract, to which the tx is initiated) the returned source will
 	// function incorrectly on library calls.
 	contracts []common.Address
-	got       []solidity.Location
+	got       []*solidity.Location
 }
 
 func (i *chainIDInterceptor) CaptureStart(evm *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
@@ -144,7 +140,7 @@ func (i *chainIDInterceptor) CaptureState(pc uint64, op vm.OpCode, gas, cost uin
 	if pos, ok := i.src.Source(c, pc); ok {
 		i.got = append(i.got, pos)
 	} else {
-		i.got = append(i.got, solidity.Location{
+		i.got = append(i.got, &solidity.Location{
 			Source: fmt.Sprintf("pc %d not found in contract %v", pc, c),
 		})
 	}
