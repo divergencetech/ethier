@@ -21,15 +21,13 @@ abstract contract Seller is PurchaseHandler, ReentrancyGuard {
     @param num The number of items requested for purchase, which MAY be
     reduced when passed to _handlePurchase().
      */
-    function _purchase(address to, uint256 num) internal virtual nonReentrant {
+    function _purchase(address to, uint256 num) internal nonReentrant {
+        (to, num) = _beforePurchase(to, num);
         uint256 cost = _cost(num);
-        if (msg.value < cost) {
-            revert InvalidPurchaseValue(cost);
-        }
-
-        _beforePurchase(to, num, cost);
+        if (msg.value < cost) revert InvalidPurchaseValue(cost);
         _handlePurchase(to, num, cost);
         _afterPurchase(to, num, cost);
+        assert(address(this).balance == 0);
     }
 
     /**
@@ -50,11 +48,13 @@ abstract contract Seller is PurchaseHandler, ReentrancyGuard {
     //
     // -------------------------------------------------------------------------
 
-    function _beforePurchase(
-        address to,
-        uint256 num,
-        uint256 cost
-    ) internal virtual {}
+    function _beforePurchase(address to, uint256 num)
+        internal
+        virtual
+        returns (address, uint256)
+    {
+        return (to, num);
+    }
 
     function _afterPurchase(
         address to,

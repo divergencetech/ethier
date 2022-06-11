@@ -3,13 +3,13 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-import "./ISellable.sol";
+import "../ISellable.sol";
 import "./Seller.sol";
 
 abstract contract SellableCallbacker is PurchaseHandler {
     ISellable private immutable _sellable;
 
-    constructor(address payable sellable_) {
+    constructor(ISellable sellable_) {
         _sellable = ISellable(sellable_);
     }
 

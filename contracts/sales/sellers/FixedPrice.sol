@@ -3,28 +3,37 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "./Seller.sol";
-import "../utils/OwnerPausable.sol";
 
 /// @notice A Seller with fixed per-item price.
-abstract contract FixedPriceSeller is Seller, OwnerPausable {
+abstract contract FixedPrice is Seller {
     /**
     @notice The fixed per-item price.
     @dev Fixed as in not changing with time nor number of items, but not a
     constant.
      */
-    uint256 public price;
+    uint256 private _price;
 
     constructor(uint256 price_) {
-        price = price_;
+        _price = price_;
     }
 
     /// @notice Sets the per-item price.
-    function setPrice(uint256 price_) external onlyOwner {
-        price = price_;
+    function _setPrice(uint256 price_) internal {
+        _price = price_;
+    }
+
+    function price() external view returns (uint256) {
+        return _price;
     }
 
     /// @notice Override of Seller.cost() with fixed price.
-    function _cost(uint256 num) internal view override returns (uint256) {
-        return num * price;
+    function _cost(uint256 num)
+        internal
+        view
+        virtual
+        override
+        returns (uint256)
+    {
+        return num * _price;
     }
 }
