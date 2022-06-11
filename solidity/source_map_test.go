@@ -20,6 +20,17 @@ import (
 func TestSourceMap(t *testing.T) {
 	sim := ethtest.NewSimulatedBackendTB(t, 1)
 
+	// As we need to test the SourceMap against actual program counters in the
+	// VM, we plug it into a vm.EVMLogger that is used to trace the
+	// SimulatedBackend on all calls to the contracts deployed below. Note that
+	// source maps are all registered automatically by the generated code that
+	// ethier adds on top of abigen, and that the EVMLogger only needs to call
+	// RegisterDeployedContract() on all calls to CreateStart with create==true.
+	cfg := sim.Blockchain().GetVMConfig()
+	cfg.Debug = true
+	spy := &chainIDInterceptor{}
+	cfg.Tracer = spy
+
 	// Deploying contracts ensures that we test whether their addresses are
 	// passed to the SourceMap when it's constructed.
 	_, _, t0, err := srcmaptest.DeploySourceMapTest0(sim.Acc(0), sim)
@@ -35,23 +46,10 @@ func TestSourceMap(t *testing.T) {
 		t.Fatalf("DeploySourceMapTest2() error %v", err)
 	}
 
-	// As we need to test the SourceMap against actual program counters in the
-	// VM, we plug it into a vm.EVMLogger that is used to trace the
-	// SimulatedBackend on all calls to the tX test-contracts above.
-	src, err := srcmaptest.SourceMap()
-	if err != nil {
-		t.Fatalf("srcmaptest.SourceMap() error %v", err)
-	}
-
-	cfg := sim.Blockchain().GetVMConfig()
-	cfg.Debug = true
-	spy := &chainIDInterceptor{
-		src: src,
-	}
-	cfg.Tracer = spy
-
 	for _, fn := range [](func(*bind.TransactOpts) (*types.Transaction, error)){
-		t0.Id, t0.IdPlusOne, t0.FromLib, t1.Id, t2.Id,
+		t0.Id, t0.IdPlusOne, t0.FromLib,
+		t1.Id,
+		t2.Id, t2.With1Modifier, t2.With2Modifiers,
 	} {
 		sim.Must(t, "")(fn(sim.Acc(0)))
 	}
@@ -104,6 +102,54 @@ func TestSourceMap(t *testing.T) {
 			Col:     24,
 			EndCol:  24 + wantLen,
 		},
+		{
+			Source:  "solidity/srcmaptest/SourceMapTest2.sol",
+			Start:   490,
+			Length:  wantLen,
+			Line:    22,
+			EndLine: 22,
+			Col:     18,
+			EndCol:  18 + wantLen,
+		},
+		{
+			Source:        "solidity/srcmaptest/SourceMapTest2.sol",
+			Start:         749,
+			Length:        wantLen,
+			Line:          36,
+			EndLine:       36,
+			Col:           24,
+			EndCol:        24 + wantLen,
+			ModifierDepth: 1,
+		},
+		{
+			Source:  "solidity/srcmaptest/SourceMapTest2.sol",
+			Start:   490,
+			Length:  wantLen,
+			Line:    22,
+			EndLine: 22,
+			Col:     18,
+			EndCol:  18 + wantLen,
+		},
+		{
+			Source:        "solidity/srcmaptest/SourceMapTest2.sol",
+			Start:         595,
+			Length:        wantLen,
+			Line:          29,
+			EndLine:       29,
+			Col:           18,
+			EndCol:        18 + wantLen,
+			ModifierDepth: 1,
+		},
+		{
+			Source:        "solidity/srcmaptest/SourceMapTest2.sol",
+			Start:         958,
+			Length:        wantLen,
+			Line:          48,
+			EndLine:       48,
+			Col:           24,
+			EndCol:        24 + wantLen,
+			ModifierDepth: 2,
+		},
 	}
 
 	ignore := []string{"FileIdx", "Jump"}
@@ -116,8 +162,6 @@ func TestSourceMap(t *testing.T) {
 // chainIDInterceptor is a vm.EVMLogger that listens for vm.CHAINID operations,
 // recording the solidity.Pos associated with each call.
 type chainIDInterceptor struct {
-	src *solidity.SourceMap
-
 	// contracts are a stack of contract addresses with the last entry of the
 	// slice being the current contract, against which the pc is compared when
 	// inspecting the source map. Without a stack (i.e. always using the
@@ -128,6 +172,9 @@ type chainIDInterceptor struct {
 }
 
 func (i *chainIDInterceptor) CaptureStart(evm *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
+	if create {
+		solidity.RegisterDeployedContract(to, input)
+	}
 	i.contracts = []common.Address{to}
 }
 
@@ -137,7 +184,7 @@ func (i *chainIDInterceptor) CaptureState(pc uint64, op vm.OpCode, gas, cost uin
 	}
 
 	c := i.contracts[len(i.contracts)-1]
-	if pos, ok := i.src.Source(c, pc); ok {
+	if pos, ok := solidity.Source(c, pc); ok {
 		i.got = append(i.got, pos)
 	} else {
 		i.got = append(i.got, &solidity.Location{
