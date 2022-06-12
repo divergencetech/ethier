@@ -1,7 +1,9 @@
-// Package solidity provides a source map to determine original code locations
-// from op codes in EVM traces. This package doesn't typically need to be used
-// directly, and can be automatically supported by adding the source-map flag to
-// `ethier gen`.
+// Package solidity provides mapping from EVM-trace program counters to original
+// Solidity source code, including automated coverage collection for tests.
+//
+// This package doesn't typically need to be used directly, and is automatically
+// supported by adding the source-map flag to `ethier gen` of the
+// github.com/divergencetech/ethier/ethier binary for generating Go bindings.
 //
 // See https://docs.soliditylang.org/en/v0.8.14/internals/source_mappings.html
 // for more information.
@@ -29,7 +31,7 @@ type Location struct {
 	Start, Length int
 
 	// FileIdx refers to the index of the source file in the inputs to solc, as
-	// passed to NewSourceMap(), but can generally be ignored in favour of the
+	// returned in solc output, but can generally be ignored in favour of the
 	// Source, which is determined from the NewSourceMap() input.
 	FileIdx int
 	Source  string
@@ -69,8 +71,14 @@ type compiledContract struct {
 
 // location converts the program counter into an instruction number, and returns
 // the corresponding Location and true. If the pc was not in the runtime source
-// map of the contract then location returns (nil, false).
+// map of the contract, or if cc == nil, then location returns (nil, false).
 func (cc *compiledContract) location(pc uint64) (*Location, bool) {
+	if cc == nil {
+		// This allows direct calls on values returned from maps when the key
+		// didn't exist, avoiding an extra check of the ok.
+		return nil, false
+	}
+
 	i, ok := cc.instructions[pc]
 	if !ok {
 		return nil, false
@@ -85,10 +93,19 @@ type contractMatcher struct {
 	*compiledContract
 }
 
+// A sourceFile holds the input to solc for a particular file in a compilation's
+// source list.
+type sourceFile struct {
+	contents   string
+	mapper     *offset.Mapper
+	isExternal bool
+}
+
 var (
-	// sourceMappers convert the byte offset in a file to the 0-indexed line and
-	// column number.
-	sourceMappers = make(map[string]*offset.Mapper)
+	sourceCode = make(map[string]*sourceFile)
+	// contractsByName is keyed by the fully qualified name of the contract, its
+	// source file and Solditiy name; e.g. path/to/file.sol:MyContract.
+	contractsByName = make(map[string]*compiledContract)
 	// contractsByHash identifies contracts by the SHA256 hash of their byte
 	// code (creation, not runtime). The sha256 package is convenient because it
 	// returns a fixed-size array instead of a slice (like crypto.Keccak256),
@@ -102,14 +119,29 @@ var (
 	deployedContracts = make(map[common.Address]*compiledContract)
 )
 
+// RegisterSourceCode registers the contents of source files passed in source
+// lists to RegisterContract. This allows op codes in contracts, deployed or
+// otherwise, to be mapped back to the specific Solidity code that resulted in
+// their compilation.
+//
 // RegisterSourceCode SHOULD be called before all calls to RegisterContract that
 // include fileName in the sourceList otherwise Location values will not contain
-// line and column numbers.
-func RegisterSourceCode(fileName, contents string) {
-	sourceMappers[fileName] = offset.NewMapper(contents)
+// line and column numbers. External source code, e.g. OpenZeppelin contracts,
+// won't be monitored in coverage collection, but will be available for
+// Etherscan verification.
+func RegisterSourceCode(fileName, contents string, isExternal bool) {
+	sourceCode[fileName] = &sourceFile{
+		contents:   contents,
+		mapper:     offset.NewMapper(contents),
+		isExternal: isExternal,
+	}
 }
 
-// RegisterContract
+// RegisterContract registers a compiled contract by its fully qualified name.
+// This allows inspection of EVM traces to watch for contract deployments that
+// are matched against already-registered contracts, and then for mapping each
+// step in the trace back to original source code via the program counter. See
+// SourceByName() documentation re fully qualified names.
 //
 // The order of the sourceList MUST match the solc output from which the
 // *Contract was parsed. The Contract's Info.SrcMapRuntime represents files as
@@ -139,6 +171,7 @@ func RegisterContract(name string, c *compiler.Contract, sourceList []string) {
 		instructions: instructions,
 		locations:    locations,
 	}
+	contractsByName[name] = cc
 
 	if libraryPlaceholder.MatchString(c.Code) {
 		registerContractByRegexp(cc)
@@ -171,9 +204,13 @@ func registerContractByHash(cc *compiledContract) {
 	contractsByHash[sha256.Sum256(bin)] = cc
 }
 
-// RegisterDeployedContract
+// RegisterDeployedContract matches the code against contracts registered with
+// RegisterContract, allowing future calls to Source(addr, …) to return
+// data pertaining to the correct contract.
 //
-//
+// RegisterDeployedContract should be called by EVMLogger.CaptureStart when the
+// create flag is true, passing the deployment address and the input code bytes,
+// th
 func RegisterDeployedContract(addr common.Address, code []byte) {
 	c, ok := contractsByHash[sha256.Sum256(code)]
 	if ok {
@@ -193,11 +230,7 @@ func RegisterDeployedContract(addr common.Address, code []byte) {
 // the specific program counter in the deployed contract. The contract's address
 // MUST have been registered with RegisterDeployedContract().
 func Source(contract common.Address, pc uint64) (*Location, bool) {
-	c, ok := deployedContracts[contract]
-	if !ok {
-		return nil, false
-	}
-	return c.location(pc)
+	return deployedContracts[contract].location(pc)
 }
 
 // SourceByName functions identically to Source but doesn't require that the
@@ -209,7 +242,7 @@ func Source(contract common.Address, pc uint64) (*Location, bool) {
 // require additional bytes as documented in:
 // https://docs.soliditylang.org/en/v0.8.14/internals/source_mappings.html.
 func SourceByName(contract string, pc uint64) (*Location, bool) {
-	return nil, false
+	return contractsByName[contract].location(pc)
 }
 
 var (
@@ -334,8 +367,9 @@ func locationFromNode(node srcMapNode, sourceList []string) (*Location, error) {
 	}
 
 	loc.Source = sourceList[fileIdx]
-	m, ok := sourceMappers[loc.Source]
-	if !ok || m.Len() == 0 {
+	c := sourceCode[loc.Source]
+	m := c.mapper
+	if m.Len() == 0 {
 		return loc, nil
 	}
 

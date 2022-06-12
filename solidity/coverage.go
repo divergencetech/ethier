@@ -15,9 +15,13 @@ import (
 // operations for code coverage. The returned function returns an LCOV trace
 // file at any time coverage is not being actively collected (i.e. it is not
 // thread safe with respect to VM computation).
+//
+// Coverage will only be collected for contracts registered with
+// RegisterContract() before they are deployed; their respective code also must
+// have been registered with RegisterSourceCode(…, isExternal = false).
 func CoverageCollector() (vm.EVMLogger, func() []byte) {
 	lineHits := make(map[string]map[int]int)
-	for file := range sourceMappers {
+	for file := range sourceCode {
 		lineHits[file] = make(map[int]int)
 	}
 
@@ -75,14 +79,18 @@ func (cc *coverageCollector) lcovTraceFile() []byte {
 	// It's important to range over a slice here and not the cc.lineHits map
 	// because the map lacks a guaranteed order.
 	var files []string
-	for f := range sourceMappers {
+	for f := range sourceCode {
 		files = append(files, f)
 	}
 	sort.Strings(files)
 
 	for _, file := range files {
-		mapper, ok := sourceMappers[file]
-		if !ok || mapper.Len() == 0 {
+		c := sourceCode[file]
+		if c.isExternal {
+			continue
+		}
+		mapper := c.mapper
+		if mapper.Len() == 0 {
 			continue
 		}
 		linef("SF:%s", file)

@@ -8,15 +8,11 @@ const (
     // SolCVersion is the version of the Solidity compiler used to create this
     // file.
     SolCVersion = {{quote .Version}}
-    
-    // CombinedJSON is the raw combined-JSON output of solc, passed to abigen to
-    // create this file.
-    CombinedJSON = {{quote .CombinedJSON}}
 )
 
 func init() {
     {{- range $i, $file := .SourceList }}
-    solidity.RegisterSourceCode({{quote $file}}, {{quote (index $.SourceCode $i)}})
+    solidity.RegisterSourceCode({{quote $file}}, {{quote (index $.SourceCode $i)}}, {{(index $.IsExternalSource $i)}})
     {{- end }}
 
     {{range $src, $c := .Contracts }}
