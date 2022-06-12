@@ -13,7 +13,10 @@ contract SellableMock is ISellable {
         uint256 amount
     );
 
-    function handlePurchase(address, uint256 num) external payable {
+    mapping(address => uint64) public balanceOf;
+
+    function handlePurchase(address to, uint256 num) external payable {
         emit Revenue(address(this), num, msg.value);
+        balanceOf[to] += uint64(num);
     }
 }

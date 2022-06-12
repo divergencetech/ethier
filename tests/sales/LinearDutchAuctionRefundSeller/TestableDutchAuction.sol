@@ -26,21 +26,16 @@ contract TestableDutchAuction is LinearDutchAuctionRefundSeller {
         return block.timestamp;
     }
 
-    mapping(address => uint256) public own;
-
-    function _afterPurchase(
-        address to,
-        uint256 num,
-        uint256 cost
-    ) internal virtual override {
-        LinearDutchAuctionRefundSeller._afterPurchase(to, num, cost);
-        own[to] += num;
-    }
-
     function sellerConfig() external view returns (Config memory cfg) {
         cfg.totalInventory = totalInventory();
         cfg.maxPerTx = maxPerTx();
         cfg.maxPerAddress = maxPerAddress();
+    }
+
+    // This is a convenience interface to maintain compatibility with already
+    // implemented tests.
+    function own(address owner) external view returns (uint256) {
+        return SellableMock(address(sellable)).balanceOf(owner);
     }
 }
 

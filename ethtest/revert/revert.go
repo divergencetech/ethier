@@ -26,7 +26,7 @@ const (
 	ERC721ApproveOrOwner = Checker("ERC721ACommon: Not approved nor owner")
 	InvalidSignature     = Checker("SignatureChecker: Invalid signature")
 	NotStarted           = Checker("LinearDutchAuction: Not started")
-	SoldOut              = Checker("Seller: Sold out")
+	SoldOut              = Checker("FixedSupply: Sold out")
 )
 
 // Checkers for wETH test double. Use the wethtest package to deploy a modified

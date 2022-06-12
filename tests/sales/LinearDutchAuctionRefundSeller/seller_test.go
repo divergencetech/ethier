@@ -921,27 +921,26 @@ func TestReentrancyGuard(t *testing.T) {
 	}
 }
 
-// func TestUnlimited(t *testing.T) {
-// 	sim, _, auction, _ := deployConstantPrice(t, big.NewInt(1))
+func TestUnlimited(t *testing.T) {
+	sim, _, auction, _ := deployConstantPrice(t, big.NewInt(1))
 
-// 	const total = 1e6
-// 	cfg := SellerConfig{
-// 		TotalInventory: big.NewInt(total),
-// 		MaxPerAddress:  big.NewInt(0),
-// 		MaxPerTx:       big.NewInt(0),
-// 	}
-// 	// TODO
-// 	// sim.Must(t, "SetSellerConfig(%+v)", cfg)(auction.SetSellerConfig(sim.Acc(0), cfg))
+	const total = 1e6
+	cfg := LinearDutchAuctionRefundSellerConfig{
+		TotalInventory: total,
+		MaxPerAddress:  0,
+		MaxPerTx:       0,
+	}
+	sim.Must(t, "SetSellerConfig(%+v)", cfg)(auction.SetSellerConfig(sim.Acc(0), cfg))
 
-// 	buyer := sim.WithValueFrom(0, big.NewInt(total))
-// 	sim.Must(t, "Purchase(%d) with unlimited transaction / address limits", int(total))(
-// 		auction.Purchase(buyer, buyer.From, big.NewInt(total)),
-// 	)
+	buyer := sim.WithValueFrom(0, big.NewInt(total))
+	sim.Must(t, "Purchase(%d) with unlimited transaction / address limits", int(total))(
+		auction.Purchase(buyer, buyer.From, big.NewInt(total)),
+	)
 
-// 	if diff := revert.SoldOut.Diff(auction.Purchase(buyer, buyer.From, big.NewInt(1))); diff != "" {
-// 		t.Errorf("Purchase(1) with no more inventory; %s", diff)
-// 	}
-// }
+	if diff := revert.SoldOut.Diff(auction.Purchase(buyer, buyer.From, big.NewInt(1))); diff != "" {
+		t.Errorf("Purchase(1) with no more inventory; %s", diff)
+	}
+}
 
 // // wantOwned is a helper to confirm total number of items owned by an address,
 // // and total received free of charge.
@@ -951,9 +950,9 @@ func TestReentrancyGuard(t *testing.T) {
 // 	if got, err := auction.Own(nil, addr); got.Cmp(big.NewInt(wantTotal)) != 0 || err != nil {
 // 		t.Errorf("Own(%q) got %d, err %v; want %d, nil err", addr, got, err, wantTotal)
 // 	}
-// 	if got, err := auction.ReceivedFree(nil, addr); got.Cmp(big.NewInt(wantFree)) != 0 || err != nil {
-// 		t.Errorf("ReceivedFree(%q) got %d, err %v; want %d, nil err", addr, got, err, wantFree)
-// 	}
+// 	// if got, err := auction.ReceivedFree(nil, addr); got.Cmp(big.NewInt(wantFree)) != 0 || err != nil {
+// 	// 	t.Errorf("ReceivedFree(%q) got %d, err %v; want %d, nil err", addr, got, err, wantFree)
+// 	// }
 // }
 
 // func TestReservedFreePurchasing(t *testing.T) {

@@ -59,7 +59,10 @@ abstract contract FixedSupply is Seller {
         )
     {
         (to, num, cost) = Seller._beforePurchase(to, num, cost);
-        require(_totalSold + num <= _totalInventory, "To many requested");
+        require(
+            _totalSold + num <= _totalInventory,
+            "FixedSupply: To many requested"
+        );
         _totalSold += uint64(num);
         return (to, num, cost);
     }
@@ -70,7 +73,7 @@ abstract contract FixedSupply is Seller {
         returns (uint256)
     {
         uint256 remaining = totalInventory() - totalSold();
-        require(remaining > 0, "Sold out");
+        require(remaining > 0, "FixedSupply: Sold out");
         return Math.min(requested, remaining);
     }
 }
