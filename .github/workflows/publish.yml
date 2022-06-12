@@ -2,7 +2,7 @@ name: Publish NPM package
 
 on:
   workflow_run:
-    workflows: ["Test", "Lint"]
+    workflows: ["Checks"]
     branches: [main]
     types:
       - completed
@@ -10,6 +10,7 @@ on:
 jobs:
   deploy:
     name: Publish to NPM
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

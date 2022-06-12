@@ -1,4 +1,4 @@
-name: Test
+name: Checks
 
 on:
   push:
@@ -40,3 +40,41 @@ jobs:
 
       - name: Run tests
         run: npm run test
+
+  lint_go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+
+      - name: Check Go code formatting
+        run: test -z $(goimports -l .)
+
+  lint_sol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup NodeJs
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14.x
+
+      - name: Cache dependencies
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: ./node_modules
+          key: modules-${{ hashFiles('yarn.lock') }}
+
+      - name: Install yarn dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: rm -rf node_modules && yarn install --frozen-lockfile
+
+      - name: Check Solidity code formatting
+        run: npx prettier '**/*.sol' --check
+
+      - name: Run solhint
+        run: yarn solhint
+
