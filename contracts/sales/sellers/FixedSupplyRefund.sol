@@ -10,31 +10,58 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./CappedRefund.sol";
 import "./FixedSupply.sol";
+import "./TxLimit.sol";
 
 /**
 @notice An abstract contract providing the _purchase() function to:
  - Enforce per-wallet / per-transaction limits
  - Calculate required cost, forwarding to a beneficiary, and refunding extra
  */
-abstract contract FixedSupplyRefund is FixedSupply, CappedRefund {
-    function _capRequested(address, uint256 requested)
-        internal
-        virtual
-        override
-        returns (uint256)
-    {
-        uint256 remaining = totalInventory() - totalSold();
-        return Math.min(requested, remaining);
-    }
+abstract contract FixedSupplyRefund is FixedSupply, TxLimit, CappedRefund {
+    constructor(
+        uint64 totalInventory_,
+        uint64 maxPerTx_,
+        uint64 maxPerAddress_
+    ) FixedSupply(totalInventory_) TxLimit(maxPerTx_, maxPerAddress_) {}
 
-    function _beforePurchase(address to, uint256 num)
+    function _beforePurchase(
+        address to,
+        uint256 num,
+        uint256 cost
+    )
         internal
         virtual
         override(FixedSupply, CappedRefund)
-        returns (address, uint256)
+        returns (
+            address,
+            uint256,
+            uint256
+        )
     {
-        (to, num) = CappedRefund._beforePurchase(to, num);
-        (to, num) = FixedSupply._beforePurchase(to, num);
-        return (to, num);
+        // Capping based on `_capRequested`
+        (to, num, cost) = CappedRefund._beforePurchase(to, num, cost);
+
+        // Updating internal states
+        (to, num, cost) = FixedSupply._beforePurchase(to, num, cost);
+        return (to, num, cost);
+    }
+
+    function _capRequested(address to, uint256 requested)
+        internal
+        virtual
+        override(CappedRefund, TxLimit)
+        returns (uint256)
+    {
+        requested = TxLimit._capRequested(to, requested);
+        requested = FixedSupply._capRequested(requested);
+        return requested;
+    }
+
+    function _afterPurchase(
+        address to,
+        uint256 num,
+        uint256 cost
+    ) internal virtual override(CappedRefund, Seller) {
+        CappedRefund._afterPurchase(to, num, cost);
     }
 }

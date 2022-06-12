@@ -21,20 +21,20 @@ abstract contract FixedSupply is Seller {
     uint64 private _totalSold;
 
     constructor(uint64 totalInventory_) {
-        setTotalInventory(totalInventory_);
+        _setTotalInventory(totalInventory_);
     }
 
-    function setTotalInventory(uint64 totalInventory_) internal {
+    function _setTotalInventory(uint64 totalInventory_) internal {
         _totalInventory = totalInventory_;
     }
 
     /// @notice Returns the total number of items sold by this contract.
-    function totalSold() public view returns (uint256) {
+    function totalSold() public view returns (uint64) {
         return _totalSold;
     }
 
     /// @notice Returns the total number of items sold by this contract.
-    function totalInventory() public view returns (uint256) {
+    function totalInventory() public view returns (uint64) {
         return _totalInventory;
     }
 
@@ -44,23 +44,33 @@ abstract contract FixedSupply is Seller {
     //
     // -------------------------------------------------------------------------
 
-    function _beforePurchase(address to, uint256 num)
+    function _beforePurchase(
+        address to,
+        uint256 num,
+        uint256 cost
+    )
         internal
         virtual
         override(Seller)
-        returns (address, uint256)
+        returns (
+            address,
+            uint256,
+            uint256
+        )
     {
-        (to, num) = Seller._beforePurchase(to, num);
-        if (_totalSold > _totalInventory) revert SoldOut();
-        ++_totalSold;
-        return (to, num);
+        (to, num, cost) = Seller._beforePurchase(to, num, cost);
+        require(_totalSold + num <= _totalInventory, "To many requested");
+        _totalSold += uint64(num);
+        return (to, num, cost);
     }
 
-    // -------------------------------------------------------------------------
-    //
-    //  Errors
-    //
-    // -------------------------------------------------------------------------
-
-    error SoldOut();
+    function _capRequested(uint256 requested)
+        internal
+        virtual
+        returns (uint256)
+    {
+        uint256 remaining = totalInventory() - totalSold();
+        require(remaining > 0, "Sold out");
+        return Math.min(requested, remaining);
+    }
 }

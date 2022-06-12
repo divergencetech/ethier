@@ -7,10 +7,10 @@ import "../ISellable.sol";
 import "./Seller.sol";
 
 abstract contract SellableCallbacker is PurchaseHandler {
-    ISellable private immutable _sellable;
+    ISellable public immutable sellable;
 
     constructor(ISellable sellable_) {
-        _sellable = ISellable(sellable_);
+        sellable = ISellable(sellable_);
     }
 
     function _handlePurchase(
@@ -18,6 +18,6 @@ abstract contract SellableCallbacker is PurchaseHandler {
         uint256 num,
         uint256 cost
     ) internal virtual override {
-        _sellable.handlePurchase{value: cost}(to, num);
+        sellable.handlePurchase{value: cost}(to, num);
     }
 }

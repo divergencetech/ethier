@@ -23,15 +23,30 @@ abstract contract CappedRefund is Seller, Context {
         virtual
         returns (uint256);
 
-    function _beforePurchase(address to, uint256 num)
+    function _beforePurchase(
+        address to,
+        uint256 num,
+        uint256 cost
+    )
         internal
         virtual
         override(Seller)
-        returns (address, uint256)
+        returns (
+            address,
+            uint256,
+            uint256
+        )
     {
         num = _capRequested(to, num);
-        _reimburseDifference(num);
-        return (to, num);
+        return (to, num, cost);
+    }
+
+    function _afterPurchase(
+        address,
+        uint256,
+        uint256 cost
+    ) internal virtual override(Seller) {
+        _reimburseRest(cost);
     }
 
     // -------------------------------------------------------------------------
@@ -40,8 +55,8 @@ abstract contract CappedRefund is Seller, Context {
     //
     // -------------------------------------------------------------------------
 
-    function _reimburseDifference(uint256 num) private {
-        uint256 cost = _cost(num);
+    function _reimburseRest(uint256 cost) private {
+        // uint256 cost = _cost(num);
 
         // Ideally we'd be using a PullPayment here, but the user experience is
         // poor when there's a variable cost or the number of items purchased

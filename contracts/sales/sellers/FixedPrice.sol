@@ -5,7 +5,7 @@ pragma solidity >=0.8.0 <0.9.0;
 import "./Seller.sol";
 
 /// @notice A Seller with fixed per-item price.
-abstract contract FixedPrice is Seller {
+abstract contract FixedPrice is InternalCostSeller {
     /**
     @notice The fixed per-item price.
     @dev Fixed as in not changing with time nor number of items, but not a

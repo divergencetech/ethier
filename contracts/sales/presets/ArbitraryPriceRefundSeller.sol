@@ -12,22 +12,45 @@ abstract contract ArbitraryPriceRefundSeller is
     SellableCallbacker,
     OwnerPausable
 {
-    constructor(uint64 maxSupply, ISellable sellable)
-        FixedSupply(maxSupply)
+    struct Config {
+        uint64 totalInventory;
+        uint64 maxPerTx;
+        uint64 maxPerAddress;
+    }
+
+    constructor(Config memory cfg, ISellable sellable)
+        FixedSupplyRefund(cfg.totalInventory, cfg.maxPerTx, cfg.maxPerAddress)
         SellableCallbacker(sellable)
     {}
 
-    function purchase(address to, uint64 num) external whenNotPaused {
-        _purchase(to, num);
+    function setSellerConfig(Config memory cfg) external onlyOwner {
+        _setTotalInventory(cfg.totalInventory);
+        _setTxLimits(cfg.maxPerTx, cfg.maxPerAddress);
     }
 
-    function _beforePurchase(address to, uint256 num)
+    function _purchase(
+        address to,
+        uint256 num,
+        uint256 cost
+    ) internal virtual override whenNotPaused {
+        Seller._purchase(to, num, cost);
+    }
+
+    function _beforePurchase(
+        address to,
+        uint256 num,
+        uint256 cost
+    )
         internal
         virtual
         override(FixedSupplyRefund)
-        returns (address, uint256)
+        returns (
+            address,
+            uint256,
+            uint256
+        )
     {
-        (to, num) = FixedSupplyRefund._beforePurchase(to, num);
-        return (to, num);
+        (to, num, cost) = FixedSupplyRefund._beforePurchase(to, num, cost);
+        return (to, num, cost);
     }
 }

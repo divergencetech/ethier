@@ -1,0 +1,3 @@
+package sales
+
+//go:generate ethier gen TestableFixedPriceSeller.sol SellableMock.sol

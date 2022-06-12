@@ -23,7 +23,7 @@ enum TimeUnit {
 }
 
 /// @notice A Seller with a linearly decreasing price.
-abstract contract LinearDutchAuction is Seller {
+abstract contract LinearDutchAuction is InternalCostSeller {
     /**
     @param unit The unit of "time" used for decreasing prices, block number or
     timestamp. NOTE: See the comment on TimeUnit re use of Time as a
@@ -42,7 +42,6 @@ abstract contract LinearDutchAuction is Seller {
     struct AuctionConfig {
         uint96 startPrice; // sufficient bits to store up to 1e10 eth
         uint96 decreaseSize;
-        uint64 totalInventory;
         uint64 startPoint;
         uint64 decreaseInterval;
         uint64 numDecreases;
@@ -50,11 +49,15 @@ abstract contract LinearDutchAuction is Seller {
     }
 
     /// @notice Configuration of price changes.
-    AuctionConfig public config;
+    AuctionConfig private _config;
 
     /// @param expectedReserve See setAuctionConfig().
     constructor(AuctionConfig memory config, uint256 expectedReserve) {
         _setAuctionConfig(config, expectedReserve);
+    }
+
+    function auctionConfig() external view returns (AuctionConfig memory) {
+        return _config;
     }
 
     /**
@@ -80,7 +83,7 @@ abstract contract LinearDutchAuction is Seller {
             config.unit != TimeUnit.UNSPECIFIED,
             "LinearDutchAuction: unspecified unit"
         );
-        config = config;
+        _config = config;
     }
 
     /**
@@ -90,7 +93,7 @@ abstract contract LinearDutchAuction is Seller {
     cost of having to update the entire config.
      */
     function _setAuctionStartPoint(uint64 startPoint) internal {
-        config.startPoint = startPoint;
+        _config.startPoint = startPoint;
     }
 
     /**
@@ -99,7 +102,7 @@ abstract contract LinearDutchAuction is Seller {
     is ignored.
     **/
     function _cost(uint256 num) internal view override returns (uint256) {
-        AuctionConfig storage cfg = config;
+        AuctionConfig storage cfg = _config;
 
         uint256 current;
         if (cfg.unit == TimeUnit.Block) {

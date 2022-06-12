@@ -3,13 +3,13 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../sellers/FixedSupplyRefund.sol";
-import "../sellers/FixedPrice.sol";
+import "../sellers/LinearDutchAuction.sol";
 import "../sellers/SellableCallbacker.sol";
 import "../../utils/OwnerPausable.sol";
 
-contract FixedPriceRefundSeller is
+contract LinearDutchAuctionRefundSeller is
     FixedSupplyRefund,
-    FixedPrice,
+    LinearDutchAuction,
     SellableCallbacker,
     OwnerPausable
 {
@@ -17,19 +17,33 @@ contract FixedPriceRefundSeller is
         uint64 totalInventory;
         uint64 maxPerTx;
         uint64 maxPerAddress;
-        uint256 price;
     }
 
-    constructor(Config memory cfg, ISellable sellable)
+    constructor(
+        Config memory cfg,
+        AuctionConfig memory config,
+        uint256 expectedReserve,
+        ISellable sellable
+    )
         FixedSupplyRefund(cfg.totalInventory, cfg.maxPerTx, cfg.maxPerAddress)
-        FixedPrice(cfg.price)
+        LinearDutchAuction(config, expectedReserve)
         SellableCallbacker(sellable)
     {}
 
     function setSellerConfig(Config memory cfg) external onlyOwner {
         _setTotalInventory(cfg.totalInventory);
-        _setPrice(cfg.price);
         _setTxLimits(cfg.maxPerTx, cfg.maxPerAddress);
+    }
+
+    function setAuctionConfig(
+        AuctionConfig memory config,
+        uint256 expectedReserve
+    ) external onlyOwner {
+        _setAuctionConfig(config, expectedReserve);
+    }
+
+    function setAuctionStartPoint(uint64 startPoint) external onlyOwner {
+        _setAuctionStartPoint(startPoint);
     }
 
     function _beforePurchase(
@@ -47,6 +61,7 @@ contract FixedPriceRefundSeller is
         )
     {
         (to, num, cost) = FixedSupplyRefund._beforePurchase(to, num, cost);
+        (to, num, cost) = InternalCostSeller._beforePurchase(to, num, cost);
         return (to, num, cost);
     }
 
