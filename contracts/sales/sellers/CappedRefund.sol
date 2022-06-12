@@ -70,6 +70,7 @@ abstract contract CappedRefund is Seller, Context {
             // reentrancy, but we want to expose it to allow for more precise
             // testing. This otherwise uses the exact same pattern as
             // Address.sendValue().
+            // solhint-disable-next-line avoid-low-level-calls
             (bool success, bytes memory returnData) = reimburse.call{
                 value: refund
             }("");

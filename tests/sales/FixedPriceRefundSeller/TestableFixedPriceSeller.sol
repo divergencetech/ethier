@@ -36,7 +36,7 @@ contract TestableFixedPriceSeller is FixedPriceRefundSeller {
             }),
             new SellableMock()
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     // constructor(uint256 price) {
     //     product = new ;

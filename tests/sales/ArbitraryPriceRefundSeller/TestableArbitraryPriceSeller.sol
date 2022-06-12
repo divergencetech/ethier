@@ -12,7 +12,7 @@ contract TestableArbitraryPriceSeller is ArbitraryPriceRefundSeller {
             Config({totalInventory: 10, maxPerTx: 0, maxPerAddress: 0}),
             new SellableMock()
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     /**
     @notice Allow purchasing at any price; exposed only for testing.

@@ -11,7 +11,7 @@ contract FreeOwnerAirdropper is FixedSupply, SellableCallbacker, OwnerPausable {
     constructor(uint64 totalInventory, ISellable sellable)
         FixedSupply(totalInventory)
         SellableCallbacker(sellable)
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     struct Receiver {
         address to;

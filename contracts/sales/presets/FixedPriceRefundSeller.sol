@@ -24,7 +24,7 @@ contract FixedPriceRefundSeller is
         FixedSupplyRefund(cfg.totalInventory, cfg.maxPerTx, cfg.maxPerAddress)
         FixedPrice(cfg.price)
         SellableCallbacker(sellable)
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     function setSellerConfig(Config memory cfg) external onlyOwner {
         _setTotalInventory(cfg.totalInventory);

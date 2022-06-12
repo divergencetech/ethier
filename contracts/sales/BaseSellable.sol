@@ -18,7 +18,7 @@ abstract contract BaseSellable is ISellable {
     function _handlePurchase(address to, uint256 num) internal virtual;
 
     modifier onlySellers(address caller) {
-        require(_sellers[caller]);
+        require(_sellers[caller], "Unauthorized seller");
         _;
     }
 

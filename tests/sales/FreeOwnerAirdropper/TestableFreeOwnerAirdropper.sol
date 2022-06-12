@@ -9,5 +9,5 @@ import "../SellableMock.sol";
 contract TestableFreeOwnerAirdropper is FreeOwnerAirdropper {
     constructor(uint64 totalInventory)
         FreeOwnerAirdropper(totalInventory, new SellableMock())
-    {}
+    {} // solhint-disable-line no-empty-blocks
 }

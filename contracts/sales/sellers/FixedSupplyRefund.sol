@@ -22,7 +22,7 @@ abstract contract FixedSupplyRefund is FixedSupply, TxLimit, CappedRefund {
         uint64 totalInventory_,
         uint64 maxPerTx_,
         uint64 maxPerAddress_
-    ) FixedSupply(totalInventory_) TxLimit(maxPerTx_, maxPerAddress_) {}
+    ) FixedSupply(totalInventory_) TxLimit(maxPerTx_, maxPerAddress_) {} // solhint-disable-line no-empty-blocks
 
     function _beforePurchase(
         address to,

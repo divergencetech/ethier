@@ -18,7 +18,7 @@ contract TestableDutchAuction is LinearDutchAuctionRefundSeller {
             expectedReserve,
             new SellableMock()
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     /// @dev Returns the current timestamp for testing of time-based auctions.
     function timestamp() public view returns (uint256) {

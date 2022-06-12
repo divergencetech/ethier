@@ -86,7 +86,7 @@ abstract contract Seller is PurchaseHandler, ReentrancyGuard {
         address to,
         uint256 num,
         uint256 cost
-    ) internal virtual {}
+    ) internal virtual {} // solhint-disable-line no-empty-blocks
 
     // -------------------------------------------------------------------------
     //
