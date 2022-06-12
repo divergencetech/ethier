@@ -8,45 +8,24 @@ const (
     // SolCVersion is the version of the Solidity compiler used to create this
     // file.
     SolCVersion = {{quote .Version}}
-    
-    // CombinedJSON is the raw combined-JSON output of solc, passed to abigen to
-    // create this file.
-    CombinedJSON = {{quote .CombinedJSON}}
 )
 
-var (
-    // SourceList is the list of sources used by solc when compiling these
-    // contracts. Their indices correspond to the file numbers in the source
-    // maps.
-    SourceList = {{soliditySourceSlice .SourceList .SourceCode}}
-
-    // RuntimeSourceMaps contains, for each compiled contract, the runtime
-    // binary and its associated source map. With a program counter pointing to
-    // an instruction in the runtime binary, this is sufficient to determine the
-    // respective location in the Solidity code from which the binary was
-    // compiled.
-    RuntimeSourceMaps = map[string]*compiler.Contract{
-    {{- range $src, $c := .Contracts }}
-    {{quote (contract $src)}}: {
-        RuntimeCode: {{quote $c.RuntimeCode}},
-        Info: compiler.ContractInfo{
-            SrcMapRuntime: {{quote $c.Info.SrcMapRuntime}},
-        },
-    },
+func init() {
+    {{- range $i, $file := .SourceList }}
+    solidity.RegisterSourceCode({{quote $file}}, {{quote (index $.SourceCode $i)}}, {{(index $.IsExternalSource $i)}})
     {{- end }}
-    }
-)
 
-// deployedContracts tracks which contract is deployed at each address. The
-// standard abigen Deploy<ContractName>() functions have been modified to set
-// the value of this map to <ContractName> before returning the deployment
-// address. This allows SourceMap() to function correctly.
-var deployedContracts = make(map[common.Address]string)
-
-// SourceMap returns a new SourceMap, able to convert program counters to
-// Solidity source offsets. SourceMap() must be called after contracts are
-// deployed otherwise they won't be registered by contract address (only by
-// contract name).
-func SourceMap() (*solidity.SourceMap, error) {
-    return solidity.NewSourceMap(SourceList, RuntimeSourceMaps, deployedContracts)
+    {{range $src, $c := .Contracts }}
+    solidity.RegisterContract(
+        {{quote $src}},
+        &compiler.Contract{
+            Code: {{quote $c.Code}},
+            RuntimeCode: {{quote $c.RuntimeCode}},
+            Info: compiler.ContractInfo{
+                SrcMapRuntime: {{quote $c.Info.SrcMapRuntime}},
+            },
+        },
+        {{stringSlice $.SourceList}},
+    )
+    {{- end }}
 }

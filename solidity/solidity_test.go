@@ -5,17 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/compiler"
 )
-
-func (cm *contractMap) uncompressed() string {
-	var parts []string
-	for _, p := range cm.locations {
-		parts = append(parts, fmt.Sprintf("%d:%d:%d:%s:%d", p.Start, p.Length, p.FileIdx, p.Jump, p.ModifierDepth))
-	}
-	return strings.Join(parts, ";")
-}
 
 func TestMapDecompression(t *testing.T) {
 	const (
@@ -26,23 +17,22 @@ func TestMapDecompression(t *testing.T) {
 		uncompressed = `1:2:1:-:0;1:9:1:-:0;2:1:2:-:0;2:1:2:-:0;2:1:2:-:0`
 	)
 
-	const name = "dummy"
-	in := map[string]*compiler.Contract{
-		name: {
-			RuntimeCode: "0x00",
-			Info: compiler.ContractInfo{
-				SrcMapRuntime: compressed,
-			},
+	in := &compiler.Contract{
+		Info: compiler.ContractInfo{
+			SrcMapRuntime: compressed,
 		},
 	}
-	deployed := map[common.Address]string{{}: name}
 
-	sm, err := NewSourceMap(nil, in, deployed)
+	locations, err := parseSrcMap(in, nil)
 	if err != nil {
-		t.Fatalf("NewSourceMap(%+v): %v", in, err)
+		t.Fatalf("parseSrcMap(%+v, nil) error %v", in, err)
 	}
 
-	if got, want := sm.contracts["dummy"].uncompressed(), uncompressed; got != want {
-		t.Errorf("NewSourceMap(%+v) got uncompressed mapping %q; want %q", in, got, want)
+	var gotParts []string
+	for _, l := range locations {
+		gotParts = append(gotParts, fmt.Sprintf("%d:%d:%d:%s:%d", l.Start, l.Length, l.FileIdx, l.Jump, l.ModifierDepth))
+	}
+	if got, want := strings.Join(gotParts, ";"), uncompressed; got != want {
+		t.Errorf("parseSrcMap(%+v) got reconstructed nodes %q; want %q", in, got, want)
 	}
 }

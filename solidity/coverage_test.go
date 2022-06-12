@@ -1,6 +1,7 @@
 package solidity_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/divergencetech/ethier/ethtest"
@@ -16,8 +17,7 @@ func TestCoverageCollector(t *testing.T) {
 		t.Fatalf("DeployCoverageTest() error %v", err)
 	}
 
-	sim.CollectCoverageTB(t, srcmaptest.SourceMap)
-
+	// sim.CollectCoverageTB(t, srcmaptest.SourceMap)
 	sim.Must(t, "%T.Foo()", cov)(cov.Foo(sim.Acc(0)))
 	sim.Must(t, "%T.Bar()", cov)(cov.Bar(sim.Acc(0)))
 
@@ -37,7 +37,7 @@ DA:22,0
 DA:24,1
 DA:25,1
 DA:28,2
-DA:29,2
+DA:29,3
 DA:30,0
 DA:31,2
 DA:32,0
@@ -56,24 +56,62 @@ DA:50,0
 DA:53,2
 DA:54,1
 DA:56,0
-LH:30
-LF:61
+LH:22
+LF:30
 end_of_record
 SF:solidity/srcmaptest/SourceMapTest.sol
 FNF:0
 FNH:0
+DA:11,0
+DA:12,0
+DA:14,0
+DA:19,0
+DA:23,0
+DA:25,0
+DA:27,0
+DA:30,0
+DA:32,0
+DA:34,0
+DA:35,0
+DA:38,0
+DA:39,0
+DA:40,0
+DA:44,0
+DA:47,0
+DA:49,0
+DA:51,0
 LH:0
-LF:54
+LF:18
 end_of_record
 SF:solidity/srcmaptest/SourceMapTest2.sol
 FNF:0
 FNH:0
+DA:9,0
+DA:13,0
+DA:15,0
+DA:17,0
+DA:22,0
+DA:24,0
+DA:29,0
+DA:34,0
+DA:36,0
+DA:38,0
+DA:41,0
+DA:43,0
+DA:44,0
+DA:45,0
+DA:48,0
+DA:50,0
 LH:0
-LF:20
+LF:16
 end_of_record
 `
 
-	if diff := cmp.Diff([]byte(want), sim.CoverageReport()); diff != "" {
+	lines := func(s string) []string {
+		return strings.Split(s, "\n")
+	}
+
+	if diff := cmp.Diff(lines(want), lines(string(sim.CoverageReport()))); diff != "" {
 		t.Errorf("sim.CoverageReport() diff (-want +got):\n%s", diff)
 	}
 }
