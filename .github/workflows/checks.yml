@@ -2,8 +2,7 @@ name: Checks
 
 on:
   push:
-    branches: [main]
-  pull_requests:
+  pull_request:
   workflow_dispatch:
 
 jobs:
