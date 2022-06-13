@@ -10,7 +10,7 @@
     "test": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./...",
     "test:light": "go test ./...",
     "test:verbose": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./... -test.v",
-    "lint:go": "golint ./... 2>&1 | tee /dev/stdout | xargs -0 test -z",
+    "lint:go": "golint ./... 2>&1 | tee /dev/stderr | xargs -0 test -z",
     "lint:sol": "npm run solhint",
     "lint": "npm run lint:sol && npm run lint:go",
     "fmt:go": "goimports -e -d . 2>&1  | tee /dev/stderr | xargs -0 test -z",
