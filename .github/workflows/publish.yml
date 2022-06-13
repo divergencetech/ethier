@@ -1,0 +1,24 @@
+name: Publish NPM package
+
+on:
+  workflow_run:
+    workflows: ["Checks"]
+    branches: [main]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    name: Publish to NPM
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          registry-url: https://registry.npmjs.org/
+
+      - run: npm publish --access public || echo "Skipping..."
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
