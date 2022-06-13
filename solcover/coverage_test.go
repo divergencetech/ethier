@@ -1,11 +1,11 @@
-package solidity_test
+package solcover_test
 
 import (
 	"strings"
 	"testing"
 
 	"github.com/divergencetech/ethier/ethtest"
-	"github.com/divergencetech/ethier/solidity/srcmaptest"
+	"github.com/divergencetech/ethier/solcover/srcmaptest"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -23,7 +23,7 @@ func TestCoverageCollector(t *testing.T) {
 
 	// This has been confirmed visually by running the report through the LCOV
 	// genhtml script.
-	const want = `SF:solidity/srcmaptest/CoverageTest.sol
+	const want = `SF:solcover/srcmaptest/CoverageTest.sol
 FNF:0
 FNH:0
 DA:11,2
@@ -59,7 +59,7 @@ DA:56,0
 LH:22
 LF:30
 end_of_record
-SF:solidity/srcmaptest/SourceMapTest.sol
+SF:solcover/srcmaptest/SourceMapTest.sol
 FNF:0
 FNH:0
 DA:11,0
@@ -83,7 +83,7 @@ DA:51,0
 LH:0
 LF:18
 end_of_record
-SF:solidity/srcmaptest/SourceMapTest2.sol
+SF:solcover/srcmaptest/SourceMapTest2.sol
 FNF:0
 FNH:0
 DA:9,0

@@ -1,4 +1,4 @@
-package solidity
+package solcover
 
 import (
 	"bytes"
@@ -11,15 +11,15 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 )
 
-// CoverageCollector returns an EVMLogger that can be used to trace EVM
-// operations for code coverage. The returned function returns an LCOV trace
-// file at any time coverage is not being actively collected (i.e. it is not
-// thread safe with respect to VM computation).
+// Collector returns an EVMLogger that can be used to trace EVM operations for
+// code coverage. The returned function returns an LCOV trace file at any time
+// coverage is not being actively collected (i.e. it is not thread safe with
+// respect to VM computation).
 //
 // Coverage will only be collected for contracts registered with
 // RegisterContract() before they are deployed; their respective code also must
 // have been registered with RegisterSourceCode(…, isExternal = false).
-func CoverageCollector() (vm.EVMLogger, func() []byte) {
+func Collector() (vm.EVMLogger, func() []byte) {
 	lineHits := make(map[string]map[int]int)
 	for file := range sourceCode {
 		lineHits[file] = make(map[int]int)

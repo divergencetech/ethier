@@ -227,7 +227,7 @@ SourceLoop:
 	}
 	for _, pkg := range []string{
 		"github.com/ethereum/go-ethereum/common/compiler",
-		"github.com/divergencetech/ethier/solidity",
+		"github.com/divergencetech/ethier/solcover",
 	} {
 		if !astutil.AddImport(fset, f, pkg) {
 			return nil, fmt.Errorf("add import %q to generated Go: %v", pkg, err)

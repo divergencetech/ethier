@@ -1,5 +1,5 @@
-// Package solidity provides mapping from EVM-trace program counters to original
-// Solidity source code, including automated coverage collection for tests.
+// Package solcover provides trace-based Solidity coverage analysis by mapping
+// from EVM-trace program counters to original Solidity source code.
 //
 // This package doesn't typically need to be used directly, and is automatically
 // supported by adding the source-map flag to `ethier gen` of the
@@ -7,7 +7,7 @@
 //
 // See https://docs.soliditylang.org/en/v0.8.14/internals/source_mappings.html
 // for more information.
-package solidity
+package solcover
 
 import (
 	"crypto/sha256"
@@ -27,14 +27,33 @@ import (
 // A Location is an offset-based location in a Solidity file. Using notation
 // described in https://docs.soliditylang.org/en/v0.8.14/internals/source_mappings.html,
 // s = Start, l = Length, f = FileIdx, j = Jump, and m = ModifierDepth.
+//
+// Note that two Locations may have the same offset within the same file but
+// their OpCode and instruction number will differ.
 type Location struct {
-	Start, Length int
+	// InstructionNumber is the index of the instruction, within the runtime
+	// byte code, that was compiled from this Solidity Location. Note that this
+	// is different to the regular byte-code index (i.e. the program counter) as
+	// PUSH<N> instructions use 1+N bytes. InstructionNumber is therefore
+	// equivalent to a regular slice index after stripping the N pushed bytes
+	// for each PUSH<N>.
+	InstructionNumber int
+	// OpCode is the instruction found at InstructionNumber.
+	OpCode vm.OpCode
 
 	// FileIdx refers to the index of the source file in the inputs to solc, as
 	// returned in solc output, but can generally be ignored in favour of the
-	// Source, which is determined from the NewSourceMap() input.
+	// Source, which is determined from the SourceList parameter passed to
+	// RegisterContract.
 	FileIdx int
-	Source  string
+	// Source is the relative file path to the source that solc used to compile
+	// this particular instruction from the location.
+	Source string
+
+	// Start and Length are byte offsets into Source, describing the specific
+	// code from which this (and other) InstructionNumber locations were
+	// compiled.
+	Start, Length int
 
 	// Line and Col are both 1-indexed as this is typical behaviour of IDEs and
 	// coverage reports.
@@ -42,6 +61,8 @@ type Location struct {
 	// EndLine and EndCol are Length bytes after Line and Col, also 1-indexed.
 	EndLine, EndCol int
 
+	// Jump and ModifierDepth are the j and m elements, respectively, as
+	// described in the Solidity source_mappings documentation above.
 	Jump          JumpType
 	ModifierDepth int
 }
@@ -51,9 +72,9 @@ type JumpType string
 
 // Possible JumpType values.
 const (
-	FunctionIn  = JumpType(`i`)
-	FunctionOut = JumpType(`o`)
-	RegularJump = JumpType(`-`)
+	FunctionIn  JumpType = `i`
+	FunctionOut JumpType = `o`
+	RegularJump JumpType = `-`
 )
 
 // A compiledContract couples a *compiler.Contract with the fully qualified name
@@ -65,8 +86,9 @@ type compiledContract struct {
 	name       string
 	sourceList []string
 
-	instructions pcToInstruction
+	// locations[instructions[pc]] provides an indirect index from pc to loc.
 	locations    []*Location
+	instructions pcToInstruction
 }
 
 // location converts the program counter into an instruction number, and returns
@@ -96,8 +118,11 @@ type contractMatcher struct {
 // A sourceFile holds the input to solc for a particular file in a compilation's
 // source list.
 type sourceFile struct {
-	contents   string
-	mapper     *offset.Mapper
+	contents string
+	mapper   *offset.Mapper
+	// isExternal flags that the code comes from an external source such as a
+	// Node module. This is merely for accounting as we don't need coverage
+	// reports for these files, and is propagated from  RegisterSourceCode()
 	isExternal bool
 }
 
@@ -112,17 +137,18 @@ var (
 	// which can be used as a map key.
 	contractsByHash = make(map[[sha256.Size]byte]*compiledContract)
 	// contractMatchers are stored by the hash of their regex pattern to avoid
-	// duplication.
+	// duplication. The pattern is effectively the entire runtime code with
+	// modifications for library addresses, so the hash saves space.
 	contractMatchers = make(map[[sha256.Size]byte]contractMatcher)
 	// deployedContracts maps contracts by their deployed addresses iff the
 	// contract has already been registered.
 	deployedContracts = make(map[common.Address]*compiledContract)
 )
 
-// RegisterSourceCode registers the contents of source files passed in source
-// lists to RegisterContract. This allows op codes in contracts, deployed or
-// otherwise, to be mapped back to the specific Solidity code that resulted in
-// their compilation.
+// RegisterSourceCode registers the contents of source files passed in
+// sourceList arguments to RegisterContract(). This allows op codes in
+// contracts, deployed or otherwise, to be mapped back to the specific Solidity
+// code that resulted in their compilation.
 //
 // RegisterSourceCode SHOULD be called before all calls to RegisterContract that
 // include fileName in the sourceList otherwise Location values will not contain
@@ -154,7 +180,7 @@ func RegisterSourceCode(fileName, contents string, isExternal bool) {
 // done as part on an init() function, and `ethier gen` generated code performs
 // this step automatically.
 func RegisterContract(name string, c *compiler.Contract, sourceList []string) {
-	instructions, err := parseCode(c)
+	instructions, opCodes, err := parseCode(c)
 	if err != nil {
 		panic(fmt.Sprintf("Parsing RuntimeCode of %q: %v", name, err))
 	}
@@ -162,6 +188,9 @@ func RegisterContract(name string, c *compiler.Contract, sourceList []string) {
 	locations, err := parseSrcMap(c, sourceList)
 	if err != nil {
 		panic(fmt.Sprintf("Parsing SrcMap of %q: %v", name, err))
+	}
+	for i, l := range locations {
+		l.OpCode = opCodes[i]
 	}
 
 	cc := &compiledContract{
@@ -209,8 +238,7 @@ func registerContractByHash(cc *compiledContract) {
 // data pertaining to the correct contract.
 //
 // RegisterDeployedContract should be called by EVMLogger.CaptureStart when the
-// create flag is true, passing the deployment address and the input code bytes,
-// th
+// create flag is true, passing the deployment address and the input code bytes.
 func RegisterDeployedContract(addr common.Address, code []byte) {
 	c, ok := contractsByHash[sha256.Sum256(code)]
 	if ok {
@@ -235,14 +263,15 @@ func Source(contract common.Address, pc uint64) (*Location, bool) {
 
 // SourceByName functions identically to Source but doesn't require that the
 // contract has been deployed. The contract MUST have been registered with
-// RegisterContract().
+// RegisterContract(). The contractName is fully qualified, including both the
+// source file and the name, e.g. path/to/file.sol:ContractName.
 //
 // NOTE that there isn't a one-to-one mapping between runtime byte code (i.e.
 // program counter) and instruction number because the PUSH* instructions
 // require additional bytes as documented in:
 // https://docs.soliditylang.org/en/v0.8.14/internals/source_mappings.html.
-func SourceByName(contract string, pc uint64) (*Location, bool) {
-	return contractsByName[contract].location(pc)
+func SourceByName(contractName string, pc uint64) (*Location, bool) {
+	return contractsByName[contractName].location(pc)
 }
 
 var (
@@ -250,9 +279,9 @@ var (
 	// string identifying a library address to be pushed (PUSH20 == 0x73). In
 	// actual deployment this value is replaced, by the generated code, with the
 	// deployed library's address, but for source mapping it can be ignored
-	// because the PUSH20 means that contractMap.parseCode() will skip the 20
-	// bytes. We can therefore replace it with a push of anything, so use the
-	// zero address for simplicity.
+	// because the PUSH20 means that parseCode() will skip the 20 bytes. We can
+	// therefore replace it with a push of anything, so use the zero address for
+	// simplicity.
 	libraryPlaceholder = regexp.MustCompile(`73__\$[[:xdigit:]]{34}\$__`)
 	pushZeroAddress    = fmt.Sprintf("73%x", common.Address{})
 )
@@ -266,29 +295,34 @@ type pcToInstruction map[uint64]int
 // parseCode converts a Contract's runtime byte code into a mapping from
 // program counter (position in byte code) to instruction number because the
 // PUSH* OpCodes require additional byte code but the source-map is based on
-// instruction number. It saves the mapping to the contractMap.
-func parseCode(c *compiler.Contract) (pcToInstruction, error) {
+// instruction number. It also returns byte code as a slice of OpCodes,
+// effectively stripping the additional bytes included by PUSH* ops.
+func parseCode(c *compiler.Contract) (pcToInstruction, []vm.OpCode, error) {
 	rawCode := strings.TrimPrefix(c.RuntimeCode, "0x")
 	rawCode = libraryPlaceholder.ReplaceAllString(rawCode, pushZeroAddress)
 
 	code, err := hex.DecodeString(rawCode)
 	if err != nil {
-		return nil, fmt.Errorf("hex.DecodeString(%T.RuntimeCode): %v", c, err)
+		return nil, nil, fmt.Errorf("hex.DecodeString(%T.RuntimeCode): %v", c, err)
 	}
 
-	var instruction int
+	var (
+		instruction int
+		opCodes     []vm.OpCode
+	)
 	instructions := make(pcToInstruction)
 
-	for i, n := 0, len(code); i < n; i++ {
-		instructions[uint64(i)] = instruction
+	for pc, n := uint64(0), uint64(len(code)); pc < n; pc++ {
+		instructions[pc] = instruction
 		instruction++
 
-		c := vm.OpCode(code[i])
+		c := vm.OpCode(code[int(pc)])
+		opCodes = append(opCodes, c)
 		if c.IsPush() {
-			i += int(c - vm.PUSH0)
+			pc += uint64(c - vm.PUSH0)
 		}
 	}
-	return instructions, nil
+	return instructions, opCodes, nil
 }
 
 // nMappingFields is the number of fields in the solc source mapping: s,l,f,j,m.
@@ -321,6 +355,7 @@ func parseSrcMap(c *compiler.Contract, sourceList []string) ([]*Location, error)
 		if err != nil {
 			return nil, err
 		}
+		loc.InstructionNumber = i
 		locations[i] = loc
 	}
 
