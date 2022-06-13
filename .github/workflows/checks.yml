@@ -51,8 +51,8 @@ jobs:
 
       - name: Install goimports
         run: |
-          export PATH=${PATH}:`go env GOPATH`/bin
-          go install golang.org/x/tools/cmd/goimports@latest
+          sudo apt-get update
+          sudo apt-get install -y golang-golang-x-tool
 
       - name: Check Go code formatting
         run: yarn fmt:go
