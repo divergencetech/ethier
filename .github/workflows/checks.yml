@@ -47,7 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
 
       - name: Install goimports
         run: go get golang.org/x/tools/cmd/goimports
