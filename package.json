@@ -13,7 +13,7 @@
     "lint:go": "golint ./... 2>&1 | tee /dev/stdout | xargs -0 test -z",
     "lint:sol": "npm run solhint",
     "lint": "npm run lint:sol && npm run lint:go",
-    "fmt:go": "goimports -e -l . 2>&1  | tee /dev/stdout | xargs -0 test -z",
+    "fmt:go": "goimports -e -d . 2>&1  | tee /dev/stderr | xargs -0 test -z",
     "fmt:sol": "npx prettier '**/*.sol' --check",
     "fmt": "npm run fmt:sol && npm run fmt:go"
   },
