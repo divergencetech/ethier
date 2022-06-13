@@ -52,7 +52,7 @@ jobs:
       - name: Install goimports
         run: |
           sudo apt-get update
-          sudo apt-get install -y golang-golang-x-tool
+          sudo apt-get install -y golang-golang-x-tools
 
       - name: Check Go code formatting
         run: yarn fmt:go
