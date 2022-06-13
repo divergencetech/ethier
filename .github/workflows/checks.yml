@@ -19,8 +19,8 @@ jobs:
       - name: Setup NodeJs
         uses: actions/setup-node@v2
         with:
-          node-version: 14.x
-      
+          node-version: 16
+
       - name: Cache dependencies
         id: cache
         uses: actions/cache@v2
@@ -48,8 +48,11 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v2
 
+      - name: Install dependencies
+        run: go install golang.org/x/tools/cmd/goimports@latest
+
       - name: Check Go code formatting
-        run: test -z $(goimports -l .)
+        run: yarn fmt:go
 
   lint_sol:
     runs-on: ubuntu-latest
@@ -73,8 +76,7 @@ jobs:
         run: rm -rf node_modules && yarn install --frozen-lockfile
 
       - name: Check Solidity code formatting
-        run: npx prettier '**/*.sol' --check
+        run: yarn fmt:sol
 
       - name: Run solhint
-        run: yarn solhint
-
+        run: yarn lint:sol

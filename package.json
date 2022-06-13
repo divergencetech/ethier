@@ -9,7 +9,13 @@
     "solhint": "solhint -w 0 '**/*.sol'",
     "test": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./...",
     "test:light": "go test ./...",
-    "test:verbose": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./... -test.v"
+    "test:verbose": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./... -test.v",
+    "lint:go": "golint ./... 2>&1 | tee /dev/stdout | xargs -0 test -z",
+    "lint:sol": "npm run solhint",
+    "lint": "npm run lint:sol && npm run lint:go",
+    "fmt:go": "goimports -e -l . 2>&1  | tee /dev/stdout | xargs -0 test -z",
+    "fmt:sol": "npx prettier '**/*.sol' --check",
+    "fmt": "npm run fmt:sol && npm run fmt:go"
   },
   "repository": {
     "type": "git",
