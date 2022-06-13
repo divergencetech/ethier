@@ -1,4 +1,4 @@
-package solidity_test
+package solcover_test
 
 import (
 	"fmt"
@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/divergencetech/ethier/ethtest"
-	"github.com/divergencetech/ethier/solidity"
-	"github.com/divergencetech/ethier/solidity/srcmaptest"
+	"github.com/divergencetech/ethier/solcover"
+	"github.com/divergencetech/ethier/solcover/srcmaptest"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -55,64 +55,70 @@ func TestSourceMap(t *testing.T) {
 	}
 
 	wantLen := len("chainid()")
-	want := []*solidity.Location{
+	want := []*solcover.Location{
 		// All values were manually determined by inspection in an IDE.
 		{
-			Source:  "solidity/srcmaptest/SourceMapTest.sol",
+			Source:  "solcover/srcmaptest/SourceMapTest.sol",
 			Start:   706,
 			Length:  wantLen,
 			Line:    25,
 			EndLine: 25,
 			Col:     24,
 			EndCol:  24 + wantLen,
+			OpCode:  vm.CHAINID,
 		},
 		{
-			Source:  "solidity/srcmaptest/SourceMapTest.sol",
+			Source:  "solcover/srcmaptest/SourceMapTest.sol",
 			Start:   872,
 			Length:  wantLen,
 			Line:    32,
 			EndLine: 32,
 			Col:     31,
 			EndCol:  31 + wantLen,
+			OpCode:  vm.CHAINID,
 		},
 		{
-			Source:  "solidity/srcmaptest/SourceMapTest.sol",
+			Source:  "solcover/srcmaptest/SourceMapTest.sol",
 			Start:   489,
 			Length:  wantLen,
 			Line:    14,
 			EndLine: 14,
 			Col:     24,
 			EndCol:  24 + wantLen,
+			OpCode:  vm.CHAINID,
 		},
 		{
-			Source:  "solidity/srcmaptest/SourceMapTest.sol",
+			Source:  "solcover/srcmaptest/SourceMapTest.sol",
 			Start:   1208,
 			Length:  wantLen,
 			Line:    49,
 			EndLine: 49,
 			Col:     24,
 			EndCol:  24 + wantLen,
+			OpCode:  vm.CHAINID,
 		},
 		{
-			Source:  "solidity/srcmaptest/SourceMapTest2.sol",
+			Source:  "solcover/srcmaptest/SourceMapTest2.sol",
 			Start:   375,
 			Length:  wantLen,
 			Line:    15,
 			EndLine: 15,
 			Col:     24,
 			EndCol:  24 + wantLen,
+			OpCode:  vm.CHAINID,
 		},
 		{
-			Source:  "solidity/srcmaptest/SourceMapTest2.sol",
+			Source:  "solcover/srcmaptest/SourceMapTest2.sol",
 			Start:   490,
 			Length:  wantLen,
 			Line:    22,
 			EndLine: 22,
 			Col:     18,
 			EndCol:  18 + wantLen,
+			OpCode:  vm.CHAINID,
 		},
 		{
-			Source:        "solidity/srcmaptest/SourceMapTest2.sol",
+			Source:        "solcover/srcmaptest/SourceMapTest2.sol",
 			Start:         749,
 			Length:        wantLen,
 			Line:          36,
@@ -120,18 +126,20 @@ func TestSourceMap(t *testing.T) {
 			Col:           24,
 			EndCol:        24 + wantLen,
 			ModifierDepth: 1,
+			OpCode:        vm.CHAINID,
 		},
 		{
-			Source:  "solidity/srcmaptest/SourceMapTest2.sol",
+			Source:  "solcover/srcmaptest/SourceMapTest2.sol",
 			Start:   490,
 			Length:  wantLen,
 			Line:    22,
 			EndLine: 22,
 			Col:     18,
 			EndCol:  18 + wantLen,
+			OpCode:  vm.CHAINID,
 		},
 		{
-			Source:        "solidity/srcmaptest/SourceMapTest2.sol",
+			Source:        "solcover/srcmaptest/SourceMapTest2.sol",
 			Start:         595,
 			Length:        wantLen,
 			Line:          29,
@@ -139,9 +147,10 @@ func TestSourceMap(t *testing.T) {
 			Col:           18,
 			EndCol:        18 + wantLen,
 			ModifierDepth: 1,
+			OpCode:        vm.CHAINID,
 		},
 		{
-			Source:        "solidity/srcmaptest/SourceMapTest2.sol",
+			Source:        "solcover/srcmaptest/SourceMapTest2.sol",
 			Start:         958,
 			Length:        wantLen,
 			Line:          48,
@@ -149,18 +158,19 @@ func TestSourceMap(t *testing.T) {
 			Col:           24,
 			EndCol:        24 + wantLen,
 			ModifierDepth: 2,
+			OpCode:        vm.CHAINID,
 		},
 	}
 
-	ignore := []string{"FileIdx", "Jump"}
-	opt := cmpopts.IgnoreFields(solidity.Location{}, ignore...)
+	ignore := []string{"InstructionNumber", "FileIdx", "Jump"}
+	opt := cmpopts.IgnoreFields(solcover.Location{}, ignore...)
 	if diff := cmp.Diff(want, spy.got, opt); diff != "" {
 		t.Error(diff)
 	}
 }
 
 // chainIDInterceptor is a vm.EVMLogger that listens for vm.CHAINID operations,
-// recording the solidity.Pos associated with each call.
+// recording the solcover.Location associated with each call.
 type chainIDInterceptor struct {
 	// contracts are a stack of contract addresses with the last entry of the
 	// slice being the current contract, against which the pc is compared when
@@ -168,12 +178,12 @@ type chainIDInterceptor struct {
 	// "bottom" contract, to which the tx is initiated) the returned source will
 	// function incorrectly on library calls.
 	contracts []common.Address
-	got       []*solidity.Location
+	got       []*solcover.Location
 }
 
 func (i *chainIDInterceptor) CaptureStart(evm *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	if create {
-		solidity.RegisterDeployedContract(to, input)
+		solcover.RegisterDeployedContract(to, input)
 	}
 	i.contracts = []common.Address{to}
 }
@@ -184,10 +194,10 @@ func (i *chainIDInterceptor) CaptureState(pc uint64, op vm.OpCode, gas, cost uin
 	}
 
 	c := i.contracts[len(i.contracts)-1]
-	if pos, ok := solidity.Source(c, pc); ok {
+	if pos, ok := solcover.Source(c, pc); ok {
 		i.got = append(i.got, pos)
 	} else {
-		i.got = append(i.got, &solidity.Location{
+		i.got = append(i.got, &solcover.Location{
 			Source: fmt.Sprintf("pc %d not found in contract %v", pc, c),
 		})
 	}

@@ -12,11 +12,11 @@ const (
 
 func init() {
     {{- range $i, $file := .SourceList }}
-    solidity.RegisterSourceCode({{quote $file}}, {{quote (index $.SourceCode $i)}}, {{(index $.IsExternalSource $i)}})
+    solcover.RegisterSourceCode({{quote $file}}, {{quote (index $.SourceCode $i)}}, {{(index $.IsExternalSource $i)}})
     {{- end }}
 
     {{range $src, $c := .Contracts }}
-    solidity.RegisterContract(
+    solcover.RegisterContract(
         {{quote $src}},
         &compiler.Contract{
             Code: {{quote $c.Code}},

@@ -18,7 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/divergencetech/ethier/eth"
-	"github.com/divergencetech/ethier/solidity"
+	"github.com/divergencetech/ethier/solcover"
 )
 
 // A SimulatedBackend embeds a go-ethereum SimulatedBackend and extends its
@@ -98,7 +98,7 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 	sb.AdjustTime(365 * 24 * time.Hour)
 	sb.Commit()
 
-	coll, report := solidity.CoverageCollector()
+	coll, report := solcover.Collector()
 	cfg := sb.Blockchain().GetVMConfig()
 	cfg.Debug = true
 	cfg.Tracer = coll
@@ -266,13 +266,11 @@ func (sb *SimulatedBackend) Must(tb testing.TB, descFormat string, descArgs ...i
 	}
 }
 
-// CoverageReport returns an LCOV trace file for contracts registered mapped by the
-// SourceMap passed to CollectCoverage(). The report can be generated at any
-// time that collection is not currently active (i.e. it is not threadsafe with
-// respect to the VM). See solidity.SourceMap.CoverageCollector() for more
-// information.
-//
-// If CollectCoverage() hasn't been called, CoverageReport returns nil.
+// CoverageReport returns an LCOV trace file for contracts registered mapped by
+// an solcover.Collector() EVMLogger injected into the SimulatedBackend during
+// construction. The report can be generated at any time that collection is not
+// currently active (i.e. it is not threadsafe with respect to the VM). See
+// solcover.Collector() for more information.
 func (sb *SimulatedBackend) CoverageReport() []byte {
 	if sb.coverageReport == nil {
 		return nil
