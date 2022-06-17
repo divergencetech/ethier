@@ -8,11 +8,9 @@ import "./CappedRefund.sol";
 import "./FixedSupply.sol";
 import "./TxLimit.sol";
 
-/**
-@notice An abstract contract providing the _purchase() function to:
- - Enforce per-wallet / per-transaction limits
- - Calculate required cost, forwarding to a beneficiary, and refunding extra
- */
+/// @notice This composes the functionality of three modules providing a
+/// capping of the requested number of items base on a total supply and limits
+/// per transaction and purchaser.
 abstract contract FixedSupplyRefund is FixedSupply, TxLimit, CappedRefund {
     constructor(
         uint64 totalInventory_,
@@ -37,12 +35,17 @@ abstract contract FixedSupplyRefund is FixedSupply, TxLimit, CappedRefund {
         // Capping based on `_capRequested`
         (to, num, cost) = CappedRefund._beforePurchase(to, num, cost);
 
-        // Don't call `{FixedSupply, TxLimit}._beforePurchase` because the checks
-        // would be redundant with capping.
+        // These calls are redundant because the checks performed in the subroutines
+        // will always be true due to the capping. We perform them notheless to avoid
+        // bugs if their implementations change at some point. Also the gas overhead
+        // is negligible.
+        (to, num, cost) = FixedSupply._beforePurchase(to, num, cost);
+        (to, num, cost) = TxLimit._beforePurchase(to, num, cost);
 
         return (to, num, cost);
     }
 
+    /// @dev Update internal states and reimburse the surplus.
     function _afterPurchase(
         address to,
         uint64 num,
@@ -56,6 +59,7 @@ abstract contract FixedSupplyRefund is FixedSupply, TxLimit, CappedRefund {
         CappedRefund._afterPurchase(to, num, cost);
     }
 
+    /// @notice Compute the cap based on the tx/address and total supply limit.
     function _capRequested(address to, uint64 requested)
         internal
         view

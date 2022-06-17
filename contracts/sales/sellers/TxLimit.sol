@@ -2,46 +2,42 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-// import "../utils/Monotonic.sol";
-// import "../utils/OwnerPausable.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Seller.sol";
 
-/**
-@notice An abstract contract providing the _purchase() function to:
- - Enforce per-wallet / per-transaction limits
- - Calculate required cost, forwarding to a beneficiary, and refunding extra
- */
+/// @notice A seller module to limit the number of purchased tokens based on
+/// per-tx and/or per-buyer limits.
 abstract contract TxLimit is Seller {
+    /// @notice Max number of purchases per transaction.
+    /// @dev `_maxPerTx = 0` means this limit will be ignored.
     uint64 private _maxPerTx;
+
+    /// @notice max number of purchases per address.
+    /// @dev `_maxPerAddress = 0` means this limit will be ignored.
     uint64 private _maxPerAddress;
 
-    /*
-    @notice Tracks the number of items already bought by an address, regardless
-    of transferring out (in the case of ERC721).
-    @dev This isn't public as it may be skewed due to differences in msg.sender
-    and tx.origin, which it treats in the same way such that
-    sum(_bought)>=totalSold().
-     */
+    /// @notice Tracks the number of items already bought by an address
+    /// @dev This isn't public as it may be skewed due to differences in msg.sender
+    /// and tx.origin, which it treats in the same way such that
+    /// `sum(_bought) >= sum(num)`.
     mapping(address => uint64) private _bought;
 
     constructor(uint64 maxPerTx_, uint64 maxPerAddress_) {
         _setTxLimits(maxPerTx_, maxPerAddress_);
     }
 
+    /// @notice Set's new limits.
     function _setTxLimits(uint64 maxPerTx_, uint64 maxPerAddress_) internal {
         _maxPerTx = maxPerTx_;
         _maxPerAddress = maxPerAddress_;
     }
 
+    /// @notice The maximum number of purchases per transaction.
     function maxPerTx() public view returns (uint64) {
         return _maxPerTx;
     }
 
+    /// @notice The maximum number of purchases per address.
     function maxPerAddress() public view returns (uint64) {
         return _maxPerAddress;
     }
@@ -52,6 +48,8 @@ abstract contract TxLimit is Seller {
     //
     // -------------------------------------------------------------------------
 
+    /// @notice Checks if the number of requested purchases is below the limits.
+    /// @dev Reverts otherwise.
     function _beforePurchase(
         address to,
         uint64 num,
@@ -71,6 +69,7 @@ abstract contract TxLimit is Seller {
         return (to, num, cost);
     }
 
+    /// @notice Updating the number of tokens bought by the purchaser.
     function _afterPurchase(
         address to,
         uint64 num,
@@ -95,6 +94,10 @@ abstract contract TxLimit is Seller {
         }
     }
 
+    /// @notice Computes the maximum number of purchases that can be performed in
+    /// the current transaction based on previously bought tokens.
+    /// @dev This function can be used to dynamically adapt the number of purchased
+    /// tokens in case to many are requested.
     function _capOnTxLimit(address to, uint64 num)
         internal
         view

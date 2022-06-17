@@ -2,30 +2,20 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-// import "../utils/Monotonic.sol";
-// import "../utils/OwnerPausable.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Seller.sol";
 
-/**
-@notice An abstract contract providing the _purchase() function to:
- - Enforce per-wallet / per-transaction limits
- - Calculate required cost, forwarding to a beneficiary, and refunding extra
- */
+/// @notice Abstract seller module that modifies the requested number of tokens
+/// based on a capping function that needs to be implemented. If to much funds
+/// were sent with the transaction, the rest will be reimbursed.
 abstract contract CappedRefund is Seller, Context {
-    /// @dev Deliberately not calling this `_cap` to avoid name clashes with the methods in
-    /// in `TxLimit` and `FixedSupply`.
     function _capRequested(address to, uint64 requested)
         internal
         view
         virtual
         returns (uint64);
 
+    /// @notice Caps the number of purchased tokens.
     function _beforePurchase(
         address to,
         uint64 num,
@@ -44,6 +34,10 @@ abstract contract CappedRefund is Seller, Context {
         return (to, num, cost);
     }
 
+    /// @notice Reimpurses the surplus to the sender.
+    /// @dev It is important that this is handled after the actual purchase
+    /// bacause the input parameters might still be subject to change in
+    /// `_beforePurchase`.
     function _afterPurchase(
         address,
         uint64,
@@ -59,8 +53,6 @@ abstract contract CappedRefund is Seller, Context {
     // -------------------------------------------------------------------------
 
     function _reimburseRest(uint256 cost) private {
-        // uint256 cost = _cost(num);
-
         // Ideally we'd be using a PullPayment here, but the user experience is
         // poor when there's a variable cost or the number of items purchased
         // has been capped. We've addressed reentrancy with both a nonReentrant

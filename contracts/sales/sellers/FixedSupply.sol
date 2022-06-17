@@ -2,28 +2,23 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-// import "../utils/Monotonic.sol";
-// import "../utils/OwnerPausable.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Seller.sol";
 
-/**
-@notice An abstract contract providing the _purchase() function to:
- - Enforce per-wallet / per-transaction limits
- - Calculate required cost, forwarding to a beneficiary, and refunding extra
- */
+/// @notice A seller module to limit the number of purchased tokens based on
+/// a maximum total supply.
 abstract contract FixedSupply is Seller {
+    /// @notice The number of tokens that can be sold by the seller.
     uint64 private _totalInventory;
+
+    /// @notice The number of tokens that have already been sold by the seller.
     uint64 private _totalSold;
 
     constructor(uint64 totalInventory_) {
         _setTotalInventory(totalInventory_);
     }
 
+    /// @notice Changes the inventory of the seller.
     function _setTotalInventory(uint64 totalInventory_) internal {
         _totalInventory = totalInventory_;
     }
@@ -44,6 +39,9 @@ abstract contract FixedSupply is Seller {
     //
     // -------------------------------------------------------------------------
 
+    /// @notice Checks if the number of requested purchases is below the limit
+    /// given by the inventory.
+    /// @dev Reverts otherwise.
     function _beforePurchase(
         address to,
         uint64 num,
@@ -66,6 +64,7 @@ abstract contract FixedSupply is Seller {
         return (to, num, cost);
     }
 
+    /// @notice Updating the total number of sold tokens.
     function _afterPurchase(
         address to,
         uint64 num,
@@ -75,6 +74,10 @@ abstract contract FixedSupply is Seller {
         _totalSold += num;
     }
 
+    /// @notice Computes the maximum number of purchases that can be performed in
+    /// the current transaction based on the remaining inventory.
+    /// @dev This function can be used to dynamically adapt the number of purchased
+    /// tokens in case to many are requested.
     function _capOnTotalSupply(uint64 requested)
         internal
         view

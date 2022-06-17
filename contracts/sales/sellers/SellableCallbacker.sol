@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "../ISellable.sol";
 import "./Seller.sol";
 
+/// @notice Handles a purchase by calling the purchase interface of a `ISellable`
+/// contract.
 abstract contract SellableCallbacker is PurchaseHandler {
     ISellable public immutable sellable;
 
