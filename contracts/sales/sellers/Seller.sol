@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 abstract contract PurchaseHandler {
     function _handlePurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     ) internal virtual;
 }
@@ -24,7 +24,7 @@ abstract contract Seller is PurchaseHandler, ReentrancyGuard {
      */
     function _purchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     ) internal virtual nonReentrant {
         (to, num, cost) = _beforePurchase(to, num, cost);
@@ -68,14 +68,14 @@ abstract contract Seller is PurchaseHandler, ReentrancyGuard {
 
     function _beforePurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     )
         internal
         virtual
         returns (
             address,
-            uint256,
+            uint64,
             uint256
         )
     {
@@ -84,7 +84,7 @@ abstract contract Seller is PurchaseHandler, ReentrancyGuard {
 
     function _afterPurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     ) internal virtual {} // solhint-disable-line no-empty-blocks
 
@@ -104,15 +104,15 @@ abstract contract InternalCostSeller is Seller {
     curve.
     @param num The number of items being purchased.
      */
-    function _cost(uint256 num) internal view virtual returns (uint256);
+    function _cost(uint64 num) internal view virtual returns (uint256);
 
-    function cost(uint256 num) external view returns (uint256) {
+    function cost(uint64 num) external view returns (uint256) {
         return _cost(num);
     }
 
     function _beforePurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256
     )
         internal
@@ -120,7 +120,7 @@ abstract contract InternalCostSeller is Seller {
         override
         returns (
             address,
-            uint256,
+            uint64,
             uint256
         )
     {

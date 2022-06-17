@@ -4,5 +4,5 @@ pragma solidity >=0.8.0 <0.9.0;
 
 interface ISellable {
     // Todo should we have this return a success flag?
-    function handlePurchase(address to, uint256 num) external payable;
+    function handlePurchase(address to, uint64 num) external payable;
 }

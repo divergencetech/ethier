@@ -27,7 +27,7 @@ abstract contract TxLimit is Seller {
     and tx.origin, which it treats in the same way such that
     sum(_bought)>=totalSold().
      */
-    mapping(address => uint256) private _bought;
+    mapping(address => uint64) private _bought;
 
     constructor(uint64 maxPerTx_, uint64 maxPerAddress_) {
         _setTxLimits(maxPerTx_, maxPerAddress_);
@@ -54,7 +54,7 @@ abstract contract TxLimit is Seller {
 
     function _beforePurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     )
         internal
@@ -62,7 +62,7 @@ abstract contract TxLimit is Seller {
         override(Seller)
         returns (
             address,
-            uint256,
+            uint64,
             uint256
         )
     {
@@ -73,7 +73,7 @@ abstract contract TxLimit is Seller {
 
     function _afterPurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     ) internal virtual override(Seller) {
         Seller._afterPurchase(to, num, cost);
@@ -95,12 +95,12 @@ abstract contract TxLimit is Seller {
         }
     }
 
-    function _capOnTxLimit(address to, uint256 num)
+    function _capOnTxLimit(address to, uint64 num)
         internal
         view
-        returns (uint256)
+        returns (uint64)
     {
-        num = _maxPerTx == 0 ? num : Math.min(num, _maxPerTx);
+        num = _maxPerTx == 0 ? num : uint64(Math.min(num, _maxPerTx));
 
         if (_maxPerAddress > 0) {
             num = _capExtra(num, to, "Buyer limit");
@@ -127,15 +127,15 @@ abstract contract TxLimit is Seller {
     @param zeroMsg The message with which to revert on 0 extra.
      */
     function _capExtra(
-        uint256 n,
+        uint64 requested,
         address addr,
         string memory zeroMsg
-    ) private view returns (uint256) {
-        uint256 remaining = _maxPerAddress - _bought[addr];
+    ) private view returns (uint64) {
+        uint64 remaining = _maxPerAddress - _bought[addr];
         require(
             remaining > 0,
             string(abi.encodePacked("TxLimiter: ", zeroMsg))
         );
-        return Math.min(n, remaining);
+        return uint64(Math.min(requested, remaining));
     }
 }

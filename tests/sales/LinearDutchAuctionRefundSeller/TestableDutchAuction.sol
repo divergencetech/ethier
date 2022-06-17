@@ -34,7 +34,7 @@ contract TestableDutchAuction is LinearDutchAuctionRefundSeller {
 
     // This is a convenience interface to maintain compatibility with already
     // implemented tests.
-    function own(address owner) external view returns (uint256) {
+    function own(address owner) external view returns (uint64) {
         return SellableMock(address(sellable)).balanceOf(owner);
     }
 }
@@ -47,7 +47,7 @@ contract ProxyPurchaser {
         auction = TestableDutchAuction(_auction);
     }
 
-    function purchase(address to, uint256 n) public payable {
+    function purchase(address to, uint64 n) public payable {
         auction.purchase(to, n);
     }
 }
@@ -61,7 +61,7 @@ contract ReentrantProxyPurchaser {
         auction = TestableDutchAuction(_auction);
     }
 
-    function purchase(address to, uint256 n) public payable {
+    function purchase(address to, uint64 n) public payable {
         auction.purchase{value: msg.value}(to, n);
     }
 

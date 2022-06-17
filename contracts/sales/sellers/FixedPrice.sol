@@ -27,7 +27,7 @@ abstract contract FixedPrice is InternalCostSeller {
     }
 
     /// @notice Override of Seller.cost() with fixed price.
-    function _cost(uint256 num)
+    function _cost(uint64 num)
         internal
         view
         virtual

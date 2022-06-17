@@ -69,7 +69,7 @@ func TestFixedPriceSeller(t *testing.T) {
 			}
 
 			for n, want := range tt.wantCosts {
-				got, err := seller.Cost(nil, big.NewInt(n))
+				got, err := seller.Cost(nil, uint64(n))
 				if err != nil {
 					t.Errorf("Cost(%d) error %v", n, err)
 					continue

@@ -30,7 +30,7 @@ abstract contract ArbitraryPriceRefundSeller is
 
     function _purchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     ) internal virtual override whenNotPaused {
         Seller._purchase(to, num, cost);
@@ -38,7 +38,7 @@ abstract contract ArbitraryPriceRefundSeller is
 
     function _beforePurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     )
         internal
@@ -46,7 +46,7 @@ abstract contract ArbitraryPriceRefundSeller is
         override(FixedSupplyRefund)
         returns (
             address,
-            uint256,
+            uint64,
             uint256
         )
     {

@@ -22,7 +22,7 @@ abstract contract FixedSupplyRefund is FixedSupply, TxLimit, CappedRefund {
 
     function _beforePurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     )
         internal
@@ -30,7 +30,7 @@ abstract contract FixedSupplyRefund is FixedSupply, TxLimit, CappedRefund {
         override(FixedSupply, TxLimit, CappedRefund)
         returns (
             address,
-            uint256,
+            uint64,
             uint256
         )
     {
@@ -45,7 +45,7 @@ abstract contract FixedSupplyRefund is FixedSupply, TxLimit, CappedRefund {
 
     function _afterPurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     ) internal virtual override(FixedSupply, TxLimit, CappedRefund) {
         // Updating internal states
@@ -56,12 +56,12 @@ abstract contract FixedSupplyRefund is FixedSupply, TxLimit, CappedRefund {
         CappedRefund._afterPurchase(to, num, cost);
     }
 
-    function _capRequested(address to, uint256 requested)
+    function _capRequested(address to, uint64 requested)
         internal
         view
         virtual
         override
-        returns (uint256)
+        returns (uint64)
     {
         requested = TxLimit._capOnTxLimit(to, requested);
         requested = FixedSupply._capOnTotalSupply(requested);

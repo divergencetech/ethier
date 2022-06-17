@@ -15,7 +15,7 @@ abstract contract SellableCallbacker is PurchaseHandler {
 
     function _handlePurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     ) internal virtual override {
         sellable.handlePurchase{value: cost}(to, num);

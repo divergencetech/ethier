@@ -7,9 +7,9 @@ import "../SellableMock.sol";
 
 /// @notice A concrete FixedPriceSeller for testing the cost() function.
 contract TestableArbitraryPriceSeller is ArbitraryPriceRefundSeller {
-    constructor(uint256 price)
+    constructor(uint64 inventory)
         ArbitraryPriceRefundSeller(
-            Config({totalInventory: 10, maxPerTx: 0, maxPerAddress: 0}),
+            Config({totalInventory: inventory, maxPerTx: 0, maxPerAddress: 0}),
             new SellableMock()
         )
     {} // solhint-disable-line no-empty-blocks
@@ -19,7 +19,7 @@ contract TestableArbitraryPriceSeller is ArbitraryPriceRefundSeller {
     @dev DO NOT USE IN PRODUCTION; the caller MUST NOT be able to control the
     cost of an item.
      */
-    function purchase(uint256 num, uint256 costEach)
+    function purchase(uint64 num, uint256 costEach)
         external
         payable
         whenNotPaused

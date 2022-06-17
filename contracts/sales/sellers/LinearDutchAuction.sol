@@ -101,24 +101,24 @@ abstract contract LinearDutchAuction is InternalCostSeller {
     @dev The second parameter, metadata propagated from the call to _purchase(),
     is ignored.
     **/
-    function _cost(uint256 num) internal view override returns (uint256) {
+    function _cost(uint64 num) internal view override returns (uint256) {
         AuctionConfig storage cfg = _config;
 
-        uint256 current;
+        uint256 now_;
         if (cfg.unit == TimeUnit.Block) {
-            current = block.number;
+            now_ = block.number;
         } else if (cfg.unit == TimeUnit.Time) {
             // solhint-disable-next-line not-rely-on-time
-            current = block.timestamp;
+            now_ = block.timestamp;
         }
 
         require(
-            cfg.startPoint != 0 && current >= cfg.startPoint,
+            cfg.startPoint != 0 && now_ >= cfg.startPoint,
             "LinearDutchAuction: Not started"
         );
 
         uint256 decreases = Math.min(
-            (current - cfg.startPoint) / cfg.decreaseInterval,
+            (now_ - cfg.startPoint) / cfg.decreaseInterval,
             cfg.numDecreases
         );
         return num * (cfg.startPrice - decreases * cfg.decreaseSize);

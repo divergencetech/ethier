@@ -20,15 +20,15 @@ import "./Seller.sol";
 abstract contract CappedRefund is Seller, Context {
     /// @dev Deliberately not calling this `_cap` to avoid name clashes with the methods in
     /// in `TxLimit` and `FixedSupply`.
-    function _capRequested(address to, uint256 requested)
+    function _capRequested(address to, uint64 requested)
         internal
         view
         virtual
-        returns (uint256);
+        returns (uint64);
 
     function _beforePurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     )
         internal
@@ -36,7 +36,7 @@ abstract contract CappedRefund is Seller, Context {
         override(Seller)
         returns (
             address,
-            uint256,
+            uint64,
             uint256
         )
     {
@@ -46,7 +46,7 @@ abstract contract CappedRefund is Seller, Context {
 
     function _afterPurchase(
         address,
-        uint256,
+        uint64,
         uint256 cost
     ) internal virtual override(Seller) {
         _reimburseRest(cost);

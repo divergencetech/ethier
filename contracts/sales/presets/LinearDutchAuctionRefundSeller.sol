@@ -48,7 +48,7 @@ contract LinearDutchAuctionRefundSeller is
 
     function _beforePurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     )
         internal
@@ -56,7 +56,7 @@ contract LinearDutchAuctionRefundSeller is
         override(FixedSupplyRefund, InternalCostSeller)
         returns (
             address,
-            uint256,
+            uint64,
             uint256
         )
     {
@@ -67,13 +67,13 @@ contract LinearDutchAuctionRefundSeller is
 
     function _afterPurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     ) internal virtual override(FixedSupplyRefund, Seller) {
         FixedSupplyRefund._afterPurchase(to, num, cost);
     }
 
-    function purchase(address to, uint256 num) external payable whenNotPaused {
+    function purchase(address to, uint64 num) external payable whenNotPaused {
         _purchase(to, num, 0);
     }
 }

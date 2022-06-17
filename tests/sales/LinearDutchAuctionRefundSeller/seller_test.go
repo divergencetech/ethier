@@ -148,12 +148,9 @@ func TestLinearPriceDecrease(t *testing.T) {
 
 	type wantCost struct {
 		point     int64 // block or time
-		num       *big.Int
+		num       uint64
 		totalCost *big.Int
 	}
-
-	one := big.NewInt(1)
-	two := big.NewInt(2)
 
 	tests := []struct {
 		name string
@@ -172,11 +169,11 @@ func TestLinearPriceDecrease(t *testing.T) {
 				ExpectedReserve:  eth.Ether(2),
 			},
 			want: []wantCost{
-				{startBlock, one, eth.Ether(2)},
-				{startBlock + 1, one, eth.Ether(2)},
-				{startBlock + 9, two, eth.Ether(4)},
-				{startBlock + 10, one, eth.Ether(2)},
-				{startBlock + 20, one, eth.Ether(2)},
+				{startBlock, 1, eth.Ether(2)},
+				{startBlock + 1, 1, eth.Ether(2)},
+				{startBlock + 9, 2, eth.Ether(4)},
+				{startBlock + 10, 1, eth.Ether(2)},
+				{startBlock + 20, 1, eth.Ether(2)},
 			},
 		},
 		{
@@ -191,8 +188,8 @@ func TestLinearPriceDecrease(t *testing.T) {
 				ExpectedReserve:  eth.Ether(42),
 			},
 			want: []wantCost{
-				{startBlock, one, eth.Ether(42)},
-				{startBlock + 1, one, eth.Ether(42)},
+				{startBlock, 1, eth.Ether(42)},
+				{startBlock + 1, 1, eth.Ether(42)},
 			},
 		},
 		{
@@ -207,15 +204,15 @@ func TestLinearPriceDecrease(t *testing.T) {
 				ExpectedReserve:  eth.Ether(1),
 			},
 			want: []wantCost{
-				{startBlock, one, eth.Ether(11)},
-				{startBlock, two, eth.Ether(22)},
-				{startBlock + 1, one, eth.Ether(10)},
-				{startBlock + 2, one, eth.Ether(9)},
-				{startBlock + 3, one, eth.Ether(8)},
-				{startBlock + 4, two, eth.Ether(14)},
-				{startBlock + 10, one, eth.Ether(1)},
-				{startBlock + 11, one, eth.Ether(1)},
-				{startBlock + 20, one, eth.Ether(1)},
+				{startBlock, 1, eth.Ether(11)},
+				{startBlock, 2, eth.Ether(22)},
+				{startBlock + 1, 1, eth.Ether(10)},
+				{startBlock + 2, 1, eth.Ether(9)},
+				{startBlock + 3, 1, eth.Ether(8)},
+				{startBlock + 4, 2, eth.Ether(14)},
+				{startBlock + 10, 1, eth.Ether(1)},
+				{startBlock + 11, 1, eth.Ether(1)},
+				{startBlock + 20, 1, eth.Ether(1)},
 			},
 		},
 		{
@@ -230,8 +227,8 @@ func TestLinearPriceDecrease(t *testing.T) {
 				ExpectedReserve:  eth.Ether(1),
 			},
 			want: []wantCost{
-				{startBlock + 1, one, eth.EtherFraction(1009, 10)},
-				{startBlock + 2, one, eth.EtherFraction(1008, 10)},
+				{startBlock + 1, 1, eth.EtherFraction(1009, 10)},
+				{startBlock + 2, 1, eth.EtherFraction(1008, 10)},
 			},
 		},
 		{
@@ -248,21 +245,21 @@ func TestLinearPriceDecrease(t *testing.T) {
 			want: []wantCost{
 				// Make sure to test boundaries before and after multiples of
 				// decreaseInterval.
-				{startBlock, one, eth.Ether(10)},
+				{startBlock, 1, eth.Ether(10)},
 				//
-				{startBlock + 6, one, eth.Ether(10)},
-				{startBlock + 7, one, eth.Ether(9)},
-				{startBlock + 8, one, eth.Ether(9)},
+				{startBlock + 6, 1, eth.Ether(10)},
+				{startBlock + 7, 1, eth.Ether(9)},
+				{startBlock + 8, 1, eth.Ether(9)},
 				//
-				{startBlock + 13, one, eth.Ether(9)},
-				{startBlock + 14, one, eth.Ether(8)},
-				{startBlock + 15, one, eth.Ether(8)},
+				{startBlock + 13, 1, eth.Ether(9)},
+				{startBlock + 14, 1, eth.Ether(8)},
+				{startBlock + 15, 1, eth.Ether(8)},
 				//
-				{startBlock + 34, one, eth.Ether(6)},
-				{startBlock + 35, one, eth.Ether(5)},
-				{startBlock + 36, one, eth.Ether(5)},
+				{startBlock + 34, 1, eth.Ether(6)},
+				{startBlock + 35, 1, eth.Ether(5)},
+				{startBlock + 36, 1, eth.Ether(5)},
 				// Respects numDecreases
-				{startBlock + 43, one, eth.Ether(5)},
+				{startBlock + 43, 1, eth.Ether(5)},
 			},
 		},
 	}
@@ -273,7 +270,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 
 			sim.FastForward(big.NewInt(startBlock - 1))
 			t.Run("before start", func(t *testing.T) {
-				if diff := revert.NotStarted.Diff(auction.Cost(nil, big.NewInt(1))); diff != "" {
+				if diff := revert.NotStarted.Diff(auction.Cost(nil, 1)); diff != "" {
 					t.Errorf("Cost() before auction start; %s", diff)
 				}
 			})
@@ -370,7 +367,7 @@ func TestTimeBasedDecrease(t *testing.T) {
 				want = new(big.Int).Sub(cfg.StartPrice, new(big.Int).Mul(cfg.DecreaseSize, big.NewInt(numDecreases)))
 			}
 
-			got, err := auction.Cost(nil, big.NewInt(1))
+			got, err := auction.Cost(nil, 1)
 			if diff := errdiff.Check(err, errDiffAgainst); diff != "" {
 				t.Fatalf("Cost() %s", diff)
 			}
@@ -487,7 +484,7 @@ func TestZeroStartToDisable(t *testing.T) {
 	const startBlock = 10
 	sim.FastForward(big.NewInt(startBlock))
 
-	if diff := revert.NotStarted.Diff(auction.Cost(nil, big.NewInt(1))); diff != "" {
+	if diff := revert.NotStarted.Diff(auction.Cost(nil, 1)); diff != "" {
 		t.Errorf("Cost() when StartPoint==0; %s", diff)
 	}
 
@@ -495,7 +492,7 @@ func TestZeroStartToDisable(t *testing.T) {
 		t.Fatalf("SetAuctionStartPoint() error %v", err)
 	}
 
-	got, err := auction.Cost(nil, big.NewInt(1))
+	got, err := auction.Cost(nil, 1)
 	if err != nil {
 		t.Fatalf("Cost() when StartPoint!=0; error %v", err)
 	}
@@ -508,7 +505,7 @@ func TestZeroStartToDisable(t *testing.T) {
 func TestTxLimit(t *testing.T) {
 	tests := []struct {
 		name               string
-		buy, wantPurchased int64
+		buy, wantPurchased uint64
 	}{
 		{
 			name:          "exact max per tx",
@@ -516,7 +513,7 @@ func TestTxLimit(t *testing.T) {
 			wantPurchased: maxPerTx,
 		},
 		{
-			name:          "one more than tx limit",
+			name:          "1 more than tx limit",
 			buy:           maxPerTx + 1,
 			wantPurchased: maxPerTx,
 		},
@@ -537,7 +534,7 @@ func TestTxLimit(t *testing.T) {
 			sim, _, auction, _ := deployConstantPrice(t, eth.Ether(0))
 			acc := sim.Acc(0)
 
-			if _, err := auction.Purchase(acc, acc.From, big.NewInt(tt.buy)); err != nil {
+			if _, err := auction.Purchase(acc, acc.From, tt.buy); err != nil {
 				t.Fatalf("Purchase(%d) error %v", tt.buy, err)
 			}
 
@@ -545,7 +542,7 @@ func TestTxLimit(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Own(%s) after Purchase() error %v", acc.From, err)
 			}
-			if got.Cmp(big.NewInt(tt.wantPurchased)) != 0 {
+			if got != tt.wantPurchased {
 				t.Errorf("Own(%s) after Purchase(%d) with max per tx = %d; got %d; want %d", acc.From, tt.buy, maxPerTx, got, tt.wantPurchased)
 			}
 		})
@@ -585,10 +582,10 @@ func TestAddressLimit(t *testing.T) {
 	// spillover between addresses. Therefore, all errors MUST use t.Fatal.
 	tests := []struct {
 		purchaseVia interface { // auction or proxy
-			Purchase(*bind.TransactOpts, common.Address, *big.Int) (*types.Transaction, error)
+			Purchase(*bind.TransactOpts, common.Address, uint64) (*types.Transaction, error)
 		}
 		payer, recipient   int
-		buy, wantPurchased int64
+		buy, wantPurchased uint64
 		errDiffAgainst     interface{}
 	}{
 		{
@@ -634,7 +631,7 @@ func TestAddressLimit(t *testing.T) {
 		{
 			purchaseVia:    auction,
 			payer:          0,
-			recipient:      1, // can't buy for someone else either
+			recipient:      1, // can't buy for some1 else either
 			buy:            1,
 			wantPurchased:  0,
 			errDiffAgainst: "Sender limit",
@@ -642,7 +639,7 @@ func TestAddressLimit(t *testing.T) {
 		{
 			purchaseVia:    auction,
 			payer:          1,
-			recipient:      0, // can't be bought for by someone else
+			recipient:      0, // can't be bought for by some1 else
 			buy:            1,
 			wantPurchased:  0,
 			errDiffAgainst: "Buyer limit",
@@ -722,7 +719,7 @@ func TestAddressLimit(t *testing.T) {
 			t.Fatalf("Own(<recipient>) before purchase; error %v", err)
 		}
 
-		_, err = tt.purchaseVia.Purchase(payer, recipient.From, big.NewInt(tt.buy))
+		_, err = tt.purchaseVia.Purchase(payer, recipient.From, tt.buy)
 		if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
 			t.Fatalf("Purchase(account[%d], n=%d) as account %d; %s", tt.recipient, tt.buy, tt.payer, diff)
 		}
@@ -731,7 +728,7 @@ func TestAddressLimit(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Own(<recipient>) after purchase attempt; error %v", err)
 		}
-		if got := after.Sub(after, before); got.Cmp(big.NewInt(tt.wantPurchased)) != 0 {
+		if got := after - before; got != tt.wantPurchased {
 			t.Errorf("Own(%s) got %d; want %d", recipient.From, got, tt.wantPurchased)
 		}
 	}
@@ -766,7 +763,7 @@ func TestFundsManagement(t *testing.T) {
 
 	tests := []struct {
 		account                                             int
-		num                                                 int64
+		num                                                 uint64
 		sendValue, wantSpent, wantRefund, wantTotalRevenues *big.Int
 		errDiffAgainst                                      interface{}
 	}{
@@ -801,7 +798,7 @@ func TestFundsManagement(t *testing.T) {
 			tx, err := auction.Purchase(
 				sim.WithValueFrom(tt.account, tt.sendValue),
 				sim.Addr(tt.account),
-				big.NewInt(tt.num),
+				tt.num,
 			)
 			if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
 				t.Fatalf("Purchase() %s", diff)
@@ -818,7 +815,7 @@ func TestFundsManagement(t *testing.T) {
 					got.Raw = types.Log{}
 					want := &SellableMockRevenue{
 						Beneficiary:  beneficiary,
-						NumPurchased: big.NewInt(tt.num),
+						NumPurchased: tt.num,
 						Amount:       tt.wantSpent,
 					}
 					if diff := cmp.Diff(want, got, ethtest.Comparers()...); diff != "" {
@@ -885,10 +882,10 @@ func TestFundsManagement(t *testing.T) {
 func TestPausing(t *testing.T) {
 	sim, _, auction, _ := deployConstantPrice(t, eth.Ether(0))
 
-	sim.Must(t, "When not paused, Purchase()")(auction.Purchase(sim.Acc(0), sim.Addr(0), big.NewInt(1)))
+	sim.Must(t, "When not paused, Purchase()")(auction.Purchase(sim.Acc(0), sim.Addr(0), 1))
 	sim.Must(t, "Pause()")(auction.Pause(sim.Acc(0)))
 
-	if diff := revert.Paused.Diff(auction.Purchase(sim.Acc(0), sim.Addr(0), big.NewInt(1))); diff != "" {
+	if diff := revert.Paused.Diff(auction.Purchase(sim.Acc(0), sim.Addr(0), 1)); diff != "" {
 		t.Errorf("When paused, Purchase() %s", diff)
 	}
 }
@@ -903,7 +900,7 @@ func TestReentrancyGuard(t *testing.T) {
 	}
 
 	if diff := revert.Reentrant.Diff(
-		attacker.Purchase(sim.WithValueFrom(0, eth.Ether(10)), sim.Addr(0), big.NewInt(1)),
+		attacker.Purchase(sim.WithValueFrom(0, eth.Ether(10)), sim.Addr(0), 1),
 	); diff != "" {
 		t.Errorf("%T.Purchase(); invoking Seller._purchase() through reentrant call; %s", attacker, diff)
 	}
@@ -912,7 +909,7 @@ func TestReentrancyGuard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Own() error %v", err)
 	}
-	if got.Cmp(big.NewInt(0)) != 0 {
+	if got != 0 {
 		t.Errorf("Own(<reentrant attacker>) got %d; want 0", got)
 	}
 }
@@ -930,10 +927,10 @@ func TestDisabledTxLimit(t *testing.T) {
 
 	buyer := sim.WithValueFrom(0, big.NewInt(total))
 	sim.Must(t, "Purchase(%d) with unlimited transaction / address limits", int(total))(
-		auction.Purchase(buyer, buyer.From, big.NewInt(total)),
+		auction.Purchase(buyer, buyer.From, total),
 	)
 
-	if diff := revert.SoldOut.Diff(auction.Purchase(buyer, buyer.From, big.NewInt(1))); diff != "" {
+	if diff := revert.SoldOut.Diff(auction.Purchase(buyer, buyer.From, 1)); diff != "" {
 		t.Errorf("Purchase(1) with no more inventory; %s", diff)
 	}
 }

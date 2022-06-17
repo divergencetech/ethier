@@ -46,7 +46,7 @@ abstract contract FixedSupply is Seller {
 
     function _beforePurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     )
         internal
@@ -54,7 +54,7 @@ abstract contract FixedSupply is Seller {
         override(Seller)
         returns (
             address,
-            uint256,
+            uint64,
             uint256
         )
     {
@@ -68,20 +68,20 @@ abstract contract FixedSupply is Seller {
 
     function _afterPurchase(
         address to,
-        uint256 num,
+        uint64 num,
         uint256 cost
     ) internal virtual override(Seller) {
         Seller._afterPurchase(to, num, cost);
-        _totalSold += uint64(num);
+        _totalSold += num;
     }
 
-    function _capOnTotalSupply(uint256 requested)
+    function _capOnTotalSupply(uint64 requested)
         internal
         view
-        returns (uint256)
+        returns (uint64)
     {
-        uint256 remaining = _totalInventory - _totalSold;
+        uint64 remaining = _totalInventory - _totalSold;
         require(remaining > 0, "FixedSupply: Sold out");
-        return Math.min(requested, remaining);
+        return uint64(Math.min(requested, remaining));
     }
 }

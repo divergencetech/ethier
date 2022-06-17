@@ -9,14 +9,14 @@ contract SellableMock is ISellable {
     /// @notice Emitted on all purchases of non-zero amount.
     event Revenue(
         address indexed beneficiary,
-        uint256 numPurchased,
+        uint64 numPurchased,
         uint256 amount
     );
 
     mapping(address => uint64) public balanceOf;
 
-    function handlePurchase(address to, uint256 num) external payable {
+    function handlePurchase(address to, uint64 num) external payable {
         emit Revenue(address(this), num, msg.value);
-        balanceOf[to] += uint64(num);
+        balanceOf[to] += num;
     }
 }

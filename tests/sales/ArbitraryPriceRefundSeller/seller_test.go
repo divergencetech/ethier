@@ -34,11 +34,11 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func deploy(t *testing.T, inventory int64) (*ethtest.SimulatedBackend, *TestableArbitraryPriceSeller) {
+func deploy(t *testing.T, inventory uint64) (*ethtest.SimulatedBackend, *TestableArbitraryPriceSeller) {
 	t.Helper()
 	sim := ethtest.NewSimulatedBackendTB(t, 1)
 
-	_, _, seller, err := DeployTestableArbitraryPriceSeller(sim.Acc(0), sim, big.NewInt(inventory))
+	_, _, seller, err := DeployTestableArbitraryPriceSeller(sim.Acc(0), sim, inventory)
 	if err != nil {
 		t.Fatalf("DeployTestableArbitraryPriceSeller(%d) error %v", inventory, err)
 	}
@@ -49,7 +49,7 @@ func TestArbitraryPriceSeller(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		numToPurchase      int64
+		numToPurchase      uint64
 		costEach, wantPaid *big.Int
 	}{
 		{
@@ -93,7 +93,7 @@ func TestArbitraryPriceSeller(t *testing.T) {
 		}
 
 		acc := sim.WithValueFrom(0, tt.wantPaid)
-		sim.Must(t, "Purchase(%d, %d)", tt.numToPurchase, tt.costEach)(seller.Purchase(acc, big.NewInt(tt.numToPurchase), tt.costEach))
+		sim.Must(t, "Purchase(%d, %d)", tt.numToPurchase, tt.costEach)(seller.Purchase(acc, tt.numToPurchase, tt.costEach))
 
 		if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(tt.wantPaid) != 0 {
 			t.Errorf("After purchase of %d items for %d each; BalanceOf(beneficiary) got %d; want %d", tt.numToPurchase, tt.costEach, got, tt.wantPaid)
@@ -108,10 +108,10 @@ func TestPausing(t *testing.T) {
 	price := eth.Ether(1)
 	acc := sim.WithValueFrom(0, price)
 
-	sim.Must(t, "When not paused, Purchase()")(seller.Purchase(acc, big.NewInt(1), price))
+	sim.Must(t, "When not paused, Purchase()")(seller.Purchase(acc, 1, price))
 	sim.Must(t, "Pause()")(seller.Pause(sim.Acc(0)))
 
-	if diff := revert.Paused.Diff(seller.Purchase(acc, big.NewInt(1), price)); diff != "" {
+	if diff := revert.Paused.Diff(seller.Purchase(acc, 1, price)); diff != "" {
 		t.Errorf("When paused, Purchase() %s", diff)
 	}
 }
