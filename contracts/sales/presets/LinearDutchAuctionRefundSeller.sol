@@ -70,7 +70,7 @@ contract LinearDutchAuctionRefundSeller is
         uint256 num,
         uint256 cost
     ) internal virtual override(FixedSupplyRefund, Seller) {
-        CappedRefund._afterPurchase(to, num, cost);
+        FixedSupplyRefund._afterPurchase(to, num, cost);
     }
 
     function purchase(address to, uint256 num) external payable whenNotPaused {

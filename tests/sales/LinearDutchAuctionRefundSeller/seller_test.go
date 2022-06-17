@@ -734,10 +734,6 @@ func TestAddressLimit(t *testing.T) {
 		if got := after.Sub(after, before); got.Cmp(big.NewInt(tt.wantPurchased)) != 0 {
 			t.Errorf("Own(%s) got %d; want %d", recipient.From, got, tt.wantPurchased)
 		}
-
-		// if got, err := auction.ReceivedFree(nil, recipient.From); got.Cmp(big.NewInt(0)) != 0 || err != nil {
-		// 	t.Errorf("ReceivedFree(%s) got %d, err %v; want 0, nil err", recipient.From, got, err)
-		// }
 	}
 
 	t.Run("total sold", func(t *testing.T) {
@@ -921,7 +917,7 @@ func TestReentrancyGuard(t *testing.T) {
 	}
 }
 
-func TestUnlimited(t *testing.T) {
+func TestDisabledTxLimit(t *testing.T) {
 	sim, _, auction, _ := deployConstantPrice(t, big.NewInt(1))
 
 	const total = 1e6

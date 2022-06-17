@@ -18,8 +18,11 @@ import "./Seller.sol";
  - Calculate required cost, forwarding to a beneficiary, and refunding extra
  */
 abstract contract CappedRefund is Seller, Context {
+    /// @dev Deliberately not calling this `_cap` to avoid name clashes with the methods in
+    /// in `TxLimit` and `FixedSupply`.
     function _capRequested(address to, uint256 requested)
         internal
+        view
         virtual
         returns (uint256);
 

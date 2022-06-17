@@ -16,7 +16,7 @@ import "./Seller.sol";
  - Enforce per-wallet / per-transaction limits
  - Calculate required cost, forwarding to a beneficiary, and refunding extra
  */
-abstract contract TxLimit is Context {
+abstract contract TxLimit is Seller {
     uint64 private _maxPerTx;
     uint64 private _maxPerAddress;
 
@@ -52,35 +52,71 @@ abstract contract TxLimit is Context {
     //
     // -------------------------------------------------------------------------
 
-    function _capRequested(address to, uint256 num)
+    function _beforePurchase(
+        address to,
+        uint256 num,
+        uint256 cost
+    )
         internal
         virtual
+        override(Seller)
+        returns (
+            address,
+            uint256,
+            uint256
+        )
+    {
+        (to, num, cost) = Seller._beforePurchase(to, num, cost);
+        require(num <= _capOnTxLimit(to, num), "TxLimit: To many requested");
+        return (to, num, cost);
+    }
+
+    function _afterPurchase(
+        address to,
+        uint256 num,
+        uint256 cost
+    ) internal virtual override(Seller) {
+        Seller._afterPurchase(to, num, cost);
+
+        if (_maxPerAddress > 0) {
+            _bought[to] += num;
+
+            bool alsoLimitSender = msg.sender != to;
+
+            if (alsoLimitSender) {
+                _bought[msg.sender] += num;
+            }
+
+            // solhint-disable avoid-tx-origin
+            bool alsoLimitOrigin = tx.origin != msg.sender && tx.origin != to;
+            if (alsoLimitOrigin) {
+                _bought[tx.origin] += num;
+            } // solhint-enable avoid-tx-origin
+        }
+    }
+
+    function _capOnTxLimit(address to, uint256 num)
+        internal
+        view
         returns (uint256)
     {
         num = _maxPerTx == 0 ? num : Math.min(num, _maxPerTx);
 
         if (_maxPerAddress > 0) {
-            bool alsoLimitSender = _msgSender() != to;
-            // solhint-disable-next-line avoid-tx-origin
-            bool alsoLimitOrigin = tx.origin != _msgSender() && tx.origin != to;
-
             num = _capExtra(num, to, "Buyer limit");
+
+            bool alsoLimitSender = msg.sender != to;
             if (alsoLimitSender) {
-                num = _capExtra(num, _msgSender(), "Sender limit");
+                num = _capExtra(num, msg.sender, "Sender limit");
             }
+
+            // solhint-disable avoid-tx-origin
+            // TODO why not only tx.origin != msg.sender?
+            bool alsoLimitOrigin = tx.origin != msg.sender && tx.origin != to;
             if (alsoLimitOrigin) {
                 // solhint-disable-next-line avoid-tx-origin
                 num = _capExtra(num, tx.origin, "Origin limit");
-            }
-
-            _bought[to] += num;
-            if (alsoLimitSender) {
-                _bought[_msgSender()] += num;
-            }
-            if (alsoLimitOrigin) {
-                // solhint-disable-next-line avoid-tx-origin
-                _bought[tx.origin] += num;
-            }
+            } // solhint-enable avoid-tx-origin
         }
 
         return num;
@@ -95,10 +131,11 @@ abstract contract TxLimit is Context {
         address addr,
         string memory zeroMsg
     ) private view returns (uint256) {
-        uint256 extra = _maxPerAddress - _bought[addr];
-        if (extra == 0) {
-            revert(string(abi.encodePacked("TxLimiter: ", zeroMsg)));
-        }
-        return Math.min(n, extra);
+        uint256 remaining = _maxPerAddress - _bought[addr];
+        require(
+            remaining > 0,
+            string(abi.encodePacked("TxLimiter: ", zeroMsg))
+        );
+        return Math.min(n, remaining);
     }
 }

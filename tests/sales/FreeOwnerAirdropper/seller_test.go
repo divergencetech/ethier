@@ -121,7 +121,7 @@ func TestAirdrop(t *testing.T) {
 	})
 
 	t.Run("limit enforced", func(t *testing.T) {
-		if diff := revert.Checker("FixedSupply: To many requested").Diff(
+		if diff := revert.Checker("FixedSupply: Sold out").Diff(
 			seller.Airdrop(sim.Acc(deployer), singleRcv),
 		); diff != "" {
 			t.Errorf("After Airdrop(totalInventory); Airdrop(1) %s", diff)
