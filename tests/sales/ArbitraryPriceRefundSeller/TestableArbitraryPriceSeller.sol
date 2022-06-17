@@ -26,4 +26,6 @@ contract TestableArbitraryPriceSeller is ArbitraryPriceRefundSeller {
     {
         _purchase(msg.sender, num, costEach * num);
     }
+
+    function sellerType() external view virtual override returns (bytes32) {}
 }

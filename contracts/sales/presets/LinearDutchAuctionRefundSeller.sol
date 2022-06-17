@@ -76,4 +76,11 @@ contract LinearDutchAuctionRefundSeller is
     function purchase(address to, uint64 num) external payable whenNotPaused {
         _purchase(to, num, 0);
     }
+
+    bytes32 private constant TYPE =
+        keccak256("ETHIER.sellers.LinearDutchAuctionRefundSeller");
+
+    function sellerType() external view virtual override returns (bytes32) {
+        return TYPE;
+    }
 }

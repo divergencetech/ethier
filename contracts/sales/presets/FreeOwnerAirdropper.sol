@@ -28,4 +28,11 @@ contract FreeOwnerAirdropper is FixedSupply, SellableCallbacker, OwnerPausable {
             _purchase(receivers[idx].to, receivers[idx].num, 0);
         }
     }
+
+    bytes32 private constant TYPE =
+        keccak256("ETHIER.sellers.FreeOwnerAirdropper");
+
+    function sellerType() external view virtual override returns (bytes32) {
+        return TYPE;
+    }
 }

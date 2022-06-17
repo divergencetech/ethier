@@ -2,7 +2,7 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "./Seller.sol";
+import "./InternalCostSeller.sol";
 
 /// @notice A Seller with fixed per-item price.
 abstract contract FixedPrice is InternalCostSeller {

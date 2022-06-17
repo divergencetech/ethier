@@ -60,6 +60,8 @@ abstract contract Seller is PurchaseHandler, ReentrancyGuard {
     //     return _cost(num);
     // }
 
+    function sellerType() external virtual returns (bytes32);
+
     // -------------------------------------------------------------------------
     //
     //  Hooks
@@ -95,35 +97,4 @@ abstract contract Seller is PurchaseHandler, ReentrancyGuard {
     // -------------------------------------------------------------------------
 
     error InvalidPurchaseValue(uint256 should);
-}
-
-abstract contract InternalCostSeller is Seller {
-    /**
-    @dev Must return the current cost of a batch of items. This may be constant
-    or, for example, decreasing for a Dutch auction or increasing for a bonding
-    curve.
-    @param num The number of items being purchased.
-     */
-    function _cost(uint64 num) internal view virtual returns (uint256);
-
-    function cost(uint64 num) external view returns (uint256) {
-        return _cost(num);
-    }
-
-    function _beforePurchase(
-        address to,
-        uint64 num,
-        uint256
-    )
-        internal
-        virtual
-        override
-        returns (
-            address,
-            uint64,
-            uint256
-        )
-    {
-        return (to, num, _cost(num));
-    }
 }
