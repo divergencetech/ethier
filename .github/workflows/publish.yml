@@ -2,7 +2,7 @@ name: Publish NPM package
 
 on:
   workflow_run:
-    workflows: ["Test+Lint"]
+    workflows: ["TestLint"]
     branches: [main]
     types:
       - completed
