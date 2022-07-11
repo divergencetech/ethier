@@ -26,7 +26,7 @@
     "@chainlink/contracts": "^0.3.0",
     "@openzeppelin/contracts": "^4.6",
     "@openzeppelin/contracts-upgradeable": "^4.4.1",
-    "erc721a": "^4.0.0"
+    "erc721a": "^4.1.0"
   },
   "directories": {
     "test": "tests"

@@ -259,10 +259,10 @@ emoji-regex@^8.0.0:
   resolved "https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz"
   integrity sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==
 
-erc721a@^4.0.0:
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/erc721a/-/erc721a-4.0.0.tgz#df9427ffa24c998fb33610bc558febfd932ec8d1"
-  integrity sha512-FXlJ3owiDWGQleXV5t1aE5fgMpzCaP5ZMg9ZamP1Xv4p6JdCj3QlKQDvP8BvT+Jn7p4TtqTcHNUMfh+xoHGhGw==
+erc721a@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/erc721a/-/erc721a-4.1.0.tgz#b7b2e27bfa38f0be414f9b20fdc222268b840eb4"
+  integrity sha512-qah/BMNilUpnGuLbvw4BTJckIlSZ9DVABx8pz0b65CU5zAAXCF4ivcae1spa4tq1pL7+R0QDLcqL0G1JEVVZGQ==
 
 error-ex@^1.3.1:
   version "1.3.2"
