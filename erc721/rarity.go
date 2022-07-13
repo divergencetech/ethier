@@ -1,8 +1,3 @@
-// Package rarity implements computation of ERC721 metadata rarity based on
-// information entropy.
-//
-// Every trait/attribute of an ERC721 NFT can be considered as a categorical
-// probability distribution. Each possible
 package erc721
 
 import (
