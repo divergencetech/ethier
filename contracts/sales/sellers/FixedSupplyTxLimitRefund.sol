@@ -11,7 +11,11 @@ import "./TxLimit.sol";
 /// @notice This composes the functionality of three modules providing a
 /// capping of the requested number of items base on a total supply and limits
 /// per transaction and purchaser.
-abstract contract FixedSupplyRefund is FixedSupply, TxLimit, CappedRefund {
+abstract contract FixedSupplyTxLimitRefund is
+    FixedSupply,
+    TxLimit,
+    CappedRefund
+{
     constructor(
         uint64 totalInventory_,
         uint64 maxPerTx_,

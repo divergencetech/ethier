@@ -2,7 +2,7 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "../sellers/FixedSupplyRefund.sol";
+import "../sellers/FixedSupplyTxLimitRefund.sol";
 import "../sellers/FixedPrice.sol";
 import "../sellers/SellableCallbacker.sol";
 import "../../utils/OwnerPausable.sol";

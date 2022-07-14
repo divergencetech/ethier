@@ -3,6 +3,7 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
 import "./Seller.sol";
 
 /// @notice Abstract seller module that modifies the requested number of tokens

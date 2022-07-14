@@ -2,13 +2,13 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "../sellers/FixedSupplyRefund.sol";
+import "../sellers/FixedSupplyTxLimitRefund.sol";
 import "../sellers/FixedPrice.sol";
 import "../sellers/SellableCallbacker.sol";
 import "../../utils/OwnerPausable.sol";
 
 contract FixedPriceRefundSeller is
-    FixedSupplyRefund,
+    FixedSupplyTxLimitRefund,
     FixedPrice,
     SellableCallbacker,
     OwnerPausable
@@ -21,7 +21,11 @@ contract FixedPriceRefundSeller is
     }
 
     constructor(Config memory cfg, ISellable sellable)
-        FixedSupplyRefund(cfg.totalInventory, cfg.maxPerTx, cfg.maxPerAddress)
+        FixedSupplyTxLimitRefund(
+            cfg.totalInventory,
+            cfg.maxPerTx,
+            cfg.maxPerAddress
+        )
         FixedPrice(cfg.price)
         SellableCallbacker(sellable)
     {} // solhint-disable-line no-empty-blocks
@@ -39,14 +43,18 @@ contract FixedPriceRefundSeller is
     )
         internal
         virtual
-        override(FixedSupplyRefund, InternalCostSeller)
+        override(FixedSupplyTxLimitRefund, InternalCostSeller)
         returns (
             address,
             uint64,
             uint256
         )
     {
-        (to, num, cost) = FixedSupplyRefund._beforePurchase(to, num, cost);
+        (to, num, cost) = FixedSupplyTxLimitRefund._beforePurchase(
+            to,
+            num,
+            cost
+        );
         return (to, num, cost);
     }
 
@@ -54,7 +62,7 @@ contract FixedPriceRefundSeller is
         address to,
         uint64 num,
         uint256 cost
-    ) internal virtual override(FixedSupplyRefund, Seller) {
+    ) internal virtual override(FixedSupplyTxLimitRefund, Seller) {
         CappedRefund._afterPurchase(to, num, cost);
     }
 

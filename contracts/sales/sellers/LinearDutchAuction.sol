@@ -3,6 +3,7 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "./Seller.sol";
+import "./InternalCostSeller.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
