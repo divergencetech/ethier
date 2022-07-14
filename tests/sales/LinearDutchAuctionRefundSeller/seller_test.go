@@ -1,4 +1,4 @@
-package sales
+package LinearDutchAuctionRefundSeller
 
 import (
 	"context"
@@ -41,32 +41,45 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func deploy(t *testing.T, cfg config) (*ethtest.SimulatedBackend, common.Address, *TestableDutchAuction) {
+type SellerConfig struct {
+	TotalInventory, MaxPerAddress, MaxPerTx uint64
+}
+
+func deploy(t *testing.T, cfg config) (*ethtest.SimulatedBackend, common.Address, *TestableDutchAuction, *SellableMock) {
 	t.Helper()
 	sim := ethtest.NewSimulatedBackendTB(t, 10)
 
 	auctionConfig := cfg.convert()
-
 	t.Logf("%T = %+v", auctionConfig, auctionConfig)
-	sellerConfig := SellerSellerConfig{
-		TotalInventory: big.NewInt(totalInventory),
-		MaxPerAddress:  big.NewInt(maxPerAddress),
-		MaxPerTx:       big.NewInt(maxPerTx),
-		FreeQuota:      big.NewInt(0),
+
+	sellerConfig := LinearDutchAuctionRefundSellerConfig{
+		TotalInventory: totalInventory,
+		MaxPerAddress:  maxPerAddress,
+		MaxPerTx:       maxPerTx,
 	}
 	t.Logf("%T = %+v", sellerConfig, sellerConfig)
 
 	addr, _, auction, err := DeployTestableDutchAuction(
-		sim.Acc(0), sim, auctionConfig, cfg.ExpectedReserve, sellerConfig, beneficiary,
+		sim.Acc(0), sim, sellerConfig, auctionConfig, cfg.ExpectedReserve,
 	)
 	if err != nil {
 		t.Fatalf("DeployTestableDutchAuction() error %v", err)
 	}
 
-	return sim, addr, auction
+	s, err := auction.Sellable(nil)
+	if err != nil {
+		t.Fatalf("Unable to get sellable: %v", err)
+	}
+	beneficiary = s
+	sellable, err := NewSellableMock(s, sim)
+	if err != nil {
+		t.Fatalf("Unable to create sellable: %v", err)
+	}
+
+	return sim, addr, auction, sellable
 }
 
-func deployConstantPrice(t *testing.T, price *big.Int) (*ethtest.SimulatedBackend, common.Address, *TestableDutchAuction) {
+func deployConstantPrice(t *testing.T, price *big.Int) (*ethtest.SimulatedBackend, common.Address, *TestableDutchAuction, *SellableMock) {
 	t.Helper()
 	return deploy(t, config{
 		StartPoint:       1,
@@ -100,12 +113,12 @@ func (u unit) String() string {
 	return fmt.Sprintf("[UNIT: %s]", n)
 }
 
-// A config is equivalent to a LinearDutchAUctionDutchAuctionConfig but uses
+// A config is equivalent to a LinearDutchAuctionAuctionConfig but uses
 // int64 values instead of *big.Int to make tests easier to write. Fields that
 // refer to values remain as *big.Int to allow use of the eth.Ether*()
 // functions.
 type config struct {
-	StartPoint, NumDecreases, DecreaseInterval int64
+	StartPoint, NumDecreases, DecreaseInterval uint64
 	StartPrice, DecreaseSize                   *big.Int
 	Unit                                       unit
 	// Although not part of the config, the setter function requires an expected
@@ -113,19 +126,19 @@ type config struct {
 	ExpectedReserve *big.Int
 }
 
-func (c config) convert() LinearDutchAuctionDutchAuctionConfig {
+func (c config) convert() LinearDutchAuctionAuctionConfig {
 	if c.StartPrice == nil {
 		c.StartPrice = big.NewInt(0)
 	}
 	if c.DecreaseSize == nil {
 		c.DecreaseSize = big.NewInt(0)
 	}
-	return LinearDutchAuctionDutchAuctionConfig{
-		StartPoint:       big.NewInt(c.StartPoint),
-		NumDecreases:     big.NewInt(c.NumDecreases),
+	return LinearDutchAuctionAuctionConfig{
+		StartPoint:       c.StartPoint,
+		NumDecreases:     c.NumDecreases,
 		StartPrice:       c.StartPrice,
 		DecreaseSize:     c.DecreaseSize,
-		DecreaseInterval: big.NewInt(c.DecreaseInterval),
+		DecreaseInterval: c.DecreaseInterval,
 		Unit:             uint8(c.Unit),
 	}
 }
@@ -135,12 +148,9 @@ func TestLinearPriceDecrease(t *testing.T) {
 
 	type wantCost struct {
 		point     int64 // block or time
-		num       *big.Int
+		num       uint64
 		totalCost *big.Int
 	}
-
-	one := big.NewInt(1)
-	two := big.NewInt(2)
 
 	tests := []struct {
 		name string
@@ -159,11 +169,11 @@ func TestLinearPriceDecrease(t *testing.T) {
 				ExpectedReserve:  eth.Ether(2),
 			},
 			want: []wantCost{
-				{startBlock, one, eth.Ether(2)},
-				{startBlock + 1, one, eth.Ether(2)},
-				{startBlock + 9, two, eth.Ether(4)},
-				{startBlock + 10, one, eth.Ether(2)},
-				{startBlock + 20, one, eth.Ether(2)},
+				{startBlock, 1, eth.Ether(2)},
+				{startBlock + 1, 1, eth.Ether(2)},
+				{startBlock + 9, 2, eth.Ether(4)},
+				{startBlock + 10, 1, eth.Ether(2)},
+				{startBlock + 20, 1, eth.Ether(2)},
 			},
 		},
 		{
@@ -178,8 +188,8 @@ func TestLinearPriceDecrease(t *testing.T) {
 				ExpectedReserve:  eth.Ether(42),
 			},
 			want: []wantCost{
-				{startBlock, one, eth.Ether(42)},
-				{startBlock + 1, one, eth.Ether(42)},
+				{startBlock, 1, eth.Ether(42)},
+				{startBlock + 1, 1, eth.Ether(42)},
 			},
 		},
 		{
@@ -194,15 +204,15 @@ func TestLinearPriceDecrease(t *testing.T) {
 				ExpectedReserve:  eth.Ether(1),
 			},
 			want: []wantCost{
-				{startBlock, one, eth.Ether(11)},
-				{startBlock, two, eth.Ether(22)},
-				{startBlock + 1, one, eth.Ether(10)},
-				{startBlock + 2, one, eth.Ether(9)},
-				{startBlock + 3, one, eth.Ether(8)},
-				{startBlock + 4, two, eth.Ether(14)},
-				{startBlock + 10, one, eth.Ether(1)},
-				{startBlock + 11, one, eth.Ether(1)},
-				{startBlock + 20, one, eth.Ether(1)},
+				{startBlock, 1, eth.Ether(11)},
+				{startBlock, 2, eth.Ether(22)},
+				{startBlock + 1, 1, eth.Ether(10)},
+				{startBlock + 2, 1, eth.Ether(9)},
+				{startBlock + 3, 1, eth.Ether(8)},
+				{startBlock + 4, 2, eth.Ether(14)},
+				{startBlock + 10, 1, eth.Ether(1)},
+				{startBlock + 11, 1, eth.Ether(1)},
+				{startBlock + 20, 1, eth.Ether(1)},
 			},
 		},
 		{
@@ -217,8 +227,8 @@ func TestLinearPriceDecrease(t *testing.T) {
 				ExpectedReserve:  eth.Ether(1),
 			},
 			want: []wantCost{
-				{startBlock + 1, one, eth.EtherFraction(1009, 10)},
-				{startBlock + 2, one, eth.EtherFraction(1008, 10)},
+				{startBlock + 1, 1, eth.EtherFraction(1009, 10)},
+				{startBlock + 2, 1, eth.EtherFraction(1008, 10)},
 			},
 		},
 		{
@@ -235,32 +245,32 @@ func TestLinearPriceDecrease(t *testing.T) {
 			want: []wantCost{
 				// Make sure to test boundaries before and after multiples of
 				// decreaseInterval.
-				{startBlock, one, eth.Ether(10)},
+				{startBlock, 1, eth.Ether(10)},
 				//
-				{startBlock + 6, one, eth.Ether(10)},
-				{startBlock + 7, one, eth.Ether(9)},
-				{startBlock + 8, one, eth.Ether(9)},
+				{startBlock + 6, 1, eth.Ether(10)},
+				{startBlock + 7, 1, eth.Ether(9)},
+				{startBlock + 8, 1, eth.Ether(9)},
 				//
-				{startBlock + 13, one, eth.Ether(9)},
-				{startBlock + 14, one, eth.Ether(8)},
-				{startBlock + 15, one, eth.Ether(8)},
+				{startBlock + 13, 1, eth.Ether(9)},
+				{startBlock + 14, 1, eth.Ether(8)},
+				{startBlock + 15, 1, eth.Ether(8)},
 				//
-				{startBlock + 34, one, eth.Ether(6)},
-				{startBlock + 35, one, eth.Ether(5)},
-				{startBlock + 36, one, eth.Ether(5)},
+				{startBlock + 34, 1, eth.Ether(6)},
+				{startBlock + 35, 1, eth.Ether(5)},
+				{startBlock + 36, 1, eth.Ether(5)},
 				// Respects numDecreases
-				{startBlock + 43, one, eth.Ether(5)},
+				{startBlock + 43, 1, eth.Ether(5)},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sim, _, auction := deploy(t, tt.cfg)
+			sim, _, auction, _ := deploy(t, tt.cfg)
 
 			sim.FastForward(big.NewInt(startBlock - 1))
 			t.Run("before start", func(t *testing.T) {
-				if diff := revert.NotStarted.Diff(auction.Cost(nil, big.NewInt(1), big.NewInt(0))); diff != "" {
+				if diff := revert.NotStarted.Diff(auction.Cost(nil, 1)); diff != "" {
 					t.Errorf("Cost() before auction start; %s", diff)
 				}
 			})
@@ -271,7 +281,7 @@ func TestLinearPriceDecrease(t *testing.T) {
 
 			for _, w := range tt.want {
 				sim.FastForward(big.NewInt(w.point))
-				got, err := auction.Cost(nil, w.num, big.NewInt(0))
+				got, err := auction.Cost(nil, w.num)
 				if err != nil {
 					t.Errorf("Cost(%d) at block %d; error %v", w.num, sim.BlockNumber(), err)
 					continue
@@ -299,7 +309,7 @@ func TestTimeBasedDecrease(t *testing.T) {
 		ExpectedReserve:  eth.EtherFraction(7, 10),
 	}
 
-	sim, _, auction := deploy(t, cfg)
+	sim, _, auction, _ := deploy(t, cfg)
 
 	timestamp := func(t *testing.T) int64 {
 		t.Helper()
@@ -315,7 +325,7 @@ func TestTimeBasedDecrease(t *testing.T) {
 	}
 
 	start := timestamp(t) + 60
-	sim.Must(t, "SetAuctionStartPoint(now+60")(auction.SetAuctionStartPoint(sim.Acc(0), big.NewInt(start)))
+	sim.Must(t, "SetAuctionStartPoint(now+60")(auction.SetAuctionStartPoint(sim.Acc(0), uint64(start)))
 
 	// Note: SimulatedBackend has undocumented functionality that adjusts its
 	// clock by 10 seconds for every Commit(). The specifics of the step aren't
@@ -357,7 +367,7 @@ func TestTimeBasedDecrease(t *testing.T) {
 				want = new(big.Int).Sub(cfg.StartPrice, new(big.Int).Mul(cfg.DecreaseSize, big.NewInt(numDecreases)))
 			}
 
-			got, err := auction.Cost(nil, big.NewInt(1), big.NewInt(0))
+			got, err := auction.Cost(nil, 1)
 			if diff := errdiff.Check(err, errDiffAgainst); diff != "" {
 				t.Fatalf("Cost() %s", diff)
 			}
@@ -379,7 +389,7 @@ func TestTimeBasedDecrease(t *testing.T) {
 }
 
 func TestReserveCheck(t *testing.T) {
-	sim, _, auction := deployConstantPrice(t, eth.Ether(0))
+	sim, _, auction, _ := deployConstantPrice(t, eth.Ether(0))
 
 	tests := []struct {
 		name            string
@@ -469,20 +479,20 @@ func TestZeroStartToDisable(t *testing.T) {
 		Unit:             Block,
 		ExpectedReserve:  eth.Ether(1),
 	}
-	sim, _, auction := deploy(t, cfg)
+	sim, _, auction, _ := deploy(t, cfg)
 
 	const startBlock = 10
 	sim.FastForward(big.NewInt(startBlock))
 
-	if diff := revert.NotStarted.Diff(auction.Cost(nil, big.NewInt(1), big.NewInt(0))); diff != "" {
+	if diff := revert.NotStarted.Diff(auction.Cost(nil, 1)); diff != "" {
 		t.Errorf("Cost() when StartPoint==0; %s", diff)
 	}
 
-	if _, err := auction.SetAuctionStartPoint(sim.Acc(0), big.NewInt(startBlock)); err != nil {
+	if _, err := auction.SetAuctionStartPoint(sim.Acc(0), startBlock); err != nil {
 		t.Fatalf("SetAuctionStartPoint() error %v", err)
 	}
 
-	got, err := auction.Cost(nil, big.NewInt(1), big.NewInt(0))
+	got, err := auction.Cost(nil, 1)
 	if err != nil {
 		t.Fatalf("Cost() when StartPoint!=0; error %v", err)
 	}
@@ -495,7 +505,7 @@ func TestZeroStartToDisable(t *testing.T) {
 func TestTxLimit(t *testing.T) {
 	tests := []struct {
 		name               string
-		buy, wantPurchased int64
+		buy, wantPurchased uint64
 	}{
 		{
 			name:          "exact max per tx",
@@ -503,7 +513,7 @@ func TestTxLimit(t *testing.T) {
 			wantPurchased: maxPerTx,
 		},
 		{
-			name:          "one more than tx limit",
+			name:          "1 more than tx limit",
 			buy:           maxPerTx + 1,
 			wantPurchased: maxPerTx,
 		},
@@ -521,26 +531,26 @@ func TestTxLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sim, _, auction := deployConstantPrice(t, eth.Ether(0))
+			sim, _, auction, _ := deployConstantPrice(t, eth.Ether(0))
 			acc := sim.Acc(0)
 
-			if _, err := auction.Buy(acc, acc.From, big.NewInt(tt.buy)); err != nil {
-				t.Fatalf("Buy(%d) error %v", tt.buy, err)
+			if _, err := auction.Purchase(acc, acc.From, tt.buy); err != nil {
+				t.Fatalf("Purchase(%d) error %v", tt.buy, err)
 			}
 
 			got, err := auction.Own(nil, acc.From)
 			if err != nil {
-				t.Fatalf("Own(%s) after Buy() error %v", acc.From, err)
+				t.Fatalf("Own(%s) after Purchase() error %v", acc.From, err)
 			}
-			if got.Cmp(big.NewInt(tt.wantPurchased)) != 0 {
-				t.Errorf("Own(%s) after Buy(%d) with max per tx = %d; got %d; want %d", acc.From, tt.buy, maxPerTx, got, tt.wantPurchased)
+			if got != tt.wantPurchased {
+				t.Errorf("Own(%s) after Purchase(%d) with max per tx = %d; got %d; want %d", acc.From, tt.buy, maxPerTx, got, tt.wantPurchased)
 			}
 		})
 	}
 }
 
 func TestAddressLimit(t *testing.T) {
-	sim, auctionAddr, auction := deployConstantPrice(t, eth.Ether(0))
+	sim, auctionAddr, auction, _ := deployConstantPrice(t, eth.Ether(0))
 
 	// This test is primarily to demonstrate to readers of this code that config
 	// values are as expected.
@@ -551,12 +561,10 @@ func TestAddressLimit(t *testing.T) {
 		}
 
 		// TODO: submit a PR so geth/accounts/abi/bind returns named structs.
-		want := struct {
-			TotalInventory, MaxPerAddress, MaxPerTx, FreeQuota  *big.Int
-			ReserveFreeQuota, LockFreeQuota, LockTotalInventory bool
-		}{
-			big.NewInt(25), big.NewInt(10), big.NewInt(3), big.NewInt(0),
-			false, false, false,
+		want := LinearDutchAuctionRefundSellerConfig{
+			TotalInventory: 25,
+			MaxPerTx:       3,
+			MaxPerAddress:  10,
 		}
 
 		if diff := cmp.Diff(want, got, ethtest.Comparers()...); diff != "" {
@@ -574,10 +582,10 @@ func TestAddressLimit(t *testing.T) {
 	// spillover between addresses. Therefore, all errors MUST use t.Fatal.
 	tests := []struct {
 		purchaseVia interface { // auction or proxy
-			Buy(*bind.TransactOpts, common.Address, *big.Int) (*types.Transaction, error)
+			Purchase(*bind.TransactOpts, common.Address, uint64) (*types.Transaction, error)
 		}
 		payer, recipient   int
-		buy, wantPurchased int64
+		buy, wantPurchased uint64
 		errDiffAgainst     interface{}
 	}{
 		{
@@ -623,7 +631,7 @@ func TestAddressLimit(t *testing.T) {
 		{
 			purchaseVia:    auction,
 			payer:          0,
-			recipient:      1, // can't buy for someone else either
+			recipient:      1, // can't buy for some1 else either
 			buy:            1,
 			wantPurchased:  0,
 			errDiffAgainst: "Sender limit",
@@ -631,7 +639,7 @@ func TestAddressLimit(t *testing.T) {
 		{
 			purchaseVia:    auction,
 			payer:          1,
-			recipient:      0, // can't be bought for by someone else
+			recipient:      0, // can't be bought for by some1 else
 			buy:            1,
 			wantPurchased:  0,
 			errDiffAgainst: "Buyer limit",
@@ -711,21 +719,17 @@ func TestAddressLimit(t *testing.T) {
 			t.Fatalf("Own(<recipient>) before purchase; error %v", err)
 		}
 
-		_, err = tt.purchaseVia.Buy(payer, recipient.From, big.NewInt(tt.buy))
+		_, err = tt.purchaseVia.Purchase(payer, recipient.From, tt.buy)
 		if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
-			t.Fatalf("Buy(account[%d], n=%d) as account %d; %s", tt.recipient, tt.buy, tt.payer, diff)
+			t.Fatalf("Purchase(account[%d], n=%d) as account %d; %s", tt.recipient, tt.buy, tt.payer, diff)
 		}
 
 		after, err := auction.Own(nil, recipient.From)
 		if err != nil {
 			t.Fatalf("Own(<recipient>) after purchase attempt; error %v", err)
 		}
-		if got := after.Sub(after, before); got.Cmp(big.NewInt(tt.wantPurchased)) != 0 {
+		if got := after - before; got != tt.wantPurchased {
 			t.Errorf("Own(%s) got %d; want %d", recipient.From, got, tt.wantPurchased)
-		}
-
-		if got, err := auction.ReceivedFree(nil, recipient.From); got.Cmp(big.NewInt(0)) != 0 || err != nil {
-			t.Errorf("ReceivedFree(%s) got %d, err %v; want 0, nil err", recipient.From, got, err)
 		}
 	}
 
@@ -734,7 +738,7 @@ func TestAddressLimit(t *testing.T) {
 		if err != nil {
 			t.Fatalf("TotalSold() error %v", err)
 		}
-		if got.Cmp(big.NewInt(totalInventory)) != 0 {
+		if got != totalInventory {
 			t.Errorf("TotalSold() got %d; want %d", got, totalInventory)
 		}
 	})
@@ -743,7 +747,7 @@ func TestAddressLimit(t *testing.T) {
 func TestFundsManagement(t *testing.T) {
 	ctx := context.Background()
 	price := eth.Ether(1)
-	sim, auctionAddr, auction := deployConstantPrice(t, price)
+	sim, auctionAddr, auction, sellable := deployConstantPrice(t, price)
 
 	if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(big.NewInt(0)) != 0 {
 		t.Fatalf("Bad test setup; beneficiary has non-zero balance; %T.BalanceOf(%s) got %d; want 0", sim, beneficiary, got)
@@ -753,13 +757,13 @@ func TestFundsManagement(t *testing.T) {
 	auction.TestableDutchAuctionFilterer.WatchRefund(&bind.WatchOpts{}, refunds, nil)
 	defer close(refunds)
 
-	revenues := make(chan *TestableDutchAuctionRevenue)
-	auction.TestableDutchAuctionFilterer.WatchRevenue(&bind.WatchOpts{}, revenues, nil)
+	revenues := make(chan *SellableMockRevenue)
+	sellable.SellableMockFilterer.WatchRevenue(&bind.WatchOpts{}, revenues, nil)
 	defer close(revenues)
 
 	tests := []struct {
 		account                                             int
-		num                                                 int64
+		num                                                 uint64
 		sendValue, wantSpent, wantRefund, wantTotalRevenues *big.Int
 		errDiffAgainst                                      interface{}
 	}{
@@ -791,13 +795,13 @@ func TestFundsManagement(t *testing.T) {
 		t.Run(fmt.Sprintf("purchase[%d]", i), func(t *testing.T) {
 			before := sim.BalanceOf(ctx, t, sim.Addr(tt.account))
 
-			tx, err := auction.Buy(
+			tx, err := auction.Purchase(
 				sim.WithValueFrom(tt.account, tt.sendValue),
 				sim.Addr(tt.account),
-				big.NewInt(tt.num),
+				tt.num,
 			)
 			if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
-				t.Fatalf("Buy() %s", diff)
+				t.Fatalf("Purchase() %s", diff)
 			}
 
 			t.Run("revenues", func(t *testing.T) {
@@ -809,9 +813,9 @@ func TestFundsManagement(t *testing.T) {
 				select {
 				case got := <-revenues:
 					got.Raw = types.Log{}
-					want := &TestableDutchAuctionRevenue{
+					want := &SellableMockRevenue{
 						Beneficiary:  beneficiary,
-						NumPurchased: big.NewInt(tt.num),
+						NumPurchased: tt.num,
 						Amount:       tt.wantSpent,
 					}
 					if diff := cmp.Diff(want, got, ethtest.Comparers()...); diff != "" {
@@ -868,147 +872,26 @@ func TestFundsManagement(t *testing.T) {
 				diff := new(big.Int).Sub(tt.wantSpent, gotSpent)
 
 				if diff.Cmp(tolerance) != -1 {
-					t.Errorf("Buy(%d) at price %d; got balance reduction of %d (excluding gas); want %d within tolerance of %d", tt.num, price, gotSpent, tt.wantSpent, tolerance)
+					t.Errorf("Purchase(%d) at price %d; got balance reduction of %d (excluding gas); want %d within tolerance of %d", tt.num, price, gotSpent, tt.wantSpent, tolerance)
 				}
 			})
 		})
 	}
 }
 
-func TestFixedPriceSeller(t *testing.T) {
-	sim := ethtest.NewSimulatedBackendTB(t, 1)
-
-	tests := []struct {
-		price     *big.Int
-		wantCosts map[int64]*big.Int
-	}{
-		{
-			price: eth.Ether(1),
-			wantCosts: map[int64]*big.Int{
-				0: big.NewInt(0),
-				1: eth.Ether(1),
-				2: eth.Ether(2),
-				7: eth.Ether(7),
-			},
-		},
-		{
-			price: eth.EtherFraction(1, 2),
-			wantCosts: map[int64]*big.Int{
-				0:  big.NewInt(0),
-				1:  eth.EtherFraction(1, 2),
-				2:  eth.Ether(1),
-				7:  eth.EtherFraction(7, 2),
-				42: eth.Ether(21),
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("%d wei", tt.price), func(t *testing.T) {
-			_, _, seller, err := DeployTestableFixedPriceSeller(sim.Acc(0), sim, tt.price)
-			if err != nil {
-				t.Fatalf("DeployTestableFixedPriceSeller() error %v", err)
-			}
-
-			for n, want := range tt.wantCosts {
-				got, err := seller.Cost(nil, big.NewInt(n), big.NewInt(0))
-				if err != nil {
-					t.Errorf("Cost(%d) error %v", n, err)
-					continue
-				}
-				if got.Cmp(want) != 0 {
-					t.Errorf("Cost(%d) got %d; want %d", n, got, want)
-				}
-			}
-		})
-	}
-}
-
-func TestArbitraryPriceSeller(t *testing.T) {
-	ctx := context.Background()
-
-	deploy := func(t *testing.T, inventory int64) (*ethtest.SimulatedBackend, *TestableArbitraryPriceSeller) {
-		t.Helper()
-		sim := ethtest.NewSimulatedBackendTB(t, 1)
-
-		_, _, seller, err := DeployTestableArbitraryPriceSeller(sim.Acc(0), sim, big.NewInt(inventory))
-		if err != nil {
-			t.Fatalf("DeployTestableArbitraryPriceSeller(%d) error %v", inventory, err)
-		}
-		return sim, seller
-	}
-
-	tests := []struct {
-		numToPurchase      int64
-		costEach, wantPaid *big.Int
-	}{
-		{
-			numToPurchase: 1,
-			costEach:      eth.Ether(2),
-			wantPaid:      eth.Ether(2),
-		},
-		{
-			numToPurchase: 2,
-			costEach:      eth.Ether(1),
-			wantPaid:      eth.Ether(2),
-		},
-		{
-			numToPurchase: 3,
-			costEach:      eth.Ether(2),
-			wantPaid:      eth.Ether(6),
-		},
-		{
-			numToPurchase: 5,
-			costEach:      eth.EtherFraction(2, 5),
-			wantPaid:      eth.Ether(2),
-		},
-		{
-			numToPurchase: 4,
-			costEach:      eth.EtherFraction(256, 1000),
-			wantPaid:      eth.EtherFraction(1024, 1000),
-		},
-	}
-
-	for _, tt := range tests {
-		sim, seller := deploy(t, tt.numToPurchase)
-
-		// An address out of our control so its balance can only increase in value.
-		beneficiary := common.HexToAddress("0x0123456789abcdef")
-		sim.Must(t, "SetBeneficiary()")(seller.SetBeneficiary(sim.Acc(0), beneficiary))
-
-		if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(big.NewInt(0)) != 0 {
-			t.Fatalf("Bad test setup; before purchase %T.BalanceOf(beneficiary) got %d; want 0", seller, got)
-		}
-
-		acc := sim.WithValueFrom(0, tt.wantPaid)
-		sim.Must(t, "Purchase(%d, %d)", tt.numToPurchase, tt.costEach)(seller.Purchase(acc, big.NewInt(tt.numToPurchase), tt.costEach))
-
-		if got := sim.BalanceOf(ctx, t, beneficiary); got.Cmp(tt.wantPaid) != 0 {
-			t.Errorf("After purchase of %d items for %d each; BalanceOf(beneficiary) got %d; want %d", tt.numToPurchase, tt.costEach, got, tt.wantPaid)
-		}
-	}
-
-	t.Run("no accidental free purchase", func(t *testing.T) {
-		sim, seller := deploy(t, 1)
-		if diff := revert.Any.Diff(seller.AccidentalFreePurchase(sim.Acc(0))); diff != "" {
-			t.Errorf("%T.AccidentalFreePurchase() %s", seller, diff)
-		}
-	})
-}
-
 func TestPausing(t *testing.T) {
-	sim, _, auction := deployConstantPrice(t, eth.Ether(0))
+	sim, _, auction, _ := deployConstantPrice(t, eth.Ether(0))
 
-	sim.Must(t, "When not paused, Buy()")(auction.Buy(sim.Acc(0), sim.Addr(0), big.NewInt(1)))
+	sim.Must(t, "When not paused, Purchase()")(auction.Purchase(sim.Acc(0), sim.Addr(0), 1))
 	sim.Must(t, "Pause()")(auction.Pause(sim.Acc(0)))
 
-	if diff := revert.Paused.Diff(auction.Buy(sim.Acc(0), sim.Addr(0), big.NewInt(1))); diff != "" {
-		t.Errorf("When paused, Buy() %s", diff)
+	if diff := revert.Paused.Diff(auction.Purchase(sim.Acc(0), sim.Addr(0), 1)); diff != "" {
+		t.Errorf("When paused, Purchase() %s", diff)
 	}
 }
 
 func TestReentrancyGuard(t *testing.T) {
-	sim, auctionAddr, auction := deployConstantPrice(t, eth.Ether(1))
+	sim, auctionAddr, auction, _ := deployConstantPrice(t, eth.Ether(1))
 
 	// Contract that reenters upon receiving a refund.
 	_, _, attacker, err := DeployReentrantProxyPurchaser(sim.Acc(0), sim, auctionAddr)
@@ -1017,192 +900,191 @@ func TestReentrancyGuard(t *testing.T) {
 	}
 
 	if diff := revert.Reentrant.Diff(
-		attacker.Buy(sim.WithValueFrom(0, eth.Ether(10)), sim.Addr(0), big.NewInt(1)),
+		attacker.Purchase(sim.WithValueFrom(0, eth.Ether(10)), sim.Addr(0), 1),
 	); diff != "" {
-		t.Errorf("%T.Buy(); invoking Seller._purchase() through reentrant call; %s", attacker, diff)
+		t.Errorf("%T.Purchase(); invoking Seller._purchase() through reentrant call; %s", attacker, diff)
 	}
 
 	got, err := auction.Own(nil, sim.Addr(0))
 	if err != nil {
 		t.Fatalf("Own() error %v", err)
 	}
-	if got.Cmp(big.NewInt(0)) != 0 {
+	if got != 0 {
 		t.Errorf("Own(<reentrant attacker>) got %d; want 0", got)
 	}
 }
 
-func TestUnlimited(t *testing.T) {
-	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
+func TestDisabledTxLimit(t *testing.T) {
+	sim, _, auction, _ := deployConstantPrice(t, big.NewInt(1))
 
 	const total = 1e6
-	cfg := SellerSellerConfig{
-		TotalInventory: big.NewInt(total),
-		MaxPerAddress:  big.NewInt(0),
-		MaxPerTx:       big.NewInt(0),
-		FreeQuota:      big.NewInt(0),
+	cfg := LinearDutchAuctionRefundSellerConfig{
+		TotalInventory: total,
+		MaxPerAddress:  0,
+		MaxPerTx:       0,
 	}
 	sim.Must(t, "SetSellerConfig(%+v)", cfg)(auction.SetSellerConfig(sim.Acc(0), cfg))
 
 	buyer := sim.WithValueFrom(0, big.NewInt(total))
-	sim.Must(t, "Buy(%d) with unlimited transaction / address limits", int(total))(
-		auction.Buy(buyer, buyer.From, big.NewInt(total)),
+	sim.Must(t, "Purchase(%d) with unlimited transaction / address limits", int(total))(
+		auction.Purchase(buyer, buyer.From, total),
 	)
 
-	if diff := revert.SoldOut.Diff(auction.Buy(buyer, buyer.From, big.NewInt(1))); diff != "" {
-		t.Errorf("Buy(1) with no more inventory; %s", diff)
+	if diff := revert.SoldOut.Diff(auction.Purchase(buyer, buyer.From, 1)); diff != "" {
+		t.Errorf("Purchase(1) with no more inventory; %s", diff)
 	}
 }
 
-// wantOwned is a helper to confirm total number of items owned by an address,
-// and total received free of charge.
-func wantOwned(t *testing.T, auction *TestableDutchAuction, addr common.Address, wantTotal, wantFree int64) {
-	t.Helper()
+// // wantOwned is a helper to confirm total number of items owned by an address,
+// // and total received free of charge.
+// func wantOwned(t *testing.T, auction *TestableDutchAuction, addr common.Address, wantTotal, wantFree int64) {
+// 	t.Helper()
 
-	if got, err := auction.Own(nil, addr); got.Cmp(big.NewInt(wantTotal)) != 0 || err != nil {
-		t.Errorf("Own(%q) got %d, err %v; want %d, nil err", addr, got, err, wantTotal)
-	}
-	if got, err := auction.ReceivedFree(nil, addr); got.Cmp(big.NewInt(wantFree)) != 0 || err != nil {
-		t.Errorf("ReceivedFree(%q) got %d, err %v; want %d, nil err", addr, got, err, wantFree)
-	}
-}
+// 	if got, err := auction.Own(nil, addr); got.Cmp(big.NewInt(wantTotal)) != 0 || err != nil {
+// 		t.Errorf("Own(%q) got %d, err %v; want %d, nil err", addr, got, err, wantTotal)
+// 	}
+// 	// if got, err := auction.ReceivedFree(nil, addr); got.Cmp(big.NewInt(wantFree)) != 0 || err != nil {
+// 	// 	t.Errorf("ReceivedFree(%q) got %d, err %v; want %d, nil err", addr, got, err, wantFree)
+// 	// }
+// }
 
-func TestReservedFreePurchasing(t *testing.T) {
-	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
+// func TestReservedFreePurchasing(t *testing.T) {
+// 	sim, _, auction, _ := deployConstantPrice(t, big.NewInt(1))
 
-	const (
-		deployer = iota
-		rcvFree
-		buyer
-	)
+// 	const (
+// 		deployer = iota
+// 		rcvFree
+// 		buyer
+// 	)
 
-	const (
-		totalInventory = 10
-		freeQuota      = 4
-	)
+// 	const (
+// 		totalInventory = 10
+// 		freeQuota      = 4
+// 	)
 
-	cfg := SellerSellerConfig{
-		TotalInventory:   big.NewInt(totalInventory),
-		FreeQuota:        big.NewInt(freeQuota),
-		ReserveFreeQuota: true,
-		// Required but irrelevant to tests:
-		MaxPerAddress: big.NewInt(0),
-		MaxPerTx:      big.NewInt(0),
-	}
-	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(deployer), cfg))
+// 	cfg := SellerConfig{
+// 		TotalInventory:   big.NewInt(totalInventory),
+// 		FreeQuota:        big.NewInt(freeQuota),
+// 		ReserveFreeQuota: true,
+// 		// Required but irrelevant to tests:
+// 		MaxPerAddress: big.NewInt(0),
+// 		MaxPerTx:      big.NewInt(0),
+// 	}
+// 	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(deployer), cfg))
 
-	t.Run("only owner purchases free", func(t *testing.T) {
-		if diff := revert.OnlyOwner.Diff(auction.PurchaseFreeOfCharge(sim.Acc(rcvFree), sim.Addr(rcvFree), big.NewInt(1))); diff != "" {
-			t.Errorf("PurchaseFreeOfCharge() as non-owner; %s", diff)
-		}
-		wantOwned(t, auction, sim.Addr(rcvFree), 0, 0)
-	})
+// 	t.Run("only owner purchases free", func(t *testing.T) {
+// 		if diff := revert.OnlyOwner.Diff(auction.PurchaseFreeOfCharge(sim.Acc(rcvFree), sim.Addr(rcvFree), big.NewInt(1))); diff != "" {
+// 			t.Errorf("PurchaseFreeOfCharge() as non-owner; %s", diff)
+// 		}
+// 		wantOwned(t, auction, sim.Addr(rcvFree), 0, 0)
+// 	})
 
-	t.Run("reserved free quota honoured", func(t *testing.T) {
-		n := big.NewInt(totalInventory - freeQuota)
-		sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, n), sim.Addr(buyer), n))
+// 	t.Run("reserved free quota honoured", func(t *testing.T) {
+// 		n := big.NewInt(totalInventory - freeQuota)
+// 		sim.Must(t, "Purchase(totalInventory - freeQuota)")(auction.Purchase(sim.WithValueFrom(buyer, n), sim.Addr(buyer), n))
 
-		if diff := revert.SoldOut.Diff(
-			auction.Buy(sim.WithValueFrom(buyer, big.NewInt(1)), sim.Addr(buyer), big.NewInt(1)),
-		); diff != "" {
-			t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) %s", diff)
-		}
+// 		if diff := revert.SoldOut.Diff(
+// 			auction.Purchase(sim.WithValueFrom(buyer, big.NewInt(1)), sim.Addr(buyer), big.NewInt(1)),
+// 		); diff != "" {
+// 			t.Errorf("After Purchase(totalInventory - freeQuota); Purchase(1) %s", diff)
+// 		}
 
-		wantOwned(t, auction, sim.Addr(buyer), totalInventory-freeQuota, 0)
-	})
+// 		wantOwned(t, auction, sim.Addr(buyer), totalInventory-freeQuota, 0)
+// 	})
 
-	t.Run("free quota enforced", func(t *testing.T) {
-		sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Addr(rcvFree), big.NewInt(freeQuota)))
+// 	t.Run("free quota enforced", func(t *testing.T) {
+// 		sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Addr(rcvFree), big.NewInt(freeQuota)))
 
-		c := revert.Checker("Seller: Free quota exceeded")
-		if diff := c.Diff(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Addr(rcvFree), big.NewInt(1))); diff != "" {
-			t.Errorf("PurchaseFreeOfCharge(1) after exhausting quota; %s", diff)
-		}
+// 		c := revert.Checker("Seller: Free quota exceeded")
+// 		if diff := c.Diff(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Addr(rcvFree), big.NewInt(1))); diff != "" {
+// 			t.Errorf("PurchaseFreeOfCharge(1) after exhausting quota; %s", diff)
+// 		}
 
-		wantOwned(t, auction, sim.Addr(rcvFree), freeQuota, freeQuota)
-	})
-}
+// 		wantOwned(t, auction, sim.Addr(rcvFree), freeQuota, freeQuota)
+// 	})
+// }
 
-func TestIssue7Regression(t *testing.T) {
-	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
+// func TestIssue7Regression(t *testing.T) {
+// 	sim, _, auction, _ := deployConstantPrice(t, big.NewInt(1))
 
-	const (
-		deployer = iota
-		rcvFree
-		buyer
-	)
+// 	const (
+// 		deployer = iota
+// 		rcvFree
+// 		buyer
+// 	)
 
-	const (
-		totalInventory = 20
-		freeQuota      = 3
-	)
+// 	const (
+// 		totalInventory = 20
+// 		freeQuota      = 3
+// 	)
 
-	cfg := SellerSellerConfig{
-		TotalInventory:   big.NewInt(totalInventory),
-		FreeQuota:        big.NewInt(freeQuota),
-		ReserveFreeQuota: true,
-		// Required but irrelevant to tests:
-		MaxPerAddress: big.NewInt(0),
-		MaxPerTx:      big.NewInt(0),
-	}
-	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(deployer), cfg))
-	sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Addr(rcvFree), big.NewInt(freeQuota)))
-	sim.Must(t, "Buy(totalInventory-2*freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, big.NewInt(totalInventory-2*freeQuota)), sim.Addr(buyer), big.NewInt(totalInventory-2*freeQuota)))
+// 	cfg := SellerConfig{
+// 		TotalInventory:   big.NewInt(totalInventory),
+// 		FreeQuota:        big.NewInt(freeQuota),
+// 		ReserveFreeQuota: true,
+// 		// Required but irrelevant to tests:
+// 		MaxPerAddress: big.NewInt(0),
+// 		MaxPerTx:      big.NewInt(0),
+// 	}
+// 	sim.Must(t, "SetSellerConfig(%+v", cfg)(auction.SetSellerConfig(sim.Acc(deployer), cfg))
+// 	sim.Must(t, "PurchaseFreeOfCharge(freeQuota)")(auction.PurchaseFreeOfCharge(sim.Acc(deployer), sim.Addr(rcvFree), big.NewInt(freeQuota)))
+// 	sim.Must(t, "Purchase(totalInventory-2*freeQuota)")(auction.Purchase(sim.WithValueFrom(buyer, big.NewInt(totalInventory-2*freeQuota)), sim.Addr(buyer), big.NewInt(totalInventory-2*freeQuota)))
 
-	// Without the fix, this call would have reverted due to https://github.com/divergencetech/ethier/issues/7
-	sim.Must(t, "Buy(freeQuota)")(auction.Buy(sim.WithValueFrom(buyer, big.NewInt(freeQuota)), sim.Addr(buyer), big.NewInt(freeQuota)))
+// 	// Without the fix, this call would have reverted due to https://github.com/divergencetech/ethier/issues/7
+// 	sim.Must(t, "Purchase(freeQuota)")(auction.Purchase(sim.WithValueFrom(buyer, big.NewInt(freeQuota)), sim.Addr(buyer), big.NewInt(freeQuota)))
 
-	if diff := revert.SoldOut.Diff(
-		auction.Buy(sim.WithValueFrom(buyer, big.NewInt(1)), sim.Addr(buyer), big.NewInt(1)),
-	); diff != "" {
-		t.Errorf("After Buy(totalInventory - freeQuota); Buy(1) %s", diff)
-	}
-}
+// 	if diff := revert.SoldOut.Diff(
+// 		auction.Purchase(sim.WithValueFrom(buyer, big.NewInt(1)), sim.Addr(buyer), big.NewInt(1)),
+// 	); diff != "" {
+// 		t.Errorf("After Purchase(totalInventory - freeQuota); Purchase(1) %s", diff)
+// 	}
+// }
 
-func TestUnreservedFreePurchasing(t *testing.T) {
-	sim, _, auction := deployConstantPrice(t, big.NewInt(1))
+// func TestUnreservedFreePurchasing(t *testing.T) {
+// 	sim, _, auction, _ := deployConstantPrice(t, big.NewInt(1))
 
-	const (
-		totalInventory = 10
-		freeQuota      = 4
-	)
+// 	const (
+// 		totalInventory = 10
+// 		freeQuota      = 4
+// 	)
 
-	cfg := SellerSellerConfig{
-		TotalInventory:   big.NewInt(totalInventory),
-		FreeQuota:        big.NewInt(freeQuota),
-		ReserveFreeQuota: false,
-		// Required but irrelevant to tests:
-		MaxPerAddress: big.NewInt(0),
-		MaxPerTx:      big.NewInt(0),
-	}
-	sim.Must(t, "SetSellerConfig(%+v)", cfg)(auction.SetSellerConfig(sim.Acc(0), cfg))
+// 	cfg := SellerConfig{
+// 		TotalInventory:   big.NewInt(totalInventory),
+// 		FreeQuota:        big.NewInt(freeQuota),
+// 		ReserveFreeQuota: false,
+// 		// Required but irrelevant to tests:
+// 		MaxPerAddress: big.NewInt(0),
+// 		MaxPerTx:      big.NewInt(0),
+// 	}
+// 	sim.Must(t, "SetSellerConfig(%+v)", cfg)(auction.SetSellerConfig(sim.Acc(0), cfg))
 
-	t.Run("unreserved free quota ignored", func(t *testing.T) {
-		n := big.NewInt(totalInventory - freeQuota)
-		sim.Must(t, "Buy(totalInventory - freeQuota)")(auction.Buy(sim.WithValueFrom(0, n), sim.Addr(0), n))
-		sim.Must(t, "After Buy(totalInventory - freeQuota); Buy(1)")(
-			auction.Buy(sim.WithValueFrom(0, big.NewInt(1)), sim.Addr(0), big.NewInt(1)),
-		)
+// 	t.Run("unreserved free quota ignored", func(t *testing.T) {
+// 		n := big.NewInt(totalInventory - freeQuota)
+// 		sim.Must(t, "Purchase(totalInventory - freeQuota)")(auction.Purchase(sim.WithValueFrom(0, n), sim.Addr(0), n))
+// 		sim.Must(t, "After Purchase(totalInventory - freeQuota); Purchase(1)")(
+// 			auction.Purchase(sim.WithValueFrom(0, big.NewInt(1)), sim.Addr(0), big.NewInt(1)),
+// 		)
 
-		wantOwned(t, auction, sim.Addr(0), totalInventory-freeQuota+1, 0)
-	})
+// 		wantOwned(t, auction, sim.Addr(0), totalInventory-freeQuota+1, 0)
+// 	})
 
-	t.Run("total inventory honoured even if free", func(t *testing.T) {
-		sim.Must(t, "PurchsaeFreeOfCharge(freeQuota-1)")(
-			auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Addr(0), big.NewInt(freeQuota-1)),
-		)
+// 	t.Run("total inventory honoured even if free", func(t *testing.T) {
+// 		sim.Must(t, "PurchsaeFreeOfCharge(freeQuota-1)")(
+// 			auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Addr(0), big.NewInt(freeQuota-1)),
+// 		)
 
-		if diff := revert.SoldOut.Diff(
-			auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Addr(0), big.NewInt(1)),
-		); diff != "" {
-			t.Errorf("PurchaseFreeOfCharge(1) when last unreserved quota already sold; %s", diff)
-		}
+// 		if diff := revert.SoldOut.Diff(
+// 			auction.PurchaseFreeOfCharge(sim.Acc(0), sim.Addr(0), big.NewInt(1)),
+// 		); diff != "" {
+// 			t.Errorf("PurchaseFreeOfCharge(1) when last unreserved quota already sold; %s", diff)
+// 		}
 
-		if diff := revert.SoldOut.Diff(
-			auction.Buy(sim.Acc(0), sim.Addr(0), big.NewInt(1)),
-		); diff != "" {
-			t.Errorf("Buy(1) when last unreserved quota already sold; %s", diff)
-		}
+// 		if diff := revert.SoldOut.Diff(
+// 			auction.Purchase(sim.Acc(0), sim.Addr(0), big.NewInt(1)),
+// 		); diff != "" {
+// 			t.Errorf("Purchase(1) when last unreserved quota already sold; %s", diff)
+// 		}
 
-		wantOwned(t, auction, sim.Addr(0), totalInventory, freeQuota-1)
-	})
-}
+// 		wantOwned(t, auction, sim.Addr(0), totalInventory, freeQuota-1)
+// 	})
+// }
