@@ -33,7 +33,11 @@ func main() {
 		scores = append(scores, pair{id, score})
 	}
 	sort.Slice(scores, func(i, j int) bool {
-		return scores[i].score > scores[j].score
+		sI, sJ := scores[i], scores[j]
+		if scI, scJ := sI.score, sJ.score; scI != scJ {
+			return scI > scJ
+		}
+		return sI.id.Cmp(&sJ.id) == -1
 	})
 
 	for _, s := range scores {

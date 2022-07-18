@@ -5,8 +5,7 @@ import (
 	"fmt"
 )
 
-// A Collection is a set of Metadata, each associated with a single uint256 (32
-// bytes).
+// A Collection is a set of Metadata, each associated with a single token ID.
 type Collection map[TokenID]*Metadata
 
 // CollectionFromMetadata assumes that each token's ID is its index in the

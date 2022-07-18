@@ -7,7 +7,7 @@ import (
 	"github.com/holiman/uint256"
 )
 
-// A TokenID is a uint256 Solidty tokenId.
+// A TokenID is a uint256 Solidity tokenId.
 type TokenID [32]byte
 
 // Uint256 returns id as a uint256.Int.
@@ -15,6 +15,15 @@ func (id *TokenID) Uint256() *uint256.Int {
 	// This is guaranteed to never overflow, so it's safe to ignore the flag.
 	i, _ := uint256.FromBig(new(big.Int).SetBytes(id[:]))
 	return i
+}
+
+// Cmp compares id and oID and returns:
+//
+//   -1 if o <  oID
+//    0 if o == oID
+//    1 if o >  oID
+func (id *TokenID) Cmp(oID *TokenID) int {
+	return id.Uint256().Cmp(oID.Uint256())
 }
 
 // String returns a decimal text representation of id.
