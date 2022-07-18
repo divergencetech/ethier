@@ -60,12 +60,12 @@ func (coll Collection) Rarity(bucket func(interface{}) string) map[TokenID]float
 		// It's important to calculate over all possible attributes, even those
 		// that a particular token lacks. Without this, we would favour tokens
 		// that simply have more traits.
-		for attr := range counts {
+		for attr, numHaveAttr := range counts {
 			var n float64
 			if v, ok := attributes[id][attr]; ok {
 				n = distributions[attr][v]
 			} else {
-				n = collSize - counts[attr]
+				n = collSize - numHaveAttr
 			}
 
 			scores[id] += -math.Log2(n / collSize)
@@ -74,8 +74,14 @@ func (coll Collection) Rarity(bucket func(interface{}) string) map[TokenID]float
 		max = math.Max(max, scores[id])
 	}
 
+	// It's not valid to consider all decimal points so we limit the precision
+	// relative to the log of the collection size as this is what dictates
+	// precision of individual probabilities.
+	precision := int(math.Floor(math.Log10(float64(len(coll)))))
+	scale := math.Pow10(precision)
+
 	for id := range scores {
-		scores[id] /= max
+		scores[id] = math.Round(scores[id]/max*scale) / scale
 	}
 	return scores
 }
