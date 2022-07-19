@@ -29,7 +29,7 @@ func main() {
 		score float64
 	}
 	var scores []pair
-	for id, score := range erc721.CollectionFromMetadata(md).Rarity(nil) {
+	for id, score := range erc721.CollectionFromMetadata(md).Rarity(nil).Scores {
 		scores = append(scores, pair{id, score})
 	}
 	sort.Slice(scores, func(i, j int) bool {
