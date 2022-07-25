@@ -1,6 +1,7 @@
 package erc721
 
 import (
+	"encoding/hex"
 	"math/big"
 	"testing"
 
@@ -23,6 +24,7 @@ const (
 	approved
 	vandal
 	proxy
+	royaltyReceiver
 
 	numAccounts // last account + 1 ;)
 )
@@ -56,7 +58,7 @@ func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721ACommon, *E
 	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
 	openseatest.DeployProxyRegistryTB(t, sim)
 
-	addr, _, nft, err := DeployTestableERC721ACommon(sim.Acc(deployer), sim)
+	addr, _, nft, err := DeployTestableERC721ACommon(sim.Acc(deployer), sim, sim.Addr(royaltyReceiver))
 	if err != nil {
 		t.Fatalf("TestableERC721ACommon() error %v", err)
 	}
@@ -540,6 +542,81 @@ func TestOpenSeaProxyPreApprovalOptInOut(t *testing.T) {
 				t.Errorf("ApprovalForAll events diff (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestRoyalties(t *testing.T) {
+	sim, nft, _ := deploy(t)
+
+	tests := []struct {
+		setConfig   bool
+		newReceiver common.Address
+		newPermille int64
+		salesPrice  int64
+	}{
+		{
+			salesPrice: 200000,
+		},
+		{
+			setConfig:   true,
+			newReceiver: sim.Addr(deployer),
+			newPermille: 300,
+			salesPrice:  500000,
+		},
+	}
+
+	for _, tt := range tests {
+		if tt.setConfig {
+			nft.SetDefaultRoyalty(sim.Acc(deployer), tt.newReceiver, big.NewInt(tt.newPermille))
+		}
+
+		wantAmount := tt.salesPrice / 1000 * 750
+		wantReceiver := sim.Addr(royaltyReceiver)
+
+		if tt.setConfig {
+			wantAmount = tt.salesPrice / 1000 * tt.newPermille
+			wantReceiver = tt.newReceiver
+		}
+
+		receiver, amount, err := nft.RoyaltyInfo(nil, big.NewInt(0), big.NewInt(tt.salesPrice))
+
+		if err != nil || big.NewInt(wantAmount).Cmp(amount) != 0 || wantReceiver != receiver {
+			t.Errorf("RoyaltyInfo(0, %d) got (%s, %d), err = %v; want (%s, %d), nil err", tt.salesPrice, receiver, amount, err, wantReceiver, wantAmount)
+		}
+
+	}
+}
+
+func TestInterfaceSupport(t *testing.T) {
+	_, nft, _ := deploy(t)
+
+	tests := []struct {
+		interfaceId string
+		wantSupport bool
+	}{
+		{
+			interfaceId: "80ac58cd", // ERC721
+			wantSupport: true,
+		},
+		{
+			interfaceId: "2a55205a", // ERC2981
+			wantSupport: true,
+		},
+	}
+
+	for _, tt := range tests {
+		b, err := hex.DecodeString(tt.interfaceId)
+		if err != nil || len(b) != 4 {
+			t.Errorf("Decoding(%s): err = %v, got len = (%d), want len = 4;", tt.interfaceId, err, len(b))
+		}
+
+		id := *(*[4]byte)(b)
+		got, err := nft.SupportsInterface(nil, id)
+
+		if err != nil || got != tt.wantSupport {
+			t.Errorf("SupportsInterface(%s) got = %t, err = %v; want = %t", id, got, err, tt.wantSupport)
+		}
+
 	}
 }
 

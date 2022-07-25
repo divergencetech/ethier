@@ -8,7 +8,10 @@ import "../../contracts/erc721/BaseTokenURI.sol";
 /// @notice Exposes a functions modified with the modifiers under test.
 contract TestableERC721ACommon is ERC721ACommon, BaseTokenURI {
     // solhint-disable-next-line no-empty-blocks
-    constructor() ERC721ACommon("Token", "JRR") BaseTokenURI("") {}
+    constructor(address payable royaltyReciever)
+        ERC721ACommon("Token", "JRR", royaltyReciever, 750)
+        BaseTokenURI("")
+    {}
 
     function mint() public {
         mintN(1);

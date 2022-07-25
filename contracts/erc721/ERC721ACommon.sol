@@ -4,16 +4,22 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "./ERC721APreApproval.sol";
 import "../utils/OwnerPausable.sol";
+import "@openzeppelin/contracts/token/common/ERC2981.sol";
 
 /**
 @notice An ERC721A contract with common functionality:
  - OpenSea gas-free listings
  - Pausable with toggling functions exposed to Owner only
  */
-contract ERC721ACommon is ERC721APreApproval, OwnerPausable {
-    constructor(string memory name, string memory symbol)
-        ERC721A(name, symbol)
-    {} // solhint-disable-line no-empty-blocks
+contract ERC721ACommon is ERC721APreApproval, OwnerPausable, ERC2981 {
+    constructor(
+        string memory name,
+        string memory symbol,
+        address payable royaltyReciever,
+        uint96 royaltyPermille
+    ) ERC721A(name, symbol) {
+        _setDefaultRoyalty(royaltyReciever, royaltyPermille);
+    }
 
     /// @notice Requires that the token exists.
     modifier tokenExists(uint256 tokenId) {
@@ -45,10 +51,23 @@ contract ERC721ACommon is ERC721APreApproval, OwnerPausable {
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        virtual
-        override(ERC721A)
+        override(ERC721A, ERC2981)
         returns (bool)
     {
-        return super.supportsInterface(interfaceId);
+        return
+            ERC721A.supportsInterface(interfaceId) ||
+            ERC2981.supportsInterface(interfaceId);
+    }
+
+    /// @notice Sets the royalty receiver and percentage (in units of 0.01%).
+    function setDefaultRoyalty(address receiver, uint96 permille)
+        external
+        onlyOwner
+    {
+        _setDefaultRoyalty(receiver, permille);
+    }
+
+    function _feeDenominator() internal pure virtual override returns (uint96) {
+        return 1000;
     }
 }
