@@ -17,9 +17,9 @@ contract ERC721ACommon is ERC721APreApproval, OwnerPausable, ERC2981 {
         string memory name,
         string memory symbol,
         address payable royaltyReciever,
-        uint96 royaltyPermyriad
+        uint96 royaltyBasisPoints
     ) ERC721A(name, symbol) {
-        _setDefaultRoyalty(royaltyReciever, royaltyPermyriad);
+        _setDefaultRoyalty(royaltyReciever, royaltyBasisPoints);
     }
 
     /// @notice Requires that the token exists.
@@ -60,12 +60,12 @@ contract ERC721ACommon is ERC721APreApproval, OwnerPausable, ERC2981 {
             ERC2981.supportsInterface(interfaceId);
     }
 
-    /// @notice Sets the royalty receiver and percentage (in units of permyriad
-    /// = 0.01%).
-    function setDefaultRoyalty(address receiver, uint96 permyriad)
+    /// @notice Sets the royalty receiver and percentage (in units of basis
+    /// points = 0.01%).
+    function setDefaultRoyalty(address receiver, uint96 basisPoints)
         external
         onlyOwner
     {
-        _setDefaultRoyalty(receiver, permyriad);
+        _setDefaultRoyalty(receiver, basisPoints);
     }
 }
