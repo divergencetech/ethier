@@ -583,7 +583,10 @@ func TestRoyalties(t *testing.T) {
 		if err != nil || big.NewInt(wantAmount).Cmp(amount) != 0 || wantReceiver != receiver {
 			t.Errorf("RoyaltyInfo(0, %d) got (%s, %d), err = %v; want (%s, %d), nil err", tt.salesPrice, receiver, amount, err, wantReceiver, wantAmount)
 		}
+	}
 
+	if diff := revert.OnlyOwner.Diff(nft.SetDefaultRoyalty(sim.Acc(vandal), sim.Addr(vandal), big.NewInt(1000))); diff != "" {
+		t.Errorf("SetDefaultRoyalty([as vandal]) %s", diff)
 	}
 }
 
