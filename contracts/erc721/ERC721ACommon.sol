@@ -60,12 +60,12 @@ contract ERC721ACommon is ERC721APreApproval, OwnerPausable, ERC2981 {
             ERC2981.supportsInterface(interfaceId);
     }
 
-    /// @notice Sets the royalty receiver and percentage (in units of permyriads
+    /// @notice Sets the royalty receiver and percentage (in units of permyriad
     /// = 0.01%).
-    function setDefaultRoyalty(address receiver, uint96 permyriads)
+    function setDefaultRoyalty(address receiver, uint96 permyriad)
         external
         onlyOwner
     {
-        _setDefaultRoyalty(receiver, permyriads);
+        _setDefaultRoyalty(receiver, permyriad);
     }
 }
