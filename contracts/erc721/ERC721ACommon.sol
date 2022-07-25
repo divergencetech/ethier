@@ -10,15 +10,16 @@ import "@openzeppelin/contracts/token/common/ERC2981.sol";
 @notice An ERC721A contract with common functionality:
  - OpenSea gas-free listings
  - Pausable with toggling functions exposed to Owner only
+ - ERC2981 royalties
  */
 contract ERC721ACommon is ERC721APreApproval, OwnerPausable, ERC2981 {
     constructor(
         string memory name,
         string memory symbol,
         address payable royaltyReciever,
-        uint96 royaltyPermille
+        uint96 royaltyPermyriad
     ) ERC721A(name, symbol) {
-        _setDefaultRoyalty(royaltyReciever, royaltyPermille);
+        _setDefaultRoyalty(royaltyReciever, royaltyPermyriad);
     }
 
     /// @notice Requires that the token exists.
@@ -59,15 +60,12 @@ contract ERC721ACommon is ERC721APreApproval, OwnerPausable, ERC2981 {
             ERC2981.supportsInterface(interfaceId);
     }
 
-    /// @notice Sets the royalty receiver and percentage (in units of 0.01%).
-    function setDefaultRoyalty(address receiver, uint96 permille)
+    /// @notice Sets the royalty receiver and percentage (in units of permyriads
+    /// = 0.01%).
+    function setDefaultRoyalty(address receiver, uint96 permyriads)
         external
         onlyOwner
     {
-        _setDefaultRoyalty(receiver, permille);
-    }
-
-    function _feeDenominator() internal pure virtual override returns (uint96) {
-        return 1000;
+        _setDefaultRoyalty(receiver, permyriads);
     }
 }

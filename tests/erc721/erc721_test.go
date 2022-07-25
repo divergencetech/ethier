@@ -549,32 +549,32 @@ func TestRoyalties(t *testing.T) {
 	sim, nft, _ := deploy(t)
 
 	tests := []struct {
-		setConfig   bool
-		newReceiver common.Address
-		newPermille int64
-		salesPrice  int64
+		setConfig    bool
+		newReceiver  common.Address
+		newPermyriad int64
+		salesPrice   int64
 	}{
 		{
 			salesPrice: 200000,
 		},
 		{
-			setConfig:   true,
-			newReceiver: sim.Addr(deployer),
-			newPermille: 300,
-			salesPrice:  500000,
+			setConfig:    true,
+			newReceiver:  sim.Addr(deployer),
+			newPermyriad: 300,
+			salesPrice:   500000,
 		},
 	}
 
 	for _, tt := range tests {
 		if tt.setConfig {
-			nft.SetDefaultRoyalty(sim.Acc(deployer), tt.newReceiver, big.NewInt(tt.newPermille))
+			nft.SetDefaultRoyalty(sim.Acc(deployer), tt.newReceiver, big.NewInt(tt.newPermyriad))
 		}
 
-		wantAmount := tt.salesPrice / 1000 * 750
+		wantAmount := tt.salesPrice / 1000 * 75
 		wantReceiver := sim.Addr(royaltyReceiver)
 
 		if tt.setConfig {
-			wantAmount = tt.salesPrice / 1000 * tt.newPermille
+			wantAmount = tt.salesPrice / 10000 * tt.newPermyriad
 			wantReceiver = tt.newReceiver
 		}
 
