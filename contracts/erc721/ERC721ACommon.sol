@@ -2,15 +2,14 @@
 // Copyright (c) 2022 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "./ERC721APreApproval.sol";
+import "erc721a/contracts/ERC721A.sol";
 import "../utils/OwnerPausable.sol";
 
 /**
 @notice An ERC721A contract with common functionality:
- - OpenSea gas-free listings
  - Pausable with toggling functions exposed to Owner only
  */
-contract ERC721ACommon is ERC721APreApproval, OwnerPausable {
+contract ERC721ACommon is ERC721A, OwnerPausable {
     constructor(string memory name, string memory symbol)
         ERC721A(name, symbol)
     {} // solhint-disable-line no-empty-blocks
