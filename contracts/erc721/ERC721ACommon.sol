@@ -7,7 +7,6 @@ import "../utils/OwnerPausable.sol";
 
 /**
 @notice An ERC721A contract with common functionality:
- - OpenSea gas-free listings
  - Pausable with toggling functions exposed to Owner only
  */
 contract ERC721ACommon is ERC721A, OwnerPausable {
