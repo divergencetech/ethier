@@ -11,7 +11,7 @@ contract TestableERC721ACommon is ERC721ACommon, BaseTokenURI {
     constructor(address payable royaltyReciever)
         ERC721ACommon("Token", "JRR", royaltyReciever, 750)
         BaseTokenURI("")
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     function mint() public {
         mintN(1);
