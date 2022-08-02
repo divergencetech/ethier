@@ -2,17 +2,16 @@
 // Copyright (c) 2022 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "./ERC721APreApproval.sol";
+import "erc721a/contracts/ERC721A.sol";
 import "../utils/OwnerPausable.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 
 /**
 @notice An ERC721A contract with common functionality:
- - OpenSea gas-free listings
  - Pausable with toggling functions exposed to Owner only
  - ERC2981 royalties
  */
-contract ERC721ACommon is ERC721APreApproval, OwnerPausable, ERC2981 {
+contract ERC721ACommon is ERC721A, OwnerPausable, ERC2981 {
     constructor(
         string memory name,
         string memory symbol,
