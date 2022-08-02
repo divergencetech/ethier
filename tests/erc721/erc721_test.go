@@ -1,6 +1,7 @@
 package erc721
 
 import (
+	"encoding/hex"
 	"math/big"
 	"testing"
 
@@ -23,6 +24,7 @@ const (
 	approved
 	vandal
 	proxy
+	royaltyReceiver
 
 	numAccounts // last account + 1 ;)
 )
@@ -56,7 +58,7 @@ func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721ACommon, *E
 	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
 	openseatest.DeployProxyRegistryTB(t, sim)
 
-	addr, _, nft, err := DeployTestableERC721ACommon(sim.Acc(deployer), sim)
+	addr, _, nft, err := DeployTestableERC721ACommon(sim.Acc(deployer), sim, sim.Addr(royaltyReceiver), big.NewInt(750))
 	if err != nil {
 		t.Fatalf("TestableERC721ACommon() error %v", err)
 	}
@@ -540,6 +542,87 @@ func TestOpenSeaProxyPreApprovalOptInOut(t *testing.T) {
 				t.Errorf("ApprovalForAll events diff (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestRoyalties(t *testing.T) {
+	sim, nft, _ := deploy(t)
+
+	tests := []struct {
+		setConfig         bool
+		newReceiver       common.Address
+		newBasisPoints    int64
+		salesPrice        int64
+		wantRoyaltyAmount int64
+	}{
+		{
+			salesPrice:        200_000,
+			wantRoyaltyAmount: 15_000,
+		},
+		{
+			setConfig:         true,
+			newReceiver:       sim.Addr(deployer),
+			newBasisPoints:    300,
+			salesPrice:        700_000,
+			wantRoyaltyAmount: 21_000,
+		},
+	}
+
+	for _, tt := range tests {
+		if tt.setConfig {
+			sim.Must(t, "nft.SetDefaultRoyalty(%s, %d)", tt.newReceiver, big.NewInt(tt.newBasisPoints))(nft.SetDefaultRoyalty(sim.Acc(deployer), tt.newReceiver, big.NewInt(tt.newBasisPoints)))
+		}
+
+		wantReceiver := sim.Addr(royaltyReceiver)
+
+		if tt.setConfig {
+			wantReceiver = tt.newReceiver
+		}
+
+		receiver, amount, err := nft.RoyaltyInfo(nil, big.NewInt(0), big.NewInt(tt.salesPrice))
+
+		if err != nil || big.NewInt(tt.wantRoyaltyAmount).Cmp(amount) != 0 || wantReceiver != receiver {
+			t.Errorf("RoyaltyInfo(0, %d) got (%s, %d), err = %v; want (%s, %d), nil err", tt.salesPrice, receiver, amount, err, wantReceiver, tt.wantRoyaltyAmount)
+		}
+	}
+
+	if diff := revert.OnlyOwner.Diff(nft.SetDefaultRoyalty(sim.Acc(vandal), sim.Addr(vandal), big.NewInt(1000))); diff != "" {
+		t.Errorf("SetDefaultRoyalty([as vandal]) %s", diff)
+	}
+}
+
+func TestInterfaceSupport(t *testing.T) {
+	_, nft, _ := deploy(t)
+
+	tests := []struct {
+		interfaceID string
+		wantSupport bool
+	}{
+		{
+			interfaceID: "80ac58cd", // ERC721
+			wantSupport: true,
+		},
+		{
+			interfaceID: "2a55205a", // ERC2981
+			wantSupport: true,
+		},
+	}
+
+	for _, tt := range tests {
+		b, err := hex.DecodeString(tt.interfaceID)
+		if err != nil || len(b) != 4 {
+			t.Errorf("hex.Decode(%q): err = %v, got len = (%d), want len = 4;", tt.interfaceID, err, len(b))
+		}
+
+		var id [4]byte
+		copy(id[:], b)
+
+		got, err := nft.SupportsInterface(nil, id)
+
+		if err != nil || got != tt.wantSupport {
+			t.Errorf("SupportsInterface(%s) got = %t, err = %v; want = %t", id, got, err, tt.wantSupport)
+		}
+
 	}
 }
 
