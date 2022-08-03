@@ -51,6 +51,7 @@ contract ERC721ACommon is ERC721A, OwnerPausable, ERC2981 {
     function supportsInterface(bytes4 interfaceId)
         public
         view
+        virtual
         override(ERC721A, ERC2981)
         returns (bool)
     {
@@ -62,7 +63,8 @@ contract ERC721ACommon is ERC721A, OwnerPausable, ERC2981 {
     /// @notice Sets the royalty receiver and percentage (in units of basis
     /// points = 0.01%).
     function setDefaultRoyalty(address receiver, uint96 basisPoints)
-        external
+        public
+        virtual
         onlyOwner
     {
         _setDefaultRoyalty(receiver, basisPoints);
