@@ -4,6 +4,7 @@ package erc721
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 )
 
 // A Collection is a set of Metadata, each associated with a single token ID.
@@ -28,6 +29,16 @@ type Metadata struct {
 	AnimationURL string       `json:"animation_url,omitempty"`
 	ExternalURL  string       `json:"external_url,omitempty"`
 	Attributes   []*Attribute `json:"attributes,omitempty"`
+}
+
+// MarshalJSONTo marshals the Metadata to JSON and writes it to the Writer,
+// returning the number of bytes written and any error that may occur.
+func (md *Metadata) MarshalJSONTo(w io.Writer) (int, error) {
+	buf, err := json.Marshal(md)
+	if err != nil {
+		return 0, fmt.Errorf("json.Marshal(%T): %v", md, err)
+	}
+	return w.Write(buf)
 }
 
 // An Attribute is a single attribute in Metadata.
