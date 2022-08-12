@@ -41,13 +41,15 @@ type Rarity struct {
 // function to simply return the string equivalent (e.g. true/false for
 // booleans).
 func (coll Collection) Rarity(bucket func(interface{}) string) *Rarity {
+	type traitType = string
+	type attrValue = string
 
 	// distribution and counts carry floats instead of integers to make
 	// calculation of entropy simpler. counts[x] will contain the sum of all
 	// values in distribution[x], which is split by value.
-	distributions := make(map[string]map[string]float64)
-	counts := make(map[string]float64)
-	attributes := make(map[TokenID]map[string]string)
+	distributions := make(map[traitType]map[attrValue]float64)
+	counts := make(map[traitType]float64)
+	attributes := make(map[TokenID]map[traitType]attrValue)
 
 	for id, meta := range coll {
 		attributes[id] = make(map[string]string)
