@@ -101,19 +101,10 @@ func (coll Collection) Rarity(bucket func(interface{}) string) *Rarity {
 		}
 	}
 
-	// It's not valid to consider all decimal points so we limit the precision
-	// relative to the log of the collection size as this is what dictates
-	// precision of individual probabilities.
-	scale := (func() func(float64) float64 {
-		precision := int(math.Floor(math.Log10(float64(len(coll)))))
-		pow := math.Pow10(precision)
-		return func(f float64) float64 {
-			return math.Round(f*pow) / pow
+	if entropy > 0 {
+		for id := range scores {
+			scores[id] /= entropy
 		}
-	})()
-
-	for id := range scores {
-		scores[id] = scale(scores[id] / entropy)
 	}
 	return &Rarity{
 		Entropy: entropy,
