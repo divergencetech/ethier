@@ -33,8 +33,8 @@ type MetadataServer struct {
 	// which must not revert.
 	Contract Interface
 
-	Metadata func(*TokenID, httprouter.Params) (_ *Metadata, code int, _ error)
-	Image    func(*TokenID, httprouter.Params) (img io.Reader, contentType string, code int, _ error)
+	Metadata func(Interface, *TokenID, httprouter.Params) (_ *Metadata, code int, _ error)
+	Image    func(Interface, *TokenID, httprouter.Params) (img io.Reader, contentType string, code int, _ error)
 }
 
 // ListenAndServe returns http.ListenAndServe(addr, s.Handler()).
@@ -130,7 +130,7 @@ func (s *MetadataServer) metadata(w http.ResponseWriter, r *http.Request, params
 		return errorf(404, "token %q not minted", params.ByName(TokenIDParam))
 	}
 
-	md, code, err := s.Metadata(id, params)
+	md, code, err := s.Metadata(s.Contract, id, params)
 	if err != nil {
 		return errorf(500, "Metadata(%s): %v", id, err)
 	}
@@ -164,7 +164,7 @@ func (s *MetadataServer) images(w http.ResponseWriter, r *http.Request, params h
 		return errorf(404, "token %q not minted", params.ByName(TokenIDParam))
 	}
 
-	img, contentType, code, err := s.Image(id, params)
+	img, contentType, code, err := s.Image(s.Contract, id, params)
 	if err != nil {
 		return errorf(500, "Image(%s): %v", id, err)
 	}

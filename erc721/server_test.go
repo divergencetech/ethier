@@ -85,12 +85,12 @@ func TestMetadataServer(t *testing.T) {
 		ImagePath:    "/image/:tokenId",
 		TokenIDBase:  16,
 		Contract:     deploy(t, totalSupply),
-		Metadata: func(id *TokenID, params httprouter.Params) (*Metadata, int, error) {
+		Metadata: func(_ Interface, id *TokenID, params httprouter.Params) (*Metadata, int, error) {
 			return &Metadata{
 				Name: fmt.Sprintf("Token %s", id),
 			}, 200, nil
 		},
-		Image: func(id *TokenID, params httprouter.Params) (io.Reader, string, int, error) {
+		Image: func(_ Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error) {
 			return strings.NewReader(fmt.Sprintf("Image %s", id)), imageType, 200, nil
 		},
 	}
