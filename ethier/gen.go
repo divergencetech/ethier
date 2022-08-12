@@ -79,6 +79,7 @@ func gen(cmd *cobra.Command, args []string) (retErr error) {
 		args,
 		"--base-path", basePath,
 		"--include-path", includePath,
+		"--optimize", "--optimize-runs", "200",
 		"--combined-json", "abi,bin,bin-runtime,hashes,metadata,srcmap-runtime",
 	)
 	solc := exec.Command("solc", args...)
