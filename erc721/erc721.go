@@ -2,6 +2,7 @@
 package erc721
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
@@ -31,9 +32,78 @@ type Metadata struct {
 
 // An Attribute is a single attribute in Metadata.
 type Attribute struct {
-	TraitType   string      `json:"trait_type,omitempty"`
-	Value       interface{} `json:"value"`
-	DisplayType string      `json:"display_type,omitempty"`
+	TraitType   string             `json:"trait_type,omitempty"`
+	Value       interface{}        `json:"value"`
+	DisplayType OpenSeaDisplayType `json:"display_type,omitempty"`
+}
+
+// An OpenSeaDisplayType is an OpenSea-specific metadata concept to control how
+// their UI treats numerical values.
+//
+// See https://docs.opensea.io/docs/metadata-standards for details.
+type OpenSeaDisplayType int
+
+// Allowable OpenSeaDisplayType values.
+const (
+	DisplayDefault OpenSeaDisplayType = iota
+	DisplayNumber
+	DisplayBoostNumber
+	DisplayBoostPercentage
+	DisplayDate
+	endDisplayTypes
+)
+
+// String returns the display type as a string.
+func (t OpenSeaDisplayType) String() string {
+	switch t {
+	case DisplayDefault:
+		return ""
+	case DisplayNumber:
+		return "number"
+	case DisplayBoostNumber:
+		return "boost_number"
+	case DisplayBoostPercentage:
+		return "boost_percentage"
+	case DisplayDate:
+		return "date"
+	default:
+		return fmt.Sprintf("%T(%d)", t, t)
+	}
+}
+
+// MarshalJSON returns the display type as JSON.
+func (t OpenSeaDisplayType) MarshalJSON() ([]byte, error) {
+	if t == DisplayDefault {
+		return nil, nil
+	}
+	if t >= endDisplayTypes {
+		return nil, fmt.Errorf("unsupported %T = %d", t, t)
+	}
+	return []byte(fmt.Sprintf("%q", t.String())), nil
+}
+
+// UnmarshalJSON parses the JSON buffer into the display type.
+func (t *OpenSeaDisplayType) UnmarshalJSON(buf []byte) error {
+	var s string
+	if err := json.Unmarshal(buf, &s); err != nil {
+		return err
+	}
+
+	switch s {
+	case "":
+		*t = DisplayDefault
+	case "number":
+		*t = DisplayNumber
+	case "boost_number":
+		*t = DisplayBoostNumber
+	case "boost_percentage":
+		*t = DisplayBoostPercentage
+	case "date":
+		*t = DisplayDate
+	default:
+		return fmt.Errorf("unsupported %T = %q", *t, s)
+	}
+	return nil
 }
 
 // String returns a human-readable string of TraitType:Value.
