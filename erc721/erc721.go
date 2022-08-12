@@ -50,7 +50,7 @@ const (
 	DisplayBoostNumber
 	DisplayBoostPercentage
 	DisplayDate
-	endDisplayTypes
+	endDisplayTypes // used for bounds checking
 )
 
 // String returns the display type as a string.
