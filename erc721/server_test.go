@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/divergencetech/ethier/ethtest"
-	"github.com/divergencetech/ethier/ethtest/openseatest"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/julienschmidt/httprouter"
@@ -24,11 +24,10 @@ func deploy(t *testing.T, totalSupply int64) Interface {
 	t.Helper()
 
 	sim := ethtest.NewSimulatedBackendTB(t, 1)
-	_, _, nft, err := contract.DeployTestableERC721ACommon(sim.Acc(0), sim)
+	_, _, nft, err := contract.DeployTestableERC721ACommon(sim.Acc(0), sim, common.Address{1}, big.NewInt(0))
 	if err != nil {
 		t.Fatalf("DeployTestableERC721ACommon(): %v", err)
 	}
-	openseatest.DeployProxyRegistryTB(t, sim)
 
 	sim.Must(t, "%T.MintN(%d)", nft, totalSupply)(nft.MintN(sim.Acc(0), big.NewInt(totalSupply)))
 	return nft
@@ -95,6 +94,10 @@ func TestMetadataServer(t *testing.T) {
 		},
 	}
 	baseURL, get := start(t, srv)
+	tokenURL := func(id int) string {
+		// Note the use of %x as we set TokenIDBase to 16.
+		return fmt.Sprintf("%s/metadata/%x", baseURL, id)
+	}
 
 	for id := 0; id < totalSupply; id++ {
 		t.Run(fmt.Sprintf("token %d", id), func(t *testing.T) {
@@ -104,8 +107,7 @@ func TestMetadataServer(t *testing.T) {
 			var gotMetadata *Metadata
 
 			t.Run("metadata", func(t *testing.T) {
-				// Note the use of %x as we set TokenIDBase to 16.
-				path := fmt.Sprintf("%s/metadata/%x", baseURL, id)
+				path := tokenURL(id)
 				resp := get(t, path)
 				testContentType(t, resp, "application/json")
 
@@ -158,4 +160,14 @@ func TestMetadataServer(t *testing.T) {
 			})
 		})
 	}
+
+	t.Run("non-existent token", func(t *testing.T) {
+		t.Run("metadata", func(t *testing.T) {
+			path := tokenURL(totalSupply)
+			resp := get(t, path)
+			if got, want := resp.StatusCode, 404; got != want {
+				t.Errorf("HTTP GET %q (non-existent token) got code %d; want %d", path, got, want)
+			}
+		})
+	})
 }

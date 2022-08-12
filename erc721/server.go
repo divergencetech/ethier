@@ -1,6 +1,8 @@
 package erc721
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
@@ -33,8 +35,13 @@ type MetadataServer struct {
 	// which must not revert.
 	Contract Interface
 
-	Metadata func(Interface, *TokenID, httprouter.Params) (_ *Metadata, code int, _ error)
-	Image    func(Interface, *TokenID, httprouter.Params) (img io.Reader, contentType string, code int, _ error)
+	// Metadata and Image are responsible for returning a token's metadata and
+	// image, respectively (surprise, surprise!). If Contract is non-nil, the
+	// token is guaranteed to exist if Metadata/Image is called. Only 200, 404,
+	// and 500 are allowed as HTTP codes, and these will be propagated to the
+	// end user.
+	Metadata func(Interface, *TokenID, httprouter.Params) (md *Metadata, httpCode int, err error)
+	Image    func(Interface, *TokenID, httprouter.Params) (img io.Reader, contentType string, httpCode int, err error)
 }
 
 // ListenAndServe returns http.ListenAndServe(addr, s.Handler()).
@@ -118,10 +125,12 @@ func errorf(code int, format string, a ...interface{}) error {
 	}
 }
 
-// metadata handles requests for metadata, sourcing it from the user-provided
-// s.Metadata() function, and substituting the Image field appropriately such
-// that it will point to the MetadataServer's image endpoint.
-func (s *MetadataServer) metadata(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
+// A tokenDataFunc returns arbitrary HTTP response data for a token.
+type tokenDataFunc func(Interface, *TokenID, httprouter.Params) (body io.Reader, contentType string, code int, err error)
+
+// tokenDataHandler is a generic handler for any token data, abstracting shared
+// logic from the metadata and image handlers.
+func (s *MetadataServer) tokenDataHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, fnName string, fn tokenDataFunc) error {
 	id, err := s.tokenID(params)
 	if err != nil {
 		return errorf(500, "%T.tokenID(%+v): %v", s, params, err)
@@ -130,57 +139,52 @@ func (s *MetadataServer) metadata(w http.ResponseWriter, r *http.Request, params
 		return errorf(404, "token %q not minted", params.ByName(TokenIDParam))
 	}
 
-	md, code, err := s.Metadata(s.Contract, id, params)
+	body, contentType, code, err := fn(s.Contract, id, params)
 	if err != nil {
-		return errorf(500, "Metadata(%s): %v", id, err)
+		return errorf(500, "%s(%s): %v", fnName, id, err)
 	}
+
 	switch code {
 	case 200:
 	case 404, 500:
 		return errorf(code, "%s", err)
 	default:
-		return errorf(500, "unsupported code %d returned by Metadata(%d)", code, id)
+		return errorf(500, "unsupported code %d returned by %s(%s)", code, fnName, id)
 	}
 
-	img := *s.BaseURL
-	img.Path = strings.ReplaceAll(s.ImagePath, fullTokenIDParam, id.Text(s.tokenIDBase()))
-	md.Image = img.String()
-
-	w.Header().Add("Content-Type", "application/json")
-	if _, err := md.MarshalJSONTo(w); err != nil {
-		return errorf(500, "%T.MarshalJSONTo([http response]): %v", md, err)
+	w.Header().Add("Content-Type", contentType)
+	if _, err := io.Copy(w, body); err != nil {
+		return errorf(500, "io.Copy([http response], [%s data]): %v", fnName, err)
 	}
 	return nil
+}
+
+// metadata handles requests for metadata, sourcing it from the user-provided
+// s.Metadata() function, and substituting the Image field appropriately such
+// that it will point to the MetadataServer's image endpoint.
+func (s *MetadataServer) metadata(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
+	return s.tokenDataHandler(w, r, params, "Metadata", func(i Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error) {
+		md, code, err := s.Metadata(s.Contract, id, params)
+		if err != nil {
+			return nil, "", code, err
+		}
+
+		img := *s.BaseURL
+		img.Path = strings.ReplaceAll(s.ImagePath, fullTokenIDParam, id.Text(s.tokenIDBase()))
+		md.Image = img.String()
+
+		buf, err := json.Marshal(md)
+		if err != nil {
+			return nil, "", 500, fmt.Errorf("json.Marshal(%T = %+v): %v", md, md, err)
+		}
+		return bytes.NewReader(buf), "application/json", 200, nil
+	})
 }
 
 // images handles requests for images, sourcing them from the user-provided
 // s.Images() function.
 func (s *MetadataServer) images(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
-	id, err := s.tokenID(params)
-	if err != nil {
-		return errorf(500, "%T.tokenID(%+v): %v", s, params, err)
-	}
-	if id == nil {
-		return errorf(404, "token %q not minted", params.ByName(TokenIDParam))
-	}
-
-	img, contentType, code, err := s.Image(s.Contract, id, params)
-	if err != nil {
-		return errorf(500, "Image(%s): %v", id, err)
-	}
-	switch code {
-	case 200:
-	case 404, 500:
-		return errorf(code, "%s", err)
-	default:
-		return errorf(500, "unsupported code %d returned by Metadata(%d)", code, id)
-	}
-
-	w.Header().Add("Content-Type", contentType)
-	if _, err := io.Copy(w, img); err != nil {
-		return errorf(500, "io.Copy([http response], [image Reader]): %v", err)
-	}
-	return nil
+	return s.tokenDataHandler(w, r, params, "Image", s.Image)
 }
 
 // TokenIDParam is the name of the httprouter parameter matched by metadata and
