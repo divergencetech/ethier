@@ -1,11 +1,11 @@
-name: TestLint
+name: Test
 
 on:
   push:
   workflow_dispatch:
 
 jobs:
-  test:
+  go_test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -43,39 +43,33 @@ jobs:
       - name: Run tests
         run: npm run test
 
-  lint_go:
+  bazel_test:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup Go
-        uses: actions/setup-go@v3
-
-      - name: Check Go code formatting
-        run: yarn fmt:go
-
-  lint_sol:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Setup NodeJs
-        uses: actions/setup-node@v2
+      - uses: actions/checkout@v3
+      # Source: README of github.com/ngalaiko/bazel-action (MIT)
+      - name: Mount bazel cache
+        uses: actions/cache@v3
         with:
-          node-version: 14.x
+          path: "/home/runner/.cache/bazel"
+          key: bazel-workspace-${{ hashFiles('WORKSPACE', 'repositories.bzl') }}
 
-      - name: Cache dependencies
-        id: cache
-        uses: actions/cache@v2
-        with:
-          path: ./node_modules
-          key: modules-${{ hashFiles('yarn.lock') }}
+      - name: Install bazelisk
+        run: |
+          curl -LO "https://github.com/bazelbuild/bazelisk/releases/download/v1.1.0/bazelisk-linux-amd64"
+          mkdir -p "${GITHUB_WORKSPACE}/bin/"
+          mv bazelisk-linux-amd64 "${GITHUB_WORKSPACE}/bin/bazel"
+          chmod +x "${GITHUB_WORKSPACE}/bin/bazel"
 
-      - name: Install yarn dependencies
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: rm -rf node_modules && yarn install --frozen-lockfile
+      - name: Check BUILD.bazel files
+        run: |
+          "${GITHUB_WORKSPACE}/bin/bazel" run //:gazelle_diff
 
-      - name: Check Solidity code formatting
-        run: yarn fmt:sol
+      - name: Build
+        run: |
+          "${GITHUB_WORKSPACE}/bin/bazel" build //...
 
-      - name: Run solhint
-        run: yarn lint:sol
+      - name: Test
+        run: |
+          "${GITHUB_WORKSPACE}/bin/bazel" test --test_output=errors  --cache_test_results=no //...
