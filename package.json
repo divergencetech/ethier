@@ -24,9 +24,9 @@
   "license": "MIT",
   "dependencies": {
     "@chainlink/contracts": "^0.3.0",
-    "@openzeppelin/contracts": "^4.6",
-    "@openzeppelin/contracts-upgradeable": "^4.4.1",
-    "erc721a": "^4.1.0"
+    "@openzeppelin/contracts": "4.7.0",
+    "@openzeppelin/contracts-upgradeable": "4.7.0",
+    "erc721a": "4.2.2"
   },
   "directories": {
     "test": "tests"

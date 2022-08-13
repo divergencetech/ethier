@@ -226,6 +226,10 @@ func TestChainAgnosticLibrary(t *testing.T) {
 			Data:   append(common.LeftPadBytes(sim.Addr(2).Bytes(), 32), common.LeftPadBytes([]byte{2}, 32)...),
 		},
 		{
+			Topics: topics("Initialized(uint8)"),
+			Data:   common.LeftPadBytes([]byte{1}, 32),
+		},
+		{
 			Topics: topics("PaymentSplitterDeployed(address)"),
 			Data:   common.LeftPadBytes(addr.Bytes(), 32),
 		},
