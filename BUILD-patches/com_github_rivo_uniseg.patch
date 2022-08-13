@@ -1,0 +1,20 @@
+//:gazelle has trouble with github.com/rivo/uniseg because it has the primary
+`package uniseg` and also generator binaries, all in the root directory. This
+results in no BUILD file being generated, so we produce it here.
+--- BUILD.bazel
++++ BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@io_bazel_rules_go//go:def.bzl", "go_library")
++
++go_library(
++    name = "uniseg",
++    srcs = glob(
++        include = ["*.go"],
++        exclude = [
++            "*_test.go",
++            "gen_*.go",
++        ],
++    ),
++    importpath = "github.com/rivo/uniseg",
++    visibility = ["//visibility:public"],
++)

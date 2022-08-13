@@ -541,6 +541,13 @@ def go_repositories():
         version = "v0.1.0",
     )
     go_repository(
+        name = "com_github_ethereum_go_ethereum",
+        importpath = "github.com/ethereum/go-ethereum",
+        patches = ["//BUILD-patches:com_github_ethereum_go_ethereum.patch"],  # keep
+        sum = "h1:5lqsEx92ZaZzRyOqBEXux4/UR06m296RGzN3ol3teJY=",
+        version = "v1.10.21",
+    )
+    go_repository(
         name = "com_github_fatih_color",
         importpath = "github.com/fatih/color",
         sum = "h1:DkWD4oS2D8LGGgTQ6IvwJJXSL5Vp2ffcQg58nFV38Ys=",
@@ -803,6 +810,12 @@ def go_repositories():
         importpath = "github.com/google/renameio",
         sum = "h1:GOZbcHa3HfsPKPlmyPyN2KEohoMXOhdMbHrvbpl2QaA=",
         version = "v0.1.0",
+    )
+    go_repository(
+        name = "com_github_google_tink_go",
+        importpath = "github.com/google/tink/go",
+        sum = "h1:6Eox8zONGebBFcCBqkVmt60LaWZa6xg1cl/DwAh/J1w=",
+        version = "v1.7.0",
     )
     go_repository(
         name = "com_github_google_uuid",
@@ -1283,7 +1296,6 @@ def go_repositories():
     go_repository(
         name = "com_github_mattn_go_runewidth",
         importpath = "github.com/mattn/go-runewidth",
-        patches = ["//patches:com_github_mattn_go_runewidth.patch"],  # keep
         sum = "h1:lTGmDsbAYt5DmK6OnoV7EuIF1wEIFAcxld6ypU4OSgU=",
         version = "v0.0.13",
     )
@@ -1538,6 +1550,13 @@ def go_repositories():
         importpath = "github.com/retailnext/hllpp",
         sum = "h1:RnWNS9Hlm8BIkjr6wx8li5abe0fr73jljLycdfemTp0=",
         version = "v1.0.1-0.20180308014038-101a6d2f8b52",
+    )
+    go_repository(
+        name = "com_github_rivo_uniseg",
+        importpath = "github.com/rivo/uniseg",
+        patches = ["//BUILD-patches:com_github_rivo_uniseg.patch"],  # keep
+        sum = "h1:3Z3Eu6FGHZWSfNKJTOUiPatWwfc7DzJRU04jFUqJODw=",
+        version = "v0.3.4",
     )
     go_repository(
         name = "com_github_rjeczalik_notify",
