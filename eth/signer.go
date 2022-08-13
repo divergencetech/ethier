@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
-	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
+	hdwallet "github.com/divergencetech/go-ethereum-hdwallet"
 	"github.com/tyler-smith/go-bip39"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"

@@ -18,6 +18,8 @@ import (
 )
 
 func TestSourceMap(t *testing.T) {
+	t.Skip("Pending https://github.com/divergencetech/ethier/issues/42")
+
 	sim := ethtest.NewSimulatedBackendTB(t, 1)
 
 	// As we need to test the SourceMap against actual program counters in the

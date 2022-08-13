@@ -10,6 +10,8 @@ import (
 )
 
 func TestCoverageCollector(t *testing.T) {
+	t.Skip("Pending https://github.com/divergencetech/ethier/issues/42")
+
 	sim := ethtest.NewSimulatedBackendTB(t, 1)
 
 	_, _, cov, err := srcmaptest.DeployCoverageTest(sim.Acc(0), sim)
