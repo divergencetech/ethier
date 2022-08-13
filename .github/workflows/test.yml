@@ -62,9 +62,9 @@ jobs:
           mv bazelisk-linux-amd64 "${GITHUB_WORKSPACE}/bin/bazel"
           chmod +x "${GITHUB_WORKSPACE}/bin/bazel"
 
-      - name: Check BUILD.bazel files
-        run: |
-          "${GITHUB_WORKSPACE}/bin/bazel" run //:gazelle_diff
+      # - name: Check BUILD.bazel files
+      #   run: |
+      #     "${GITHUB_WORKSPACE}/bin/bazel" run //:gazelle_diff
 
       - name: Build
         run: |

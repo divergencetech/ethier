@@ -15,7 +15,7 @@ go_library(
         "@com_github_ethereum_go_ethereum//common",
         "@com_github_ethereum_go_ethereum//crypto",
         "@com_github_ethereum_go_ethereum//params",
-        "@com_github_google_tink_go//prf:go_default_library",
+        "@com_github_google_tink_go//prf",
         "@com_github_tyler_smith_go_bip39//:go-bip39",
     ],
 )
@@ -29,9 +29,9 @@ go_test(
         "@com_github_ethereum_go_ethereum//accounts/abi/bind",
         "@com_github_ethereum_go_ethereum//common",
         "@com_github_ethereum_go_ethereum//core/types",
-        "@com_github_google_tink_go//keyset:go_default_library",
-        "@com_github_google_tink_go//prf:go_default_library",
-        "@com_github_google_tink_go//tink:go_default_library",
+        "@com_github_google_tink_go//keyset",
+        "@com_github_google_tink_go//prf",
+        "@com_github_google_tink_go//tink",
         "@com_github_h_fam_errdiff//:go_default_library",
     ],
 )
