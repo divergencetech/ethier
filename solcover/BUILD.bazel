@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "solcover",
+    srcs = [
+        "coverage.go",
+        "solcover.go",
+    ],
+    importpath = "github.com/divergencetech/ethier/solcover",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_bazelbuild_tools_jvm_autodeps//thirdparty/golang/parsers/util/offset:go_default_library",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_ethereum_go_ethereum//common/compiler",
+        "@com_github_ethereum_go_ethereum//core/vm",
+    ],
+)
+
+go_test(
+    name = "solcover_test",
+    srcs = [
+        "coverage_test.go",
+        "solcover_test.go",
+        "source_test.go",
+    ],
+    embed = [":solcover"],
+    deps = [
+        "//ethtest",
+        "//solcover/srcmaptest",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_ethereum_go_ethereum//common/compiler",
+        "@com_github_ethereum_go_ethereum//core/types",
+        "@com_github_ethereum_go_ethereum//core/vm",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+    ],
+)

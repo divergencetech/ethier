@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "opensea",
+    srcs = [
+        "generate.go",
+        "generated.go",
+    ],
+    importpath = "github.com/divergencetech/ethier/tests/thirdparty/opensea",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ethereum_go_ethereum//:go-ethereum",
+        "@com_github_ethereum_go_ethereum//accounts/abi",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_ethereum_go_ethereum//core/types",
+        "@com_github_ethereum_go_ethereum//event",
+    ],
+)
+
+go_test(
+    name = "opensea_test",
+    srcs = ["opensea_test.go"],
+    embed = [":opensea"],
+    deps = [
+        "//ethtest",
+        "//ethtest/openseatest",
+        "//ethtest/revert",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_ethereum_go_ethereum//core/types",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_h_fam_errdiff//:go_default_library",
+    ],
+)

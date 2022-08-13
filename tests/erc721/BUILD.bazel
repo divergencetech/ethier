@@ -1,0 +1,38 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "erc721",
+    srcs = ["generated.go"],
+    importpath = "github.com/divergencetech/ethier/tests/erc721",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ethereum_go_ethereum//:go-ethereum",
+        "@com_github_ethereum_go_ethereum//accounts/abi",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_ethereum_go_ethereum//core/types",
+        "@com_github_ethereum_go_ethereum//event",
+    ],
+)
+
+go_test(
+    name = "erc721_test",
+    srcs = [
+        "erc721_test.go",
+        "erc721redeemer_test.go",
+        "generate_test.go",
+    ],
+    embed = [":erc721"],
+    deps = [
+        "//ethtest",
+        "//ethtest/openseatest",
+        "//ethtest/revert",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_ethereum_go_ethereum//core/types",
+        "@com_github_ethereum_go_ethereum//crypto",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_h_fam_errdiff//:go_default_library",
+    ],
+)

@@ -1,0 +1,19 @@
++++ crypto/secp256k1/BUILD.bazel
+--- crypto/secp256k1/BUILD.bazel
+@@ -10,10 +10,13 @@
+         "scalar_mult_nocgo.go",
+         "secp256.go",
+     ],
++    cdeps = [
++        "@geth_secp256k1//:hdrs",
++    ],
+     cgo = True,
+     copts = [
+-        "-Icrypto/secp256k1/libsecp256k1",
+-        "-Icrypto/secp256k1/libsecp256k1/src",
++        "-Iexternal/geth_secp256k1/libsecp256k1",
++        "-Iexternal/geth_secp256k1/libsecp256k1/src",
+     ],
+     importpath = "github.com/ethereum/go-ethereum/crypto/secp256k1",
+     visibility = ["//visibility:public"],
+

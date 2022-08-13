@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ethtest",
+    srcs = [
+        "ethtest.go",
+        "simbackend.go",
+    ],
+    importpath = "github.com/divergencetech/ethier/ethtest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//eth",
+        "//solcover",
+        "@com_github_dustin_go_humanize//:go-humanize",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind/backends",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_ethereum_go_ethereum//core",
+        "@com_github_ethereum_go_ethereum//core/types",
+        "@com_github_ethereum_go_ethereum//crypto",
+        "@com_github_ethereum_go_ethereum//rpc",
+        "@com_github_google_go_cmp//cmp",
+    ],
+)
+
+go_test(
+    name = "ethtest_test",
+    srcs = ["ethtest_test.go"],
+    embed = [":ethtest"],
+)

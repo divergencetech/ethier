@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "chainlinktest",
+    srcs = ["chainlinktest.go"],
+    importpath = "github.com/divergencetech/ethier/ethtest/chainlinktest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//eth",
+        "//ethtest",
+        "//ethtest/chainlinktest/chainlinktestabi",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_ethereum_go_ethereum//event",
+        "@com_github_google_go_cmp//cmp",
+    ],
+)
