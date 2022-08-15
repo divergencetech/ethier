@@ -1,0 +1,24 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/divergencetech/ethier
+gazelle(
+    name = "gazelle",
+    command = "update",
+)
+
+# Useful for CI tests that Gazelle has been run.
+gazelle(
+    name = "gazelle_diff",
+    command = "update",
+    extra_args = ["--mode=diff"],
+)
+
+# The github.com/ethereum/go-ethereum package is imported with a go_repository()
+# rule, which results in Gazelle being responsible for creating its BUILD files.
+# Because of cgo, we patch the secp256k1 BUILD file, so must test this is done
+# correctly by exposing the secp256k1 test within the ethier WORKSPACE. This
+# will therefore be run by `bazel test //...`.
+test_suite(
+    name = "geth_secp256k1",
+    tests = ["@com_github_ethereum_go_ethereum//crypto/secp256k1:secp256k1_test"],
+)

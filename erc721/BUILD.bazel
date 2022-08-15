@@ -1,0 +1,39 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "erc721",
+    srcs = [
+        "erc721.go",
+        "rarity.go",
+        "server.go",
+        "tokenid.go",
+    ],
+    importpath = "github.com/divergencetech/ethier/erc721",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_ethereum_go_ethereum//crypto",
+        "@com_github_golang_glog//:glog",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_julienschmidt_httprouter//:httprouter",
+    ],
+)
+
+go_test(
+    name = "erc721_test",
+    srcs = [
+        "erc721_test.go",
+        "rarity_test.go",
+        "server_test.go",
+    ],
+    embed = [":erc721"],
+    deps = [
+        "//ethtest",
+        "//tests/erc721",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_julienschmidt_httprouter//:httprouter",
+    ],
+)

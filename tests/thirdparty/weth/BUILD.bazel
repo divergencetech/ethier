@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_test(
+    name = "weth_test",
+    srcs = ["weth_test.go"],
+    embed = [":weth"],
+    deps = [
+        "//eth",
+        "//ethtest",
+        "//ethtest/revert",
+        "//ethtest/wethtest",
+        "@com_github_ethereum_go_ethereum//common",
+    ],
+)
+
+go_library(
+    name = "weth",
+    srcs = ["generated.go"],
+    importpath = "github.com/divergencetech/ethier/tests/thirdparty/weth",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ethereum_go_ethereum//:go-ethereum",
+        "@com_github_ethereum_go_ethereum//accounts/abi",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//common",
+        "@com_github_ethereum_go_ethereum//core/types",
+        "@com_github_ethereum_go_ethereum//event",
+    ],
+)

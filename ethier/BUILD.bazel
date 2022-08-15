@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "ethier_lib",
+    srcs = [
+        "ethier.go",
+        "gen.go",
+        "rarity.go",
+        "shuffle.go",
+    ],
+    embedsrcs = ["gen_extra.go.tmpl"],
+    importpath = "github.com/divergencetech/ethier/ethier",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//erc721",
+        "@com_github_ethereum_go_ethereum//common/compiler",
+        "@com_github_ethereum_go_ethereum//crypto",
+        "@com_github_spf13_cobra//:cobra",
+        "@org_golang_x_tools//go/ast/astutil",
+    ],
+)
+
+go_binary(
+    name = "ethier",
+    embed = [":ethier_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "ethier_test",
+    srcs = ["shuffle_test.go"],
+    embed = [":ethier_lib"],
+    deps = ["@com_github_google_go_cmp//cmp"],
+)

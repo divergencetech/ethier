@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "revert",
+    srcs = ["revert.go"],
+    importpath = "github.com/divergencetech/ethier/ethtest/revert",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_h_fam_errdiff//:go_default_library"],
+)

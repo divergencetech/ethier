@@ -1,0 +1,33 @@
++++ crypto/secp256k1/BUILD.bazel
+--- crypto/secp256k1/BUILD.bazel
+@@ -10,10 +10,13 @@
+         "scalar_mult_nocgo.go",
+         "secp256.go",
+     ],
++    cdeps = [
++        "//crypto/secp256k1/libsecp256k1",
++    ],
+     cgo = True,
+     copts = [
+-        "-Icrypto/secp256k1/libsecp256k1",
+-        "-Icrypto/secp256k1/libsecp256k1/src",
++        "-Iexternal/com_github_ethereum_go_ethereum/crypto/secp256k1/libsecp256k1",
++        "-Iexternal/com_github_ethereum_go_ethereum/crypto/secp256k1/libsecp256k1/src",
+     ],
+     importpath = "github.com/ethereum/go-ethereum/crypto/secp256k1",
+     visibility = ["//visibility:public"],
+
+--- crypto/secp256k1/libsecp256k1/BUILD.bazel
+--- crypto/secp256k1/libsecp256k1/BUILD.bazel
+@@ -0,0 +1,11 @@
++cc_library(
++    name = "libsecp256k1",
++    hdrs = glob([
++        # .c files are included in hdrs because this target exists only to make
++        # the files available for cgo. If they were in srcs then they would be
++        # compiled, which would break without @rules_foreign_cc configure_make.
++        "**/*.c",
++        "**/*.h",
++    ]),
++    visibility = ["//crypto/secp256k1:__pkg__"],
++)

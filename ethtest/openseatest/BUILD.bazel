@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "openseatest",
+    srcs = ["openseatest.go"],
+    importpath = "github.com/divergencetech/ethier/ethtest/openseatest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ethtest",
+        "//ethtest/openseatest/openseatestabi",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//common",
+    ],
+)

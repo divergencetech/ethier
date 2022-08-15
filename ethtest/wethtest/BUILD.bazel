@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "wethtest",
+    srcs = ["wethtest.go"],
+    importpath = "github.com/divergencetech/ethier/ethtest/wethtest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ethtest",
+        "//ethtest/wethtest/wethtestabi",
+        "@com_github_ethereum_go_ethereum//accounts/abi/bind",
+        "@com_github_ethereum_go_ethereum//common",
+    ],
+)
