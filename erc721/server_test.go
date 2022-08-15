@@ -78,129 +78,131 @@ func TestMetadataServer(t *testing.T) {
 		imageType   = "image/png"
 	)
 
-	cases := []struct {
-		UseExternalImageURL bool
-		ExternalImageURL    string
+	tests := []struct {
+		Name             string
+		ExternalImageURL string
 	}{
 		{
-			UseExternalImageURL: false,
+			Name: "Internal images",
 		},
 		{
-			UseExternalImageURL: true,
-			ExternalImageURL:    "http://foo.bar",
+			Name:             "External images",
+			ExternalImageURL: "http://foo.bar",
 		},
 	}
 
-	for _, c := range cases {
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
 
-		srv := &MetadataServer{
-			BaseURL:      nil, // will be set to the test-server URL by start()
-			MetadataPath: "/metadata/:tokenId",
-			ImagePath:    "/image/:tokenId",
-			TokenIDBase:  16,
-			Contract:     deploy(t, totalSupply),
-			Metadata: func(_ Interface, id *TokenID, params httprouter.Params) (*Metadata, int, error) {
-				md := Metadata{
-					Name: fmt.Sprintf("Token %s", id),
-				}
-
-				if c.UseExternalImageURL {
-					md.Image = c.ExternalImageURL
-				}
-
-				return &md, 200, nil
-			},
-			Image: func(_ Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error) {
-				return strings.NewReader(fmt.Sprintf("Image %s", id)), imageType, 200, nil
-			},
-		}
-		baseURL, get := start(t, srv)
-		tokenURL := func(id int) string {
-			// Note the use of %x as we set TokenIDBase to 16.
-			return fmt.Sprintf("%s/metadata/%x", baseURL, id)
-		}
-
-		for id := 0; id < totalSupply; id++ {
-			t.Run(fmt.Sprintf("token %d", id), func(t *testing.T) {
-				// The image path has to be extracted from the metadata response,
-				// but it's cleaner to separate into sub tests and we therefore need
-				// a variable at a higher scope.
-				var gotMetadata *Metadata
-
-				t.Run("metadata", func(t *testing.T) {
-					path := tokenURL(id)
-					resp := get(t, path)
-					testContentType(t, resp, "application/json")
-
-					buf, err := io.ReadAll(resp.Body)
-					if err != nil {
-						t.Fatalf("io.ReadAll([http response body]): %v", err)
-					}
-					t.Logf("HTTP response body:\n%s", string(buf))
-					gotMetadata = new(Metadata)
-					if err := json.Unmarshal(buf, gotMetadata); err != nil {
-						t.Fatalf("json.Unmarshal([http response body], %T): %v", gotMetadata, err)
+			srv := &MetadataServer{
+				BaseURL:      nil, // will be set to the test-server URL by start()
+				MetadataPath: "/metadata/:tokenId",
+				ImagePath:    "/image/:tokenId",
+				TokenIDBase:  16,
+				Contract:     deploy(t, totalSupply),
+				Metadata: func(_ Interface, id *TokenID, params httprouter.Params) (*Metadata, int, error) {
+					md := Metadata{
+						Name: fmt.Sprintf("Token %s", id),
 					}
 
-					want := &Metadata{
-						Name:  fmt.Sprintf("Token %d", id),
-						Image: c.ExternalImageURL,
+					if tt.ExternalImageURL != "" {
+						md.Image = tt.ExternalImageURL
 					}
 
-					var ignore cmp.Option
-					if !c.UseExternalImageURL {
-						ignore = cmpopts.IgnoreFields(Metadata{}, "Image")
-					}
+					return &md, 200, nil
+				},
+				Image: func(_ Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error) {
+					return strings.NewReader(fmt.Sprintf("Image %s", id)), imageType, 200, nil
+				},
+			}
+			baseURL, get := start(t, srv)
+			tokenURL := func(id int) string {
+				// Note the use of %x as we set TokenIDBase to 16.
+				return fmt.Sprintf("%s/metadata/%x", baseURL, id)
+			}
 
-					if diff := cmp.Diff(want, gotMetadata, ignore); diff != "" {
-						t.Errorf("HTTP GET %q; parsed %T diff (-want +got):\n%s", path, gotMetadata, diff)
-					}
-				})
+			for id := 0; id < totalSupply; id++ {
+				t.Run(fmt.Sprintf("token %d", id), func(t *testing.T) {
+					// The image path has to be extracted from the metadata response,
+					// but it's cleaner to separate into sub tests and we therefore need
+					// a variable at a higher scope.
+					var gotMetadata *Metadata
 
-				if t.Failed() {
-					// Running image tests without correct Metadata is guaranteed to
-					// fail, so don't spuriously pollute the error messages.
-					return
-				}
+					t.Run("metadata", func(t *testing.T) {
+						path := tokenURL(id)
+						resp := get(t, path)
+						testContentType(t, resp, "application/json")
 
-				t.Run("image", func(t *testing.T) {
-					if c.UseExternalImageURL {
+						buf, err := io.ReadAll(resp.Body)
+						if err != nil {
+							t.Fatalf("io.ReadAll([http response body]): %v", err)
+						}
+						t.Logf("HTTP response body:\n%s", string(buf))
+						gotMetadata = new(Metadata)
+						if err := json.Unmarshal(buf, gotMetadata); err != nil {
+							t.Fatalf("json.Unmarshal([http response body], %T): %v", gotMetadata, err)
+						}
+
+						want := &Metadata{
+							Name:  fmt.Sprintf("Token %d", id),
+							Image: tt.ExternalImageURL,
+						}
+
+						var ignore cmp.Option
+						if tt.ExternalImageURL == "" {
+							ignore = cmpopts.IgnoreFields(Metadata{}, "Image")
+						}
+
+						if diff := cmp.Diff(want, gotMetadata, ignore); diff != "" {
+							t.Errorf("HTTP GET %q; parsed %T diff (-want +got):\n%s", path, gotMetadata, diff)
+						}
+					})
+
+					if t.Failed() {
+						// Running image tests without correct Metadata is guaranteed to
+						// fail, so don't spuriously pollute the error messages.
 						return
 					}
 
-					resp := get(t, gotMetadata.Image)
-					testContentType(t, resp, imageType)
+					t.Run("image", func(t *testing.T) {
+						if tt.ExternalImageURL != "" {
+							return
+						}
 
-					got, err := io.ReadAll(resp.Body)
-					if err != nil {
-						t.Fatalf("io.ReadAll([http response body]): %v", err)
-					}
-					if want := fmt.Sprintf("Image %d", id); string(got) != want {
-						t.Errorf("HTTP GET %q; got body %q; want %q", gotMetadata.Image, got, want)
-					}
+						resp := get(t, gotMetadata.Image)
+						testContentType(t, resp, imageType)
 
-					t.Run("path", func(t *testing.T) {
-						u, err := url.Parse(gotMetadata.Image)
+						got, err := io.ReadAll(resp.Body)
 						if err != nil {
-							t.Fatalf("url.Parse(%q = %T.Image return value): %v", gotMetadata.Image, gotMetadata, err)
+							t.Fatalf("io.ReadAll([http response body]): %v", err)
 						}
-						if got, want := u.Path, fmt.Sprintf("/image/%x", id); got != want {
-							t.Errorf("%T.Image path = %q; want %q", gotMetadata, got, want)
+						if want := fmt.Sprintf("Image %d", id); string(got) != want {
+							t.Errorf("HTTP GET %q; got body %q; want %q", gotMetadata.Image, got, want)
 						}
+
+						t.Run("path", func(t *testing.T) {
+							u, err := url.Parse(gotMetadata.Image)
+							if err != nil {
+								t.Fatalf("url.Parse(%q = %T.Image return value): %v", gotMetadata.Image, gotMetadata, err)
+							}
+							if got, want := u.Path, fmt.Sprintf("/image/%x", id); got != want {
+								t.Errorf("%T.Image path = %q; want %q", gotMetadata, got, want)
+							}
+						})
 					})
 				})
-			})
-		}
+			}
 
-		t.Run("non-existent token", func(t *testing.T) {
-			t.Run("metadata", func(t *testing.T) {
-				path := tokenURL(totalSupply)
-				resp := get(t, path)
-				if got, want := resp.StatusCode, 404; got != want {
-					t.Errorf("HTTP GET %q (non-existent token) got code %d; want %d", path, got, want)
-				}
+			t.Run("non-existent token", func(t *testing.T) {
+				t.Run("metadata", func(t *testing.T) {
+					path := tokenURL(totalSupply)
+					resp := get(t, path)
+					if got, want := resp.StatusCode, 404; got != want {
+						t.Errorf("HTTP GET %q (non-existent token) got code %d; want %d", path, got, want)
+					}
+				})
 			})
+
 		})
-
 	}
 }
