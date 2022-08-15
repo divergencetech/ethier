@@ -28,15 +28,15 @@
   resolved "https://registry.npmjs.org/@chainlink/contracts/-/contracts-0.3.0.tgz"
   integrity sha512-Pxu5qMTa0gc28Sxf9hyBkvwhPMn3HD62cGXy54RkL9PcabOHlUsk1i3BoFf3rwFr7T30N/obYn4de3ZrG12PDA==
 
-"@openzeppelin/contracts-upgradeable@^4.4.1":
-  version "4.4.1"
-  resolved "https://registry.npmjs.org/@openzeppelin/contracts-upgradeable/-/contracts-upgradeable-4.4.1.tgz"
-  integrity sha512-84dUN+TBY42D52BzUc4RHxU4KORs8Ys7dj3nH0WX1QKtlS6rrN45gL+sxaotkPdCqFLVLPyj+kd8GfJ4puxVjA==
+"@openzeppelin/contracts-upgradeable@4.7.0":
+  version "4.7.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts-upgradeable/-/contracts-upgradeable-4.7.0.tgz#6437261286879d353f6de7bf3ac8216bef8a486d"
+  integrity sha512-wO3PyoAaAV/rA77cK8H4c3SbO98QylTjfiFxyvURUZKTFLV180rnAvna1x7/Nxvt0Gqv+jt1sXKC7ygxsq8iCw==
 
-"@openzeppelin/contracts@^4.6":
-  version "4.6.0"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.6.0.tgz#c91cf64bc27f573836dba4122758b4743418c1b3"
-  integrity sha512-8vi4d50NNya/bQqCmaVzvHNmwHvS0OBKb7HNtuNwEE3scXWrP31fKQoGxNMT+KbzmrNZzatE3QK5p2gFONI/hg==
+"@openzeppelin/contracts@4.7.0":
+  version "4.7.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.7.0.tgz#3092d70ea60e3d1835466266b1d68ad47035a2d5"
+  integrity sha512-52Qb+A1DdOss8QvJrijYYPSf32GUg2pGaG/yCxtaA3cu4jduouTdg4XZSMLW9op54m1jH7J8hoajhHKOPsoJFw==
 
 "@solidity-parser/parser@^0.14.0", "@solidity-parser/parser@^0.14.1":
   version "0.14.1"
@@ -259,10 +259,10 @@ emoji-regex@^8.0.0:
   resolved "https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz"
   integrity sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==
 
-erc721a@^4.1.0:
-  version "4.1.0"
-  resolved "https://registry.yarnpkg.com/erc721a/-/erc721a-4.1.0.tgz#b7b2e27bfa38f0be414f9b20fdc222268b840eb4"
-  integrity sha512-qah/BMNilUpnGuLbvw4BTJckIlSZ9DVABx8pz0b65CU5zAAXCF4ivcae1spa4tq1pL7+R0QDLcqL0G1JEVVZGQ==
+erc721a@4.2.2:
+  version "4.2.2"
+  resolved "https://registry.yarnpkg.com/erc721a/-/erc721a-4.2.2.tgz#7362e2854bb28e438c19619605128b9af7d05e01"
+  integrity sha512-u5kDOqn47qFCTjXtU8VUrNqToo6aZaiUxy4e9Rtmjq3sR1k+NEZf8Kh+H5VT65rDSglRn1nn4MrY7QVa1n3Eig==
 
 error-ex@^1.3.1:
   version "1.3.2"
