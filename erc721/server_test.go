@@ -102,11 +102,8 @@ func TestMetadataServer(t *testing.T) {
 				Contract:     deploy(t, totalSupply),
 				Metadata: func(_ Interface, id *TokenID, params httprouter.Params) (*Metadata, int, error) {
 					md := Metadata{
-						Name: fmt.Sprintf("Token %s", id),
-					}
-
-					if tt.ExternalImageURL != "" {
-						md.Image = tt.ExternalImageURL
+						Name:  fmt.Sprintf("Token %s", id),
+						Image: tt.ExternalImageURL,
 					}
 
 					return &md, 200, nil
@@ -148,12 +145,14 @@ func TestMetadataServer(t *testing.T) {
 							Image: tt.ExternalImageURL,
 						}
 
-						var ignore cmp.Option
+						var opts []cmp.Option
 						if tt.ExternalImageURL == "" {
-							ignore = cmpopts.IgnoreFields(Metadata{}, "Image")
+							// We ignore the image field when using the internal
+							// endpoint because we test its validity later.
+							opts = append(opts, cmpopts.IgnoreFields(Metadata{}, "Image"))
 						}
 
-						if diff := cmp.Diff(want, gotMetadata, ignore); diff != "" {
+						if diff := cmp.Diff(want, gotMetadata, opts...); diff != "" {
 							t.Errorf("HTTP GET %q; parsed %T diff (-want +got):\n%s", path, gotMetadata, diff)
 						}
 					})
@@ -166,6 +165,8 @@ func TestMetadataServer(t *testing.T) {
 
 					t.Run("image", func(t *testing.T) {
 						if tt.ExternalImageURL != "" {
+							// Skiping this test for external images because we
+							// already checked if the correct URL is returned.
 							return
 						}
 
