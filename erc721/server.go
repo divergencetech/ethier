@@ -169,9 +169,11 @@ func (s *MetadataServer) metadata(w http.ResponseWriter, r *http.Request, params
 			return nil, "", code, err
 		}
 
-		img := *s.BaseURL
-		img.Path = strings.ReplaceAll(s.ImagePath, fullTokenIDParam, id.Text(s.tokenIDBase()))
-		md.Image = img.String()
+		if md.Image == "" {
+			img := *s.BaseURL
+			img.Path = strings.ReplaceAll(s.ImagePath, fullTokenIDParam, id.Text(s.tokenIDBase()))
+			md.Image = img.String()
+		}
 
 		buf, err := json.Marshal(md)
 		if err != nil {
