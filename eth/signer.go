@@ -134,6 +134,8 @@ func (s *Signer) Address() common.Address {
 // (always 0 or 1), carried in the highest bit of the s parameter, as per
 // EIP-2098. Using compact signatures reduces gas by removing a word from
 // calldata, and is compatible with OpenZeppelin's ECDSA.recover() helper.
+//
+// Deprecated: Compact signatures are now longer supported by ethier contracts.
 func CompactSignature(rsv []byte) ([]byte, error) {
 	// Convert the 65-byte signature returned by Sign() into a 64-byte
 	// compressed version, as described in
@@ -173,11 +175,12 @@ type signOpts struct {
 
 // sign signs a given buffer depending on the chosen options:
 // withNonce = true, appends a nonce to the message
-// compact = true, returns a compactified version of the signature according to
-// EIP-2098.
 // personal = true, adds a prefix to the message to conform to the EIP-191
 // personal message standard.
 // raw = false, the message is hashed before signing
+// compact = true, returns a compactified version of the signature according to
+// EIP-2098. Deprecated: Compact signatures are now longer supported by ethier
+// contracts.
 func (s *Signer) sign(buf []byte, opts signOpts) ([]byte, *[32]byte, error) {
 	var nonce *[32]byte
 	var err error
@@ -245,7 +248,7 @@ func (s *Signer) Sign(buf []byte) ([]byte, error) {
 func (s *Signer) PersonalSign(buf []byte) ([]byte, error) {
 	sig, _, err := s.sign(buf, signOpts{
 		raw:       false,
-		compact:   true,
+		compact:   false,
 		personal:  true,
 		withNonce: false,
 	})
@@ -257,7 +260,7 @@ func (s *Signer) PersonalSign(buf []byte) ([]byte, error) {
 func (s *Signer) PersonalSignWithNonce(buf []byte) ([]byte, [32]byte, error) {
 	sig, nonce, err := s.sign(buf, signOpts{
 		raw:       false,
-		compact:   true,
+		compact:   false,
 		personal:  true,
 		withNonce: true,
 	})
