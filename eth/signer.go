@@ -208,6 +208,8 @@ func (s *Signer) sign(buf []byte, opts signOpts) ([]byte, *[32]byte, error) {
 	}
 
 	if !opts.compact {
+		// yParities are shifted by 27 for Ethereum signatures by convention.
+		sig[64] += 27
 		return sig, nonce, nil
 	}
 
