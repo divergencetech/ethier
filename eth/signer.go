@@ -170,7 +170,11 @@ func WithPersonalMessagePrefix(message []byte) []byte {
 }
 
 type signOpts struct {
-	raw, compact, personal, withNonce bool
+	raw bool
+	// Deprecated: Compact signatures are now longer supported by ethier contracts.
+	compact   bool
+	personal  bool
+	withNonce bool
 }
 
 // sign signs a given buffer depending on the chosen options:
