@@ -1,0 +1,3 @@
+load(":sol_binary_test.bzl", "sol_binary_test_suite")
+
+sol_binary_test_suite(name = "sol_binary_test")

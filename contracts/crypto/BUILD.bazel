@@ -1,0 +1,7 @@
+load("//sol:defs.bzl", "sol_binary")
+
+sol_binary(
+    name = "crypto",
+    srcs = glob(["*.sol"]),
+    deps = ["@openzeppelin-contracts"],
+)
