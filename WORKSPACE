@@ -1,5 +1,12 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
+load("//sol:repositories.bzl", "LATEST_VERSION", "rules_sol_dependencies", "sol_register_toolchains")
+
+rules_sol_dependencies()
+
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
+bazel_skylib_workspace()
 
 ##########
 # Protobuf
@@ -92,9 +99,7 @@ go_register_toolchains(version = "1.18")
 
 gazelle_dependencies()
 
-load("//sol:repositories.bzl", "LATEST_VERSION", "rules_sol_dependencies", "sol_register_toolchains")
 
-rules_sol_dependencies()
 
 sol_register_toolchains(
     name = "solc",
