@@ -130,27 +130,6 @@ func (s *Signer) Address() common.Address {
 	return crypto.PubkeyToAddress(s.key.PublicKey)
 }
 
-// CompactSignature converts a signature with the final byte, the y parity
-// (always 0 or 1), carried in the highest bit of the s parameter, as per
-// EIP-2098. Using compact signatures reduces gas by removing a word from
-// calldata, and is compatible with OpenZeppelin's ECDSA.recover() helper.
-//
-// Deprecated: Compact signatures are now longer supported by ethier contracts.
-func CompactSignature(rsv []byte) ([]byte, error) {
-	// Convert the 65-byte signature returned by Sign() into a 64-byte
-	// compressed version, as described in
-	// https://eips.ethereum.org/EIPS/eip-2098.
-	if n := len(rsv); n != 65 {
-		return nil, fmt.Errorf("signature length %d; expecting 65", n)
-	}
-	v := rsv[64]
-	if v != 0 && v != 1 {
-		return nil, fmt.Errorf("signature V = %d; expecting 0 or 1", v)
-	}
-	rsv[32] |= v << 7
-	return rsv[:64], nil
-}
-
 // AppendRandomNonce appends random 32 bytes to the buffer, commonly used in
 // signature nonces.
 func appendRandomNonce(buf []byte) ([]byte, [32]byte, error) {
@@ -170,9 +149,7 @@ func WithPersonalMessagePrefix(message []byte) []byte {
 }
 
 type signOpts struct {
-	raw bool
-	// Deprecated: Compact signatures are now longer supported by ethier contracts.
-	compact   bool
+	raw       bool
 	personal  bool
 	withNonce bool
 }
@@ -182,9 +159,6 @@ type signOpts struct {
 // personal = true, adds a prefix to the message to conform to the EIP-191
 // personal message standard.
 // raw = false, the message is hashed before signing
-// compact = true, returns a compactified version of the signature according to
-// EIP-2098. Deprecated: Compact signatures are now longer supported by ethier
-// contracts.
 func (s *Signer) sign(buf []byte, opts signOpts) ([]byte, *[32]byte, error) {
 	var nonce *[32]byte
 	var err error
@@ -211,17 +185,8 @@ func (s *Signer) sign(buf []byte, opts signOpts) ([]byte, *[32]byte, error) {
 		return nil, nil, err
 	}
 
-	if !opts.compact {
-		// yParities are shifted by 27 for Ethereum signatures by convention.
-		sig[64] += 27
-		return sig, nonce, nil
-	}
-
-	sig, err = CompactSignature(sig)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	// yParities are shifted by 27 for Ethereum signatures by convention.
+	sig[64] += 27
 	return sig, nonce, nil
 }
 
@@ -231,7 +196,6 @@ func (s *Signer) sign(buf []byte, opts signOpts) ([]byte, *[32]byte, error) {
 func (s *Signer) RawSign(buf []byte) ([]byte, error) {
 	sig, _, err := s.sign(buf, signOpts{
 		raw:       true,
-		compact:   false,
 		personal:  false,
 		withNonce: false,
 	})
@@ -242,7 +206,6 @@ func (s *Signer) RawSign(buf []byte) ([]byte, error) {
 func (s *Signer) Sign(buf []byte) ([]byte, error) {
 	sig, _, err := s.sign(buf, signOpts{
 		raw:       false,
-		compact:   false,
 		personal:  false,
 		withNonce: false,
 	})
@@ -254,7 +217,6 @@ func (s *Signer) Sign(buf []byte) ([]byte, error) {
 func (s *Signer) PersonalSign(buf []byte) ([]byte, error) {
 	sig, _, err := s.sign(buf, signOpts{
 		raw:       false,
-		compact:   false,
 		personal:  true,
 		withNonce: false,
 	})
@@ -266,7 +228,6 @@ func (s *Signer) PersonalSign(buf []byte) ([]byte, error) {
 func (s *Signer) PersonalSignWithNonce(buf []byte) ([]byte, [32]byte, error) {
 	sig, nonce, err := s.sign(buf, signOpts{
 		raw:       false,
-		compact:   false,
 		personal:  true,
 		withNonce: true,
 	})
