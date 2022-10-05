@@ -90,25 +90,101 @@ library DynamicBuffer {
     /// @param data the data to append
     /// @dev Performs out-of-bound checks and calls `appendUnchecked`.
     function appendSafe(bytes memory buffer, bytes memory data) internal pure {
-        uint256 capacity;
-        uint256 length;
-        assembly {
-            capacity := sub(mload(sub(buffer, 0x20)), 0x40)
-            length := mload(buffer)
-        }
-
-        require(
-            length + data.length <= capacity,
-            "DynamicBuffer: Appending out of bounds."
-        );
+        _checkOverflow(buffer, data.length);
         appendUnchecked(buffer, data);
     }
 
-    string internal constant _TABLE =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    /// @notice Appends data encoded as Base64 to buffer.
+    /// @param fileSafe  Whether to replace '+' with '-' and '/' with '_'.
+    /// @param noPadding Whether to strip away the padding.
+    /// @dev Encodes `data` using the base64 encoding described in RFC 4648.
+    /// See: https://datatracker.ietf.org/doc/html/rfc4648
+    /// Author: Modified from Solady (https://github.com/vectorized/solady/blob/main/src/utils/Base64.sol)
+    /// Author: Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/utils/Base64.sol)
+    /// Author: Modified from (https://github.com/Brechtpd/base64/blob/main/base64.sol) by Brecht Devos.
+    function appendSafeBase64(
+        bytes memory buffer,
+        bytes memory data,
+        bool fileSafe,
+        bool noPadding
+    ) internal pure {
+        uint256 dataLength = data.length;
 
-    function appendSafeBase64(bytes memory buffer, bytes memory data)
-        internal
+        if (data.length == 0) {
+            return;
+        }
+
+        uint256 encodedLength;
+        uint256 r;
+        assembly {
+            // Multiply by 4/3 rounded up.
+            // The `shl(2, ...)` is equivalent to multiplying by 4.
+            encodedLength := shl(2, div(add(dataLength, 2), 3))
+
+            r := mod(dataLength, 3)
+            if noPadding {
+                encodedLength := sub(
+                    encodedLength,
+                    add(iszero(iszero(r)), eq(r, 1))
+                )
+            }
+        }
+
+        _checkOverflow(buffer, encodedLength);
+
+        assembly {
+            let nextFree := mload(0x40)
+
+            // Store the table into the scratch space.
+            // Offsetted by -1 byte so that the `mload` will load the character.
+            // We will rewrite the free memory pointer at `0x40` later with
+            // the allocated size.
+            // The magic constant 0x0230 will translate "-_" + "+/".
+            mstore(0x1f, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef")
+            mstore(
+                0x3f,
+                sub(
+                    "ghijklmnopqrstuvwxyz0123456789-_",
+                    mul(iszero(fileSafe), 0x0230)
+                )
+            )
+
+            // Skip the first slot, which stores the length.
+            let ptr := add(add(buffer, 0x20), mload(buffer))
+            let end := add(data, dataLength)
+
+            // Run over the input, 3 bytes at a time.
+            // prettier-ignore
+            for {} 1 {} {
+                    data := add(data, 3) // Advance 3 bytes.
+                    let input := mload(data)
+
+                    // Write 4 bytes. Optimized for fewer stack operations.
+                    mstore8(    ptr    , mload(and(shr(18, input), 0x3F)))
+                    mstore8(add(ptr, 1), mload(and(shr(12, input), 0x3F)))
+                    mstore8(add(ptr, 2), mload(and(shr( 6, input), 0x3F)))
+                    mstore8(add(ptr, 3), mload(and(        input , 0x3F)))
+                    
+                    ptr := add(ptr, 4) // Advance 4 bytes.
+                    // prettier-ignore
+                    if iszero(lt(data, end)) { break }
+                }
+
+            if iszero(noPadding) {
+                // Offset `ptr` and pad with '='. We can simply write over the end.
+                mstore8(sub(ptr, iszero(iszero(r))), 0x3d) // Pad at `ptr - 1` if `r > 0`.
+                mstore8(sub(ptr, shl(1, eq(r, 1))), 0x3d) // Pad at `ptr - 2` if `r == 1`.
+            }
+
+            mstore(buffer, add(mload(buffer), encodedLength))
+            mstore(0x40, nextFree)
+        }
+    }
+
+    /// @notice Reverts if the buffer will overflow after appending a given
+    /// number of bytes.
+    function _checkOverflow(bytes memory buffer, uint256 addedLength)
+        private
         pure
     {
         uint256 capacity;
@@ -118,90 +194,9 @@ library DynamicBuffer {
             length := mload(buffer)
         }
 
-        /**
-         * Inspired by Brecht Devos (Brechtpd) implementation - MIT licence
-         * https://github.com/Brechtpd/base64/blob/e78d9fd951e7b0977ddca77d92dc85183770daf4/base64.sol
-         */
-
-        // Loads the table into memory
-        string memory table = _TABLE;
-
-        // Encoding takes 3 bytes chunks of binary data from `bytes` data parameter
-        // and split into 4 numbers of 6 bits.
-        // The final Base64 length should be `bytes` data length multiplied by 4/3 rounded up
-        // - `data.length + 2`  -> Round up
-        // - `/ 3`              -> Number of 3-bytes chunks
-        // - `4 *`              -> 4 characters for each chunk
-        uint256 addedLength = 4 * ((data.length + 2) / 3);
-
         require(
             length + addedLength <= capacity,
             "DynamicBuffer: Appending out of bounds."
         );
-
-        /// @solidity memory-safe-assembly
-        assembly {
-            // Prepare the lookup table (skip the first "length" byte)
-            let tablePtr := add(table, 1)
-
-            // Prepare result pointer, jump over length
-            // let resultPtr := add(result, 32)
-            let resultPtr := add(buffer, add(length, 0x20))
-
-            // Run over the input, 3 bytes at a time
-            for {
-                let dataPtr := data
-                let endPtr := add(data, mload(data))
-            } lt(dataPtr, endPtr) {
-
-            } {
-                // Advance 3 bytes
-                dataPtr := add(dataPtr, 3)
-                let input := mload(dataPtr)
-
-                // To write each character, shift the 3 bytes (18 bits) chunk
-                // 4 times in blocks of 6 bits for each character (18, 12, 6, 0)
-                // and apply logical AND with 0x3F which is the number of
-                // the previous character in the ASCII table prior to the Base64 Table
-                // The result is then added to the table to get the character to write,
-                // and finally write it in the result pointer but with a left shift
-                // of 256 (1 byte) - 8 (1 ASCII char) = 248 bits
-
-                mstore8(
-                    resultPtr,
-                    mload(add(tablePtr, and(shr(18, input), 0x3F)))
-                )
-                resultPtr := add(resultPtr, 1) // Advance
-
-                mstore8(
-                    resultPtr,
-                    mload(add(tablePtr, and(shr(12, input), 0x3F)))
-                )
-                resultPtr := add(resultPtr, 1) // Advance
-
-                mstore8(
-                    resultPtr,
-                    mload(add(tablePtr, and(shr(6, input), 0x3F)))
-                )
-                resultPtr := add(resultPtr, 1) // Advance
-
-                mstore8(resultPtr, mload(add(tablePtr, and(input, 0x3F))))
-                resultPtr := add(resultPtr, 1) // Advance
-            }
-
-            // When data `bytes` is not exactly 3 bytes long
-            // it is padded with `=` characters at the end
-            switch mod(mload(data), 3)
-            case 1 {
-                mstore8(sub(resultPtr, 1), 0x3d)
-                mstore8(sub(resultPtr, 2), 0x3d)
-            }
-            case 2 {
-                mstore8(sub(resultPtr, 1), 0x3d)
-            }
-
-            // Update buffer length
-            mstore(buffer, add(length, addedLength))
-        }
     }
 }
