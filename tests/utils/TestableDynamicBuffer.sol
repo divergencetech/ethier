@@ -28,7 +28,6 @@ contract TestableDynamicBuffer {
         return string(buffer);
     }
 
-
     /**
     @notice Allocates a buffer with a given capacity and safely appends data for
     a given number of times encoded as base64.
@@ -37,7 +36,7 @@ contract TestableDynamicBuffer {
         uint256 capacity,
         bytes memory data,
         uint256 repetitions,
-                bool fileSafe,
+        bool fileSafe,
         bool noPadding
     ) public pure returns (string memory) {
         bytes memory buffer = DynamicBuffer.allocate(capacity);
@@ -48,5 +47,4 @@ contract TestableDynamicBuffer {
 
         return string(buffer);
     }
-
 }

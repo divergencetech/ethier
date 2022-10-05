@@ -155,6 +155,7 @@ library DynamicBuffer {
 
             // Run over the input, 3 bytes at a time.
             // prettier-ignore
+            // solhint-disable-next-line no-empty-blocks
             for {} 1 {} {
                     data := add(data, 3) // Advance 3 bytes.
                     let input := mload(data)
