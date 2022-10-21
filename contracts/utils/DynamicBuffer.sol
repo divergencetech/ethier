@@ -90,7 +90,7 @@ library DynamicBuffer {
     /// @param data the data to append
     /// @dev Performs out-of-bound checks and calls `appendUnchecked`.
     function appendSafe(bytes memory buffer, bytes memory data) internal pure {
-        _checkOverflow(buffer, data.length);
+        checkOverflow(buffer, data.length);
         appendUnchecked(buffer, data);
     }
 
@@ -130,7 +130,7 @@ library DynamicBuffer {
             }
         }
 
-        _checkOverflow(buffer, encodedLength);
+        checkOverflow(buffer, encodedLength);
 
         assembly {
             let nextFree := mload(0x40)
@@ -182,22 +182,32 @@ library DynamicBuffer {
         }
     }
 
+    /// @notice Returns the capacity of a given buffer.
+    function capacity(bytes memory buffer) internal pure returns (uint256) {
+        uint256 cap;
+        assembly {
+            cap := sub(mload(sub(buffer, 0x20)), 0x40)
+        }
+        return cap;
+    }
+
+    error BufferOverflow(uint256, uint256);
+
     /// @notice Reverts if the buffer will overflow after appending a given
     /// number of bytes.
-    function _checkOverflow(bytes memory buffer, uint256 addedLength)
-        private
+    function checkOverflow(bytes memory buffer, uint256 addedLength)
+        internal
         pure
     {
-        uint256 capacity;
-        uint256 length;
-        assembly {
-            capacity := sub(mload(sub(buffer, 0x20)), 0x40)
-            length := mload(buffer)
-        }
+        // require(
+        //     buffer.length + addedLength <= capacity(buffer),
+        //     "DynamicBuffer: Appending out of bounds."
+        // );
 
-        require(
-            length + addedLength <= capacity,
-            "DynamicBuffer: Appending out of bounds."
-        );
+        uint256 cap = capacity(buffer);
+        uint256 newLength = buffer.length + addedLength;
+        if (cap < newLength) {
+            revert BufferOverflow(cap, newLength);
+        }
     }
 }
