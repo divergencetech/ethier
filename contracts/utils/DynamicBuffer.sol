@@ -191,23 +191,16 @@ library DynamicBuffer {
         return cap;
     }
 
-    error BufferOverflow(uint256, uint256);
-
     /// @notice Reverts if the buffer will overflow after appending a given
     /// number of bytes.
     function checkOverflow(bytes memory buffer, uint256 addedLength)
         internal
         pure
     {
-        // require(
-        //     buffer.length + addedLength <= capacity(buffer),
-        //     "DynamicBuffer: Appending out of bounds."
-        // );
-
         uint256 cap = capacity(buffer);
         uint256 newLength = buffer.length + addedLength;
         if (cap < newLength) {
-            revert BufferOverflow(cap, newLength);
+            revert("DynamicBuffer: Appending out of bounds.");
         }
     }
 }
