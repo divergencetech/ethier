@@ -14,12 +14,12 @@ pragma solidity >=0.8.0;
 ///      bounds checking is required.
 library DynamicBuffer {
     /// @notice Allocates container space for the DynamicBuffer
-    /// @param capacity The intended max amount of bytes in the buffer
+    /// @param capacity_ The intended max amount of bytes in the buffer
     /// @return buffer The memory location of the buffer
-    /// @dev Allocates `capacity + 0x60` bytes of space
+    /// @dev Allocates `capacity_ + 0x60` bytes of space
     ///      The buffer array starts at the first container data position,
     ///      (i.e. `buffer = container + 0x20`)
-    function allocate(uint256 capacity)
+    function allocate(uint256 capacity_)
         internal
         pure
         returns (bytes memory buffer)
@@ -32,14 +32,14 @@ library DynamicBuffer {
             {
                 // Add 2 x 32 bytes in size for the two length fields
                 // Add 32 bytes safety space for 32B chunked copy
-                let size := add(capacity, 0x60)
+                let size := add(capacity_, 0x60)
                 let newNextFree := add(container, size)
                 mstore(0x40, newNextFree)
             }
 
             // Set the correct container length
             {
-                let length := add(capacity, 0x40)
+                let length := add(capacity_, 0x40)
                 mstore(container, length)
             }
 
