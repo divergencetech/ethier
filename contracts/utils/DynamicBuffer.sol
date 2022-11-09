@@ -117,12 +117,16 @@ library DynamicBuffer {
         uint256 encodedLength;
         uint256 r;
         assembly {
-            // Multiply by 4/3 rounded up.
+            // For each 3 bytes block, we will have 4 bytes in the base64
+            // encoding: `encodedLength = 4 * divCeil(dataLength, 3)`.
             // The `shl(2, ...)` is equivalent to multiplying by 4.
             encodedLength := shl(2, div(add(dataLength, 2), 3))
 
             r := mod(dataLength, 3)
             if noPadding {
+                // if r == 0 => no modification
+                // if r == 1 => encodedLength -= 2
+                // if r == 2 => encodedLength -= 1
                 encodedLength := sub(
                     encodedLength,
                     add(iszero(iszero(r)), eq(r, 1))

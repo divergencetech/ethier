@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	b64 "encoding/base64"
+	"encoding/base64"
 
 	"github.com/divergencetech/ethier/ethtest"
 	"github.com/h-fam/errdiff"
@@ -135,12 +135,12 @@ func TestDynamicBuffer(t *testing.T) {
 	}
 }
 
-func base64Len(data string) int64 {
-	return int64((len(data) + 2) / 3 * 4)
+func base64Len(data string) int {
+	return base64.StdEncoding.EncodedLen(len(data))
 }
 
-func base64LenUnpadded(data string) int64 {
-	return base64Len(data) - int64(len(data)%3)
+func base64LenUnpadded(data string) int {
+	return base64Len(data) - len(data)%3
 }
 
 func TestDynamicBufferBase64(t *testing.T) {
@@ -150,24 +150,24 @@ func TestDynamicBufferBase64(t *testing.T) {
 		t.Fatalf("DeployTestableDynamicBuffer() error %v", err)
 	}
 	const (
-		testStrWithoutPadding = "This is a really long test string that with padding"
+		testStrWithoutPadding = "This is a really long string without padding."
 		testStrWithPadding    = "This is a short string"
 		outOfBoundsMsg        = "DynamicBuffer: Appending out of bounds."
 	)
 
 	if base64Len(testStrWithoutPadding) != base64LenUnpadded(testStrWithoutPadding) {
-		t.Fatalf("Test string has incorrect length: %s", testStrWithoutPadding)
+		t.Fatalf("The length of %q must be a multiple of 3", testStrWithoutPadding)
 	}
 
 	if base64Len(testStrWithPadding) == base64LenUnpadded(testStrWithPadding) {
-		t.Fatalf("Test string has incorrect length: %s", testStrWithPadding)
+		t.Fatalf("The length of %q must not be a multiple of 3", testStrWithPadding)
 	}
 
 	tests := []struct {
 		name           string
-		capacity       int64
+		capacity       int
 		appendString   string
-		repetitions    int64
+		repetitions    int
 		fileSafe       bool
 		noPadding      bool
 		errDiffAgainst interface{}
@@ -232,28 +232,28 @@ func TestDynamicBufferBase64(t *testing.T) {
 			errDiffAgainst: outOfBoundsMsg,
 		},
 		{
-			name:         "Single (unpadded) append with noPadding ",
+			name:         "Single (testStrWithoutPadding) append with noPadding ",
 			capacity:     base64Len(testStrWithoutPadding),
 			appendString: testStrWithoutPadding,
 			repetitions:  1,
 			noPadding:    true,
 		},
 		{
-			name:         "Double (unpadded) append with noPadding ",
+			name:         "Double (testStrWithoutPadding) append with noPadding ",
 			capacity:     2 * base64Len(testStrWithoutPadding),
 			appendString: testStrWithoutPadding,
 			repetitions:  2,
 			noPadding:    true,
 		},
 		{
-			name:         "Single (padded) append with noPadding ",
+			name:         "Single (testStrWithPadding) append with noPadding ",
 			capacity:     base64LenUnpadded(testStrWithPadding),
 			appendString: testStrWithPadding,
 			repetitions:  1,
 			noPadding:    true,
 		},
 		{
-			name:         "Mutliple (padded) append with noPadding ",
+			name:         "Mutliple (testStrWithPadding) append with noPadding ",
 			capacity:     42 * base64LenUnpadded(testStrWithPadding),
 			appendString: testStrWithPadding,
 			repetitions:  42,
@@ -270,7 +270,7 @@ func TestDynamicBufferBase64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := dynBuf.AllocateAndAppendRepeatedBase64(nil, big.NewInt(tt.capacity), []byte(tt.appendString), big.NewInt(tt.repetitions), tt.fileSafe, tt.noPadding)
+			got, err := dynBuf.AllocateAndAppendRepeatedBase64(nil, big.NewInt(int64(tt.capacity)), []byte(tt.appendString), big.NewInt(int64(tt.repetitions)), tt.fileSafe, tt.noPadding)
 
 			if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
 				t.Fatalf("AllocateAndAppendRepeatedBase64(%d, %q, %d, %v, %v) %s", tt.capacity, tt.appendString, tt.repetitions, tt.fileSafe, tt.noPadding, diff)
@@ -280,9 +280,9 @@ func TestDynamicBufferBase64(t *testing.T) {
 				return
 			}
 
-			want := ""
-			for r := int64(0); r < tt.repetitions; r++ {
-				want = want + b64.StdEncoding.EncodeToString([]byte(tt.appendString))
+			var want string
+			for i := 0; i < tt.repetitions; i++ {
+				want = want + base64.StdEncoding.EncodeToString([]byte(tt.appendString))
 			}
 
 			if tt.noPadding {
@@ -295,7 +295,7 @@ func TestDynamicBufferBase64(t *testing.T) {
 			}
 
 			if got != want {
-				t.Errorf("AllocateAndAppendRepeatedBase64(%d, %q, %d, %v, %v) got %q; want %q", tt.capacity, tt.appendString, tt.repetitions, tt.fileSafe, tt.noPadding, got, want)
+				t.Errorf("AllocateAndAppendRepeatedBase64(%v, %q, %v, %v, %v) got %q; want %q", tt.capacity, tt.appendString, tt.repetitions, tt.fileSafe, tt.noPadding, got, want)
 			}
 		})
 	}
