@@ -204,8 +204,8 @@ func TestMetadataServer(t *testing.T) {
 					t.Run("internal image code", func(t *testing.T) {
 						path := internalImageURL(id)
 						resp := get(t, path)
-						if resp.StatusCode != tt.wantInternalImageCode {
-							t.Fatalf("HTTP GET %q: got code %v, want %v", path, resp.StatusCode, tt.wantInternalImageCode)
+						if got, want := resp.StatusCode, tt.wantInternalImageCode; got != want {
+							t.Errorf("HTTP GET %q: got code %v, want %v", path, got, want)
 						}
 					})
 

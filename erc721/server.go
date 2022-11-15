@@ -131,16 +131,16 @@ type tokenDataFunc func(Interface, *TokenID, httprouter.Params) (body io.Reader,
 // tokenDataHandler is a generic handler for any token data, abstracting shared
 // logic from the metadata and image handlers.
 func (s *MetadataServer) tokenDataHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, fnName string, fn tokenDataFunc) error {
+	if fn == nil {
+		return errorf(400, "unsupported method %s", fnName)
+	}
+
 	id, err := s.tokenID(params)
 	if err != nil {
 		return errorf(500, "%T.tokenID(%+v): %v", s, params, err)
 	}
 	if id == nil {
 		return errorf(404, "token %q not minted", params.ByName(TokenIDParam))
-	}
-
-	if fn == nil {
-		return errorf(400, "unsupported method %s", fnName)
 	}
 
 	body, contentType, code, err := fn(s.Contract, id, params)
