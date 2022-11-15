@@ -60,4 +60,4 @@ contract LookMaNoAddress {
 
 * `PaymentSplitter`
   * [Mainnet](https://etherscan.io/address/0xf034d6a4b1a64f0e6038632d87746ca24b79d325#code)
-  * [Rinkeby](https://rinkeby.etherscan.io/address/0x633dc916D9f59cf4aA117dE2Bb8edF7752270EC0#code)
+  * [Goerli](https://goerli.etherscan.io/address/0x7F4Ae949da2eD37E0a4b37e0b15B22Ad5c94DE65#code)
