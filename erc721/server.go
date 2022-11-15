@@ -37,9 +37,9 @@ type MetadataServer struct {
 
 	// Metadata and Image are responsible for returning a token's metadata and
 	// image, respectively (surprise, surprise!). If Contract is non-nil, the
-	// token is guaranteed to exist if Metadata/Image is called. Only 200, 404,
-	// and 500 are allowed as HTTP codes, and these will be propagated to the
-	// end user.
+	// token is guaranteed to exist if Metadata/Image is called. Only 200, 400,
+	// 404 and 500 are allowed as HTTP codes, and these will be propagated to
+	// the end user.
 	Metadata func(Interface, *TokenID, httprouter.Params) (md *Metadata, httpCode int, err error)
 	Image    func(Interface, *TokenID, httprouter.Params) (img io.Reader, contentType string, httpCode int, err error)
 }
@@ -139,6 +139,10 @@ func (s *MetadataServer) tokenDataHandler(w http.ResponseWriter, r *http.Request
 		return errorf(404, "token %q not minted", params.ByName(TokenIDParam))
 	}
 
+	if fn == nil {
+		return errorf(400, "unsupported method %s", fnName)
+	}
+
 	body, contentType, code, err := fn(s.Contract, id, params)
 	if err != nil {
 		return errorf(500, "%s(%s): %v", fnName, id, err)
@@ -146,7 +150,7 @@ func (s *MetadataServer) tokenDataHandler(w http.ResponseWriter, r *http.Request
 
 	switch code {
 	case 200:
-	case 404, 500:
+	case 400, 404, 500:
 		return errorf(code, "%s", err)
 	default:
 		return errorf(500, "unsupported code %d returned by %s(%s)", code, fnName, id)

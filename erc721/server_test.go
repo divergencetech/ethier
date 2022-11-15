@@ -79,15 +79,22 @@ func TestMetadataServer(t *testing.T) {
 	)
 
 	tests := []struct {
-		Name             string
-		ExternalImageURL string
+		Name                  string
+		ExternalImageURL      string
+		Image                 func(_ Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error)
+		wantInternalImageCode int
 	}{
 		{
 			Name: "Internal images",
+			Image: func(_ Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error) {
+				return strings.NewReader(fmt.Sprintf("Image %s", id)), imageType, 200, nil
+			},
+			wantInternalImageCode: 200,
 		},
 		{
-			Name:             "External images",
-			ExternalImageURL: "http://foo.bar",
+			Name:                  "External images",
+			ExternalImageURL:      "http://foo.bar",
+			wantInternalImageCode: 400,
 		},
 	}
 
@@ -108,14 +115,16 @@ func TestMetadataServer(t *testing.T) {
 
 					return &md, 200, nil
 				},
-				Image: func(_ Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error) {
-					return strings.NewReader(fmt.Sprintf("Image %s", id)), imageType, 200, nil
-				},
+				Image: tt.Image,
 			}
 			baseURL, get := start(t, srv)
 			tokenURL := func(id int) string {
 				// Note the use of %x as we set TokenIDBase to 16.
 				return fmt.Sprintf("%s/metadata/%x", baseURL, id)
+			}
+			internalImageURL := func(id int) string {
+				// Note the use of %x as we set TokenIDBase to 16.
+				return fmt.Sprintf("%s/image/%x", baseURL, id)
 			}
 
 			for id := 0; id < totalSupply; id++ {
@@ -191,6 +200,15 @@ func TestMetadataServer(t *testing.T) {
 							}
 						})
 					})
+
+					t.Run("internal image code", func(t *testing.T) {
+						path := internalImageURL(id)
+						resp := get(t, path)
+						if resp.StatusCode != tt.wantInternalImageCode {
+							t.Fatalf("HTTP GET %q: got code %v, want %v", path, resp.StatusCode, tt.wantInternalImageCode)
+						}
+					})
+
 				})
 			}
 
