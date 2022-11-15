@@ -2,7 +2,10 @@ package utils
 
 import (
 	"math/big"
+	"strings"
 	"testing"
+
+	"encoding/base64"
 
 	"github.com/divergencetech/ethier/ethtest"
 	"github.com/h-fam/errdiff"
@@ -127,6 +130,172 @@ func TestDynamicBuffer(t *testing.T) {
 
 			if got != want {
 				t.Errorf("AllocateAndAppendRepeated(%d, %q, %d) got %q; want %q", tt.capacity, tt.appendString, tt.repetitions, got, want)
+			}
+		})
+	}
+}
+
+func base64Len(data string) int {
+	return base64.StdEncoding.EncodedLen(len(data))
+}
+
+func base64LenUnpadded(data string) int {
+	return base64Len(data) - len(data)%3
+}
+
+func TestDynamicBufferBase64(t *testing.T) {
+	sim := ethtest.NewSimulatedBackendTB(t, 3)
+	_, _, dynBuf, err := DeployTestableDynamicBuffer(sim.Acc(0), sim)
+	if err != nil {
+		t.Fatalf("DeployTestableDynamicBuffer() error %v", err)
+	}
+	const (
+		testStrWithoutPadding = "This is a really long string without padding."
+		testStrWithPadding    = "This is a short string"
+		outOfBoundsMsg        = "DynamicBuffer: Appending out of bounds."
+	)
+
+	if base64Len(testStrWithoutPadding) != base64LenUnpadded(testStrWithoutPadding) {
+		t.Fatalf("The length of %q must be a multiple of 3", testStrWithoutPadding)
+	}
+
+	if base64Len(testStrWithPadding) == base64LenUnpadded(testStrWithPadding) {
+		t.Fatalf("The length of %q must not be a multiple of 3", testStrWithPadding)
+	}
+
+	tests := []struct {
+		name           string
+		capacity       int
+		appendString   string
+		repetitions    int
+		fileSafe       bool
+		noPadding      bool
+		errDiffAgainst interface{}
+	}{
+		{
+			name:         "Single append",
+			capacity:     base64Len(testStrWithoutPadding),
+			appendString: testStrWithoutPadding,
+			repetitions:  1,
+		},
+		{
+			name:           "Double append out-of-bound",
+			capacity:       base64Len(testStrWithoutPadding),
+			appendString:   testStrWithoutPadding,
+			repetitions:    2,
+			errDiffAgainst: outOfBoundsMsg,
+		},
+		{
+			name:         "Mutliple append",
+			capacity:     420 * base64Len(testStrWithoutPadding),
+			appendString: testStrWithoutPadding,
+			repetitions:  420,
+		},
+		{
+			name:           "Mutliple append out-of-bound",
+			capacity:       420 * base64Len(testStrWithoutPadding),
+			appendString:   testStrWithoutPadding,
+			repetitions:    421,
+			errDiffAgainst: outOfBoundsMsg,
+		},
+		{
+			name:         "Single append short",
+			capacity:     base64Len(testStrWithPadding),
+			appendString: testStrWithPadding,
+			repetitions:  1,
+		},
+		{
+			name:           "Double append short out-of-bound",
+			capacity:       base64Len(testStrWithPadding),
+			repetitions:    2,
+			appendString:   testStrWithPadding,
+			errDiffAgainst: outOfBoundsMsg,
+		},
+		{
+			name:         "Mutliple append short",
+			capacity:     420 * base64Len(testStrWithPadding),
+			appendString: testStrWithPadding,
+			repetitions:  420,
+		},
+		{
+			name:           "Mutliple append short out-of-bound",
+			capacity:       420 * base64Len(testStrWithPadding),
+			appendString:   testStrWithPadding,
+			repetitions:    421,
+			errDiffAgainst: outOfBoundsMsg,
+		},
+		{
+			name:           "Mutliple append short out-of-bound",
+			capacity:       420 * base64Len(testStrWithPadding),
+			appendString:   testStrWithPadding,
+			repetitions:    421,
+			errDiffAgainst: outOfBoundsMsg,
+		},
+		{
+			name:         "Single (testStrWithoutPadding) append with noPadding ",
+			capacity:     base64Len(testStrWithoutPadding),
+			appendString: testStrWithoutPadding,
+			repetitions:  1,
+			noPadding:    true,
+		},
+		{
+			name:         "Double (testStrWithoutPadding) append with noPadding ",
+			capacity:     2 * base64Len(testStrWithoutPadding),
+			appendString: testStrWithoutPadding,
+			repetitions:  2,
+			noPadding:    true,
+		},
+		{
+			name:         "Single (testStrWithPadding) append with noPadding ",
+			capacity:     base64LenUnpadded(testStrWithPadding),
+			appendString: testStrWithPadding,
+			repetitions:  1,
+			noPadding:    true,
+		},
+		{
+			name:         "Mutliple (testStrWithPadding) append with noPadding ",
+			capacity:     42 * base64LenUnpadded(testStrWithPadding),
+			appendString: testStrWithPadding,
+			repetitions:  42,
+			noPadding:    true,
+		},
+		{
+			name:         "Mutliple append file safe",
+			capacity:     42 * base64Len(testStrWithoutPadding),
+			appendString: testStrWithoutPadding,
+			repetitions:  42,
+			fileSafe:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := dynBuf.AllocateAndAppendRepeatedBase64(nil, big.NewInt(int64(tt.capacity)), []byte(tt.appendString), big.NewInt(int64(tt.repetitions)), tt.fileSafe, tt.noPadding)
+
+			if diff := errdiff.Check(err, tt.errDiffAgainst); diff != "" {
+				t.Fatalf("AllocateAndAppendRepeatedBase64(%d, %q, %d, %v, %v) %s", tt.capacity, tt.appendString, tt.repetitions, tt.fileSafe, tt.noPadding, diff)
+			}
+
+			if tt.errDiffAgainst != nil {
+				return
+			}
+
+			var want string
+			for i := 0; i < tt.repetitions; i++ {
+				want = want + base64.StdEncoding.EncodeToString([]byte(tt.appendString))
+			}
+
+			if tt.noPadding {
+				want = strings.ReplaceAll(want, "=", "")
+			}
+
+			if tt.fileSafe {
+				want = strings.ReplaceAll(want, "+", "-")
+				want = strings.ReplaceAll(want, "/", "_")
+			}
+
+			if got != want {
+				t.Errorf("AllocateAndAppendRepeatedBase64(%v, %q, %v, %v, %v) got %q; want %q", tt.capacity, tt.appendString, tt.repetitions, tt.fileSafe, tt.noPadding, got, want)
 			}
 		})
 	}
