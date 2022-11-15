@@ -28,6 +28,7 @@ type SimulatedBackend struct {
 
 	AutoCommit bool
 	accounts   []*bind.TransactOpts
+	keys       []*ecdsa.PrivateKey
 
 	// See comment on MockedEntity.
 	mockAccounts map[MockedEntity]*bind.TransactOpts
@@ -58,35 +59,36 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 		}
 	}
 
-	createAccount := func(seed []byte) (*bind.TransactOpts, error) {
+	createAccount := func(seed []byte) (*bind.TransactOpts, *ecdsa.PrivateKey, error) {
 		entropy := bytes.NewReader(crypto.Keccak512(seed))
 		key, err := ecdsa.GenerateKey(crypto.S256(), entropy)
 		if err != nil {
-			return nil, fmt.Errorf("ecdsa.GenerateKey(crypto.S256, [deterministic entropy; Keccak512(%q)]): %v", seed, err)
+			return nil, nil, fmt.Errorf("ecdsa.GenerateKey(crypto.S256, [deterministic entropy; Keccak512(%q)]): %v", seed, err)
 		}
 
 		txOpts, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
 		if err != nil {
-			return nil, fmt.Errorf("NewKeyedTransactorWithChainID(<new key>, sim-backend-id=1337): %v", err)
+			return nil, nil, fmt.Errorf("NewKeyedTransactorWithChainID(<new key>, sim-backend-id=1337): %v", err)
 		}
 		alloc[txOpts.From] = core.GenesisAccount{
 			Balance: eth.Ether(100),
 		}
-		return txOpts, nil
+		return txOpts, key, nil
 	}
 
 	for i := 0; i < numAccounts; i++ {
-		txOpts, err := createAccount([]byte(fmt.Sprintf("account:%d", i)))
+		txOpts, pk, err := createAccount([]byte(fmt.Sprintf("account:%d", i)))
 		if err != nil {
 			return nil, err
 		}
 		sb.accounts = append(sb.accounts, txOpts)
+		sb.keys = append(sb.keys, pk)
 	}
 
 	// These accounts need to be deterministic so that any contracts they deploy
 	// have deterministic addresses.
 	for _, mock := range []MockedEntity{OpenSea, Chainlink, Ethier, WETH} {
-		txOpts, err := createAccount([]byte(mock))
+		txOpts, _, err := createAccount([]byte(mock))
 		if err != nil {
 			return nil, err
 		}
@@ -149,6 +151,11 @@ func (sb *SimulatedBackend) Acc(account int) *bind.TransactOpts {
 // Addr returns the Address of the specified account number.
 func (sb *SimulatedBackend) Addr(account int) common.Address {
 	return sb.accounts[account].From
+}
+
+// PrivateKey returns the private key of the specified account number.
+func (sb *SimulatedBackend) PrivateKey(account int) *ecdsa.PrivateKey {
+	return sb.keys[account]
 }
 
 // WithValueFrom returns a TransactOpts that sends the specified value from the
@@ -235,7 +242,8 @@ func (sb *SimulatedBackend) GasSpent(ctx context.Context, tb testing.TB, tx *typ
 // error on tb.Fatal, or propagating the transaction.
 //
 // Intended usage:
-//  sb.Must(t, "ContractFunc()")(foo.ContractFunc(sim.Acc(<acc>), …))
+//
+//	sb.Must(t, "ContractFunc()")(foo.ContractFunc(sim.Acc(<acc>), …))
 //
 // The description format and associated args will be used as a prefix in any
 // reported errors. The returned function MUST be used immediately, and can only
