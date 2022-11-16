@@ -6,16 +6,16 @@ require (
 	github.com/bazelbuild/tools_jvm_autodeps v0.0.0-20180917073602-62694dd50b91
 	github.com/divergencetech/go-ethereum-hdwallet v0.0.0-20220813162312-0417b48d5b09
 	github.com/dustin/go-humanize v1.0.0
-	github.com/ethereum/go-ethereum v1.10.21
+	github.com/ethereum/go-ethereum v1.10.26
 	github.com/golang/glog v1.0.0
 	github.com/google/go-cmp v0.5.8
 	github.com/google/tink/go v1.7.0
 	github.com/h-fam/errdiff v1.0.2
-	github.com/holiman/uint256 v1.2.0
+	github.com/holiman/uint256 v1.2.1
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/spf13/cobra v1.5.0
 	github.com/tyler-smith/go-bip39 v1.1.0
-	golang.org/x/tools v0.1.12
+	golang.org/x/tools v0.3.0
 )
 
 require (
@@ -51,9 +51,9 @@ require (
 	github.com/tklauser/numcpus v0.5.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
-	golang.org/x/net v0.0.0-20220812174116-3211cb980234 // indirect
-	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/net v0.2.0 // indirect
+	golang.org/x/sys v0.2.0 // indirect
+	golang.org/x/text v0.4.0 // indirect
 	google.golang.org/genproto v0.0.0-20220812140447-cec7f5303424 // indirect
 	google.golang.org/grpc v1.48.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
