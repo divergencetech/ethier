@@ -5,12 +5,6 @@ libs = ["node_modules", "lib"]
 test = 'tests'
 match_path = '*.t.sol'
 solc_version = "0.8.16"
-remappings = [
-    '@chainlink/=node_modules/@chainlink/',
-    '@openzeppelin/=node_modules/@openzeppelin/',
-    'openzeppelin-contracts/=node_modules/@openzeppelin/contracts/',
-    'erc721a/=node_modules/erc721a/',
-]
 ffi=true
 fs_permissions = [
     { access = "write", path = "/tmp"},
