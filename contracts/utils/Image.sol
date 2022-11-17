@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2022 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.16 <0.9.0;
 
