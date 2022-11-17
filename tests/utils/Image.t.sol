@@ -4,7 +4,7 @@ pragma solidity ^0.8.15;
 
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
-import "openzeppelin-contracts/utils/Base64.sol";
+import "@openzeppelin/contracts/utils/Base64.sol";
 
 import {Image, Rectangle} from "../../contracts/utils/Image.sol";
 
