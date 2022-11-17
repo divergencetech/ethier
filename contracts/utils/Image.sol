@@ -31,6 +31,7 @@ library Image {
     function fill(bytes memory bgrPixels, uint24 rgb) internal pure {
         assembly {
             let bgr := shl(
+                // Pushing the BGR tripplet all the way to the left 256 - 24
                 232,
                 or(
                     and(0x00FF00, rgb),
@@ -127,15 +128,15 @@ library Image {
     /**
      * @notice Blends a background frame with foreground one depending on the
      * alpha channel of the latter.
-     * @param bgrPixels BGR encoded pixel frame (background)
-     * @param abgrPixels ABGR encoded pixel frame with alpha channel
+     * @param bgBgr BGR encoded pixel frame (background)
+     * @param fgAbgr ABGR encoded pixel frame with alpha channel
      * (foreground)
      * @param width of the background frame
      * @param rect The frame rectangle (coordinates) of the foreground
      */
     function alphaBlend(
-        bytes memory bgrPixels,
-        bytes memory abgrPixels,
+        bytes memory bgBgr,
+        bytes memory fgAbgr,
         uint256 width,
         Rectangle memory rect
     ) internal pure {
@@ -145,8 +146,8 @@ library Image {
         uint256 fgCursor;
         uint256 bgCursor;
         assembly {
-            fgCursor := add(abgrPixels, 0x20)
-            bgCursor := add(bgrPixels, 0x20)
+            fgCursor := add(fgAbgr, 0x20)
+            bgCursor := add(bgBgr, 0x20)
         }
 
         // Adding the offset to the lower left corner of the foreground frame
@@ -209,7 +210,7 @@ library Image {
             }
 
             // Looping over the foreground frame
-            let fgEnd := add(fgCursor, mload(abgrPixels))
+            let fgEnd := add(fgCursor, mload(fgAbgr))
             let fgIdx := 0
 
             for {

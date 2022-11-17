@@ -1,5 +1,4 @@
 // The isValidBMP binary checks if a given file contains a valid BMP image.
-
 package main
 
 import (
@@ -7,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golang/glog"
 	"golang.org/x/image/bmp"
 )
 
@@ -15,13 +13,15 @@ func main() {
 	path := os.Args[1]
 	valid, err := isValidBMP(path)
 	if err != nil {
-		glog.Exit(err)
+		fmt.Fprint(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	if valid {
 		fmt.Println("0")
 	} else {
 		fmt.Println("1")
+		os.Exit(1)
 	}
 }
 

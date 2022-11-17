@@ -13,7 +13,7 @@ library BMP {
     using DynamicBuffer for bytes;
     using RawData for bytes;
 
-    error InvalidDimensions(uint256 want, uint256 got);
+    error InvalidDimensions(uint256 expected, uint256 actual);
     error InvalidWidth();
 
     uint8 internal constant _BMP_HEADER_SIZE = 54;
@@ -116,8 +116,8 @@ library BMP {
         // biYPelsPerMeter
         buf.writeUint32LE(0x2a, 0x01);
 
-        // I've decided to use raw pixels instead of run-length encoding for
-        // compression as these aren't being stored. It's therefore simpler to
+        // We use raw pixels instead of run-length encoding for compression
+        // as these aren't being stored. It's therefore simpler to
         // avoid the extra computation. Therefore biSize can be 0. Similarly
         // there's no point checking exactly which colours are used, so
         // biClrUsed and biClrImportant can be 0 to indicate all colours. This
