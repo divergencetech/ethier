@@ -8,13 +8,14 @@ pragma solidity >=0.8.16 <0.9.0;
 library RawData {
     /**
      * @notice Return the byte at the given index interpreted as bool.
+     * @dev Any non-zero value is interpreted as true.
      */
     function getBool(bytes memory data, uint256 idx)
         internal
         pure
         returns (bool value)
     {
-        return data[idx] != 0 ? true : false;
+        return data[idx] != 0;
     }
 
     /**
@@ -56,15 +57,18 @@ library RawData {
 
     /**
      * @notice Reads a big-endian-encoded, 16-bit, unsigned interger from a
-     * given location in a bytes array.
+     * given offset in a bytes array.
+     * @param data The bytes array
+     * @param offset The index of the byte in the array at which we start reading.
+     * @dev Equivalent to `(uint(data[offset]) << 8) + uint(data[offset + 1])`
      */
-    function getUint16(bytes memory data, uint256 idx)
+    function getUint16(bytes memory data, uint256 offset)
         internal
         pure
         returns (uint16 value)
     {
         assembly {
-            value := shr(240, mload(add(data, add(0x20, idx))))
+            value := shr(240, mload(add(data, add(0x20, offset))))
         }
     }
 
