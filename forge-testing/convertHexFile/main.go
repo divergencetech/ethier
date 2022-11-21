@@ -3,68 +3,64 @@
 package main
 
 import (
-	"bufio"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
-	"strings"
 )
 
 func main() {
 	path := os.Args[1]
-	if err := convertHexFile(path); err != nil {
+	if err := convertHexFile(path, 4*1024); err != nil {
 		fmt.Fprint(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func convertHexFile(path string) (retErr error) {
-	fin, err := os.Open(path)
+func convertHexFile(path string, bufSize int) error {
+	fIn, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("os.Open(%q): %w", path, err)
+		return fmt.Errorf("os.Open(%q): %v", path, err)
+	}
+	defer fIn.Close()
+
+	// Fast-forward if we have a 0x prefix.
+	prefix, err := io.ReadAll(io.NewSectionReader(fIn, 0, 2))
+	if err != nil {
+		return fmt.Errorf("io.ReadAll(io.NewSectionReader([%q], 0, 2)): %v", path, err)
+	}
+	if string(prefix) == "0x" {
+		if at, err := fIn.Seek(2, io.SeekStart); err != nil || at != 2 {
+			return fmt.Errorf("%T.Seek(0, Start): (%d, %v); want (2, nil)", fIn, at, err)
+		}
 	}
 
-	fout, err := os.CreateTemp("", "")
+	// Although we can technically write to the beginning of the file because
+	// reads are twice as fast as writes, that risks corrupting a file if
+	// there's an error in the conversion.
+	fOut, err := os.CreateTemp("", "")
 	if err != nil {
-		return fmt.Errorf("os.CreateTemp(): %w", err)
+		return fmt.Errorf(`os.CreateTemp("", ""): %v`, err)
 	}
 
-	r := bufio.NewReader(fin)
-	buf := make([]byte, 0, 4*1024)
+	dec := hex.NewDecoder(fIn)
+	buf := make([]byte, bufSize)
 	for {
-		n, err := r.Read(buf[:cap(buf)])
+		n, err := dec.Read(buf)
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("%T.Read(): %w", r, err)
+			return fmt.Errorf("%T.Read(…): %v", dec, err)
 		}
 
-		buf = buf[:n]
-
-		data, err := hex.DecodeString(strings.TrimPrefix(string(buf), "0x"))
-		if err != nil {
-			return fmt.Errorf("hex.DecodeString([data]): %w", err)
+		if _, err := fOut.Write(buf[:n]); err != nil {
+			return fmt.Errorf("%T.Write(…): %v", fOut, err)
 		}
-		_, err = fout.Write(data)
-		if err != nil {
-			return fmt.Errorf("%T.Write(%T): %w", fout, buf, err)
-		}
-
+	}
+	if err := fOut.Close(); err != nil {
+		return fmt.Errorf("%T.Close(): %v", fOut, err)
 	}
 
-	if err := fin.Close(); err != nil {
-		return fmt.Errorf("%T.Close(): %w", fin, err)
-	}
-
-	if err := fout.Close(); err != nil {
-		return fmt.Errorf("%T.Close(): %w", fout, err)
-	}
-
-	if err := os.Rename(fout.Name(), fin.Name()); err != nil {
-		return fmt.Errorf("os.Rename(%q,%q): %w", fout.Name(), fin.Name(), err)
-	}
-
-	return nil
+	return os.Rename(fOut.Name(), fIn.Name())
 }
