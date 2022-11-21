@@ -8,15 +8,19 @@ jobs:
   go_test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: '^1.18.0'
-      - name: Build ethier
-        run: |
-          go version
-          go build -o ~/.local/bin/ethier ./ethier
+          go-version: "^1.18.0"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
 
       - name: Setup NodeJs
         uses: actions/setup-node@v2
@@ -40,38 +44,42 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y solc abigen
 
+      - name: Build ethier
+        run: |
+          go version
+          npm run build
+
       - name: Run tests
         run: npm run test
-
 # TODO(aschlosberg): Run Bazel tests once `ethier gen` is wrapped in a macro or rule.
 
-  # bazel_test:
-  #   runs-on: ubuntu-latest
-    
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     # Source: README of github.com/ngalaiko/bazel-action (MIT)
-  #     - name: Mount bazel cache
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: "/home/runner/.cache/bazel"
-  #         key: bazel-workspace-${{ hashFiles('WORKSPACE', 'repositories.bzl') }}
+# bazel_test:
+#   runs-on: ubuntu-latest
 
-  #     - name: Install bazelisk
-  #       run: |
-  #         curl -LO "https://github.com/bazelbuild/bazelisk/releases/download/v1.1.0/bazelisk-linux-amd64"
-  #         mkdir -p "${GITHUB_WORKSPACE}/bin/"
-  #         mv bazelisk-linux-amd64 "${GITHUB_WORKSPACE}/bin/bazel"
-  #         chmod +x "${GITHUB_WORKSPACE}/bin/bazel"
+#   steps:
+#     - uses: actions/checkout@v3
+#     # Source: README of github.com/ngalaiko/bazel-action (MIT)
+#     - name: Mount bazel cache
+#       uses: actions/cache@v3
+#       with:
+#         path: "/home/runner/.cache/bazel"
+#         key: bazel-workspace-${{ hashFiles('WORKSPACE', 'repositories.bzl') }}
 
-  #     - name: Check BUILD.bazel files
-  #       run: |
-  #         "${GITHUB_WORKSPACE}/bin/bazel" run //:gazelle_diff
+#     - name: Install bazelisk
+#       run: |
+#         curl -LO "https://github.com/bazelbuild/bazelisk/releases/download/v1.1.0/bazelisk-linux-amd64"
+#         mkdir -p "${GITHUB_WORKSPACE}/bin/"
+#         mv bazelisk-linux-amd64 "${GITHUB_WORKSPACE}/bin/bazel"
+#         chmod +x "${GITHUB_WORKSPACE}/bin/bazel"
 
-  #     - name: Build
-  #       run: |
-  #         "${GITHUB_WORKSPACE}/bin/bazel" build //...
+#     - name: Check BUILD.bazel files
+#       run: |
+#         "${GITHUB_WORKSPACE}/bin/bazel" run //:gazelle_diff
 
-  #     - name: Test
-  #       run: |
-  #         "${GITHUB_WORKSPACE}/bin/bazel" test --test_output=errors --cache_test_results=no //...
+#     - name: Build
+#       run: |
+#         "${GITHUB_WORKSPACE}/bin/bazel" build //...
+
+#     - name: Test
+#       run: |
+#         "${GITHUB_WORKSPACE}/bin/bazel" test --test_output=errors --cache_test_results=no //...
