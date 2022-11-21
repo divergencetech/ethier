@@ -32,8 +32,7 @@ func isValidBMP(path string) (bool, error) {
 	}
 	defer file.Close()
 
-	_, err = bmp.Decode(file)
-	if err != nil {
+	if _, err := bmp.Decode(file); err != nil {
 		return false, fmt.Errorf("bmp.Decode(%T): %w", file, err)
 	}
 
