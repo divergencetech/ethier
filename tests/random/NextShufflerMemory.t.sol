@@ -74,7 +74,9 @@ contract NextShufflerMemoryTest is Test {
     }
 }
 
-contract NextShufflerMemoryWithExternalEntropyTest is NextShufflerMemoryTest {
+contract NextShufflerMemoryWithExternalRandomnessTest is
+    NextShufflerMemoryTest
+{
     using NextShufflerMemory for NextShufflerMemory.State;
     using CSPRNG for CSPRNG.Source;
 
