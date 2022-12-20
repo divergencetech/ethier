@@ -2,8 +2,6 @@
 // Copyright (c) 2022 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.9 <0.9.0;
 
-import {PRNG} from "./PRNG.sol";
-
 /**
  * @notice Computes the values in a shuffled list [0,n).
  * @dev Although the final shuffle is uniformly random, it is entirely
@@ -16,8 +14,6 @@ import {PRNG} from "./PRNG.sol";
  * in-memory shuffling.
  */
 library NextShufflerMemory {
-    using PRNG for PRNG.Source;
-
     struct State {
         uint256[] permutation;
         bytes32 entropy;
