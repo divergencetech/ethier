@@ -21,7 +21,6 @@ contract BMPTest is Test {
         bytes
             memory raw = hex"ff0000_00ff00_0000ff_ff0000_00ff00_0000ff_ff0000_00ff00_0000ff";
         bytes memory bmp = BMP.bmp(raw, 3, 3);
-        console2.logBytes(bmp);
         assertTrue(vm.isValidBMP(bmp));
     }
 
