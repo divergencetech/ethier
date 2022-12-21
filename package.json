@@ -1,13 +1,14 @@
 {
   "name": "@divergencetech/ethier",
-  "version": "0.42.0",
+  "version": "0.43.0",
   "description": "Golang and Solidity SDK to make Ethereum development ethier",
   "main": "\"\"",
   "scripts": {
     "build": "go build -o build/ethier ethier/*.go && go build -o build ./forge-testing/...",
     "generate": "PATH=\"$(readlink -f build):${PATH}\" go generate ./...",
     "solhint": "solhint -w 0 '**/*.sol'",
-    "test": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && yarn test:light && yarn test:forge",
+    "test": "yarn test:go && yarn test:forge",
+    "test:go": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && yarn test:light",
     "test:forge": "PATH=\"$(readlink -f build):${PATH}\" forge test",
     "test:light": "go test ./...",
     "test:verbose": "PATH=\"$(readlink -f build):${PATH}\" go generate ./... && go test ./... -test.v",
