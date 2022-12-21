@@ -73,7 +73,7 @@ library NextShufflerMemory {
         require(state.shuffled < state.numToShuffle, "NextShuffler: finished");
 
         unchecked {
-            uint256 rand = _getRandom(state) %
+            uint256 rand = getRandom(state) %
                 (state.numToShuffle - state.shuffled);
             return _next(state, rand);
         }
@@ -83,12 +83,13 @@ library NextShufflerMemory {
      * @notice Generates a random number form the seed and number of shuffled
      * elements.
      */
-    function _getRandom(State memory state)
-        private
+    function getRandom(State memory state)
+        internal
         pure
         returns (uint256 rand)
     {
         assembly {
+            // The following hashes `state.entropy || state.shuffled`.
             rand := keccak256(add(state, 0x20), 0x40)
         }
     }

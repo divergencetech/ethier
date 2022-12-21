@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
 import "forge-std/Test.sol";
@@ -38,6 +38,38 @@ contract NextShufflerMemoryTest is Test {
         state.next();
     }
 
+    // A common error in Fisher–Yates implementations is not including the
+    // current index in the set of possibilities for the next shuffle, resulting
+    // in Sattolo's algorithm which never produces stationary points, i.e.
+    // `shuffled[i]==i` although they should occur with
+    // `p(numStationary > 0 ) ~ 0.63` independent of array length.
+    function testCanHaveStationary(bytes32 entropy) public {
+        uint256 length = 10;
+        uint256 numReps = 1000;
+
+        for (uint256 i; i < numReps; ++i) {
+            entropy = keccak256(abi.encodePacked(entropy));
+            if (hasStationaryIndex(shuffle(length, entropy))) {
+                return;
+            }
+        }
+
+        assertFalse(true, "No stationary index found");
+    }
+
+    function testInternalRandomSampling(bytes32 entropy, uint256 shuffled)
+        public
+    {
+        NextShufflerMemory.State memory state;
+        state.entropy = entropy;
+        state.shuffled = shuffled;
+
+        assertEq(
+            state.getRandom(),
+            uint256(keccak256(abi.encodePacked(entropy, shuffled)))
+        );
+    }
+
     function shuffle(uint256 length, bytes32 entropy)
         public
         pure
@@ -53,6 +85,19 @@ contract NextShufflerMemoryTest is Test {
             ret[i] = state.next();
         }
         return ret;
+    }
+
+    function hasStationaryIndex(uint256[] memory shuffled)
+        public
+        pure
+        returns (bool)
+    {
+        for (uint256 i; i < shuffled.length; ++i) {
+            if (shuffled[i] == i) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function assertContainsAll(uint256[] memory shuffled, uint256 length)

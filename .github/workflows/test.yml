@@ -17,11 +17,6 @@ jobs:
         with:
           go-version: "^1.18.0"
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-
       - name: Setup NodeJs
         uses: actions/setup-node@v2
         with:
@@ -50,7 +45,43 @@ jobs:
           npm run build
 
       - name: Run tests
-        run: npm run test
+        run: npm run test:go
+
+  foundry_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "^1.18.0"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Setup NodeJs
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16
+
+      - name: Cache dependencies
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: ./node_modules
+          key: modules-${{ hashFiles('yarn.lock') }}
+
+      - name: Install yarn dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: rm -rf node_modules && yarn install --frozen-lockfile
+
+      - name: Run tests
+        run: npm run test:forge
 # TODO(aschlosberg): Run Bazel tests once `ethier gen` is wrapped in a macro or rule.
 
 # bazel_test:
