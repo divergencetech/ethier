@@ -80,6 +80,11 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: rm -rf node_modules && yarn install --frozen-lockfile
 
+      - name: Build ethier
+        run: |
+          go version
+          npm run build
+
       - name: Run tests
         run: npm run test:forge
 # TODO(aschlosberg): Run Bazel tests once `ethier gen` is wrapped in a macro or rule.
