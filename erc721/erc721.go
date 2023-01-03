@@ -23,12 +23,13 @@ func CollectionFromMetadata(md []*Metadata) Collection {
 // Metadata carries a parsed JSON payload from ERC721 metadata, compatible with
 // OpenSea.
 type Metadata struct {
-	Name         string       `json:"name"`
-	Description  string       `json:"description,omitempty"`
-	Image        string       `json:"image"`
-	AnimationURL string       `json:"animation_url,omitempty"`
-	ExternalURL  string       `json:"external_url,omitempty"`
-	Attributes   []*Attribute `json:"attributes,omitempty"`
+	Name           string       `json:"name"`
+	Description    string       `json:"description,omitempty"`
+	Image          string       `json:"image"`
+	AnimationURL   string       `json:"animation_url,omitempty"`
+	ExternalURL    string       `json:"external_url,omitempty"`
+	CollectionName string       `json:"collection_name,omitempty"`
+	Attributes     []*Attribute `json:"attributes,omitempty"`
 }
 
 // MarshalJSONTo marshals the Metadata to JSON and writes it to the Writer,
