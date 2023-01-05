@@ -27,6 +27,9 @@ type MetadataServer struct {
 	// respectively. They follow syntax of github.com/julienschmidt/httprouter
 	// and use the TokenIDParam to extract the token ID.
 	MetadataPath, ImagePath string
+	// MetadataPaths allows to add additional paths that are routed to the
+	// metadata function.
+	MetadataPaths []string
 	// TokenIDBase, if non-zero, uses a custom base for decoding the token ID,
 	// defaulting to base 10.
 	TokenIDBase int
@@ -59,17 +62,24 @@ func (s *MetadataServer) ListenAndServe(addr string) error {
 func (s *MetadataServer) Handler() (http.Handler, error) {
 	r := httprouter.New()
 
-	for name, path := range map[string]string{
-		"Metadata": s.MetadataPath,
-		"Image":    s.ImagePath,
+	for name, paths := range map[string][]string{
+		"Metadata":      {s.MetadataPath},
+		"MetadataPaths": s.MetadataPaths,
+		"Image":         {s.ImagePath},
 	} {
-		if !strings.Contains(path, fullTokenIDParam) {
-			return nil, fmt.Errorf("%sPath %q must contain %q", name, path, fullTokenIDParam)
+		for _, path := range paths {
+			if !strings.Contains(path, fullTokenIDParam) {
+				return nil, fmt.Errorf("%sPath %q must contain %q", name, path, fullTokenIDParam)
+			}
 		}
 	}
 
 	r.GET(s.MetadataPath, httpErrHandler(s.metadata))
 	r.GET(s.ImagePath, httpErrHandler(s.images))
+
+	for _, p := range s.MetadataPaths {
+		r.GET(p, httpErrHandler(s.metadata))
+	}
 
 	return r, nil
 }
