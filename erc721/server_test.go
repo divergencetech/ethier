@@ -33,8 +33,11 @@ func deploy(t *testing.T, totalSupply int64) Interface {
 	return nft
 }
 
-func start(t *testing.T, srv *MetadataServer) (string, func(*testing.T, string) *http.Response) {
-	handler, err := srv.Handler()
+// start starts a new http server with requests handled by srv.Handler(), and
+// returns the base URL of the started server. Optional extra endpoints are
+// propagated to srv.Handler(), unchanged.
+func start(t *testing.T, srv *MetadataServer, endpoints ...*MetadataEndpoint) string {
+	handler, err := srv.Handler(endpoints...)
 	if err != nil {
 		t.Fatalf("%T{%+v}.Handler() error %v", srv, srv, err)
 	}
@@ -48,15 +51,19 @@ func start(t *testing.T, srv *MetadataServer) (string, func(*testing.T, string) 
 	}
 	srv.BaseURL = base
 
-	return httpSrv.URL, func(t *testing.T, url string) *http.Response {
-		t.Helper()
+	return httpSrv.URL
+}
 
-		res, err := http.Get(url)
-		if err != nil {
-			t.Fatalf("http.Get(%q): %v", url, err)
-		}
-		return res
+// httpGet calls http.Get(url), reports any errors on t.Fatal(), and returns the
+// HTTP response.
+func httpGet(t *testing.T, url string) *http.Response {
+	t.Helper()
+
+	res, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("http.Get(%q): %v", url, err)
 	}
+	return res
 }
 
 // testContentType asserts that the response has 200 code and the expected
@@ -70,6 +77,19 @@ func testContentType(t *testing.T, resp *http.Response, wantContentType string) 
 	if got, want := resp.Header.Get("Content-Type"), wantContentType; got != want {
 		t.Errorf("HTTP GET %q; got Content-Type %q; want %q", resp.Request.URL, got, want)
 	}
+}
+
+// metadataFromResponse parses the http.Response.Body into a new Metadata
+// instance and returns it.
+func metadataFromResponse(t *testing.T, r *http.Response) *Metadata {
+	t.Helper()
+
+	dec := json.NewDecoder(r.Body)
+	md := new(Metadata)
+	if err := dec.Decode(md); err != nil {
+		t.Fatalf("%T.Decode(%T) error %v", dec, md, err)
+	}
+	return md
 }
 
 func TestMetadataServer(t *testing.T) {
@@ -117,7 +137,7 @@ func TestMetadataServer(t *testing.T) {
 				},
 				Image: tt.Image,
 			}
-			baseURL, get := start(t, srv)
+			baseURL := start(t, srv)
 			tokenURL := func(id int) string {
 				// Note the use of %x as we set TokenIDBase to 16.
 				return fmt.Sprintf("%s/metadata/%x", baseURL, id)
@@ -136,19 +156,10 @@ func TestMetadataServer(t *testing.T) {
 
 					t.Run("metadata", func(t *testing.T) {
 						path := tokenURL(id)
-						resp := get(t, path)
+						resp := httpGet(t, path)
 						testContentType(t, resp, "application/json")
 
-						buf, err := io.ReadAll(resp.Body)
-						if err != nil {
-							t.Fatalf("io.ReadAll([http response body]): %v", err)
-						}
-						t.Logf("HTTP response body:\n%s", string(buf))
-						gotMetadata = new(Metadata)
-						if err := json.Unmarshal(buf, gotMetadata); err != nil {
-							t.Fatalf("json.Unmarshal([http response body], %T): %v", gotMetadata, err)
-						}
-
+						gotMetadata = metadataFromResponse(t, resp)
 						want := &Metadata{
 							Name:  fmt.Sprintf("Token %d", id),
 							Image: tt.ExternalImageURL,
@@ -179,7 +190,7 @@ func TestMetadataServer(t *testing.T) {
 							return
 						}
 
-						resp := get(t, gotMetadata.Image)
+						resp := httpGet(t, gotMetadata.Image)
 						testContentType(t, resp, imageType)
 
 						got, err := io.ReadAll(resp.Body)
@@ -203,7 +214,7 @@ func TestMetadataServer(t *testing.T) {
 
 					t.Run("internal image code", func(t *testing.T) {
 						path := internalImageURL(id)
-						resp := get(t, path)
+						resp := httpGet(t, path)
 						if got, want := resp.StatusCode, tt.wantInternalImageCode; got != want {
 							t.Errorf("HTTP GET %q: got code %v, want %v", path, got, want)
 						}
@@ -215,7 +226,7 @@ func TestMetadataServer(t *testing.T) {
 			t.Run("non-existent token", func(t *testing.T) {
 				t.Run("metadata", func(t *testing.T) {
 					path := tokenURL(totalSupply)
-					resp := get(t, path)
+					resp := httpGet(t, path)
 					if got, want := resp.StatusCode, 404; got != want {
 						t.Errorf("HTTP GET %q (non-existent token) got code %d; want %d", path, got, want)
 					}
@@ -223,5 +234,81 @@ func TestMetadataServer(t *testing.T) {
 			})
 
 		})
+	}
+}
+
+func TestMultipleMetadataEndpoints(t *testing.T) {
+	srv := &MetadataServer{
+		MetadataPath: "/default/:tokenId",
+		ImagePath:    "/images/:tokenId",
+		Metadata: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
+			md := Metadata{
+				Name: fmt.Sprintf("DEFAULT %s", id),
+			}
+			return &md, 200, nil
+		},
+	}
+
+	extra := []*MetadataEndpoint{
+		{
+			Path: "/extra0/:tokenId",
+			Handler: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
+				md := Metadata{
+					Name: fmt.Sprintf("EXTRA0 %s", id),
+				}
+				return &md, 200, nil
+			},
+		},
+		{
+			Path: "/extra1/:tokenId",
+			Handler: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
+				md := Metadata{
+					Name: fmt.Sprintf("EXTRA1 %s", id),
+				}
+				return &md, 200, nil
+			},
+		},
+	}
+
+	baseURL := start(t, srv, extra...)
+
+	ignore := cmpopts.IgnoreFields(Metadata{}, "Image")
+	tests := []struct {
+		path string
+		want *Metadata
+	}{
+		{
+			path: "default/0",
+			want: &Metadata{
+				Name: "DEFAULT 0",
+			},
+		},
+		{
+			path: "default/42",
+			want: &Metadata{
+				Name: "DEFAULT 42",
+			},
+		},
+		{
+			path: "extra0/42",
+			want: &Metadata{
+				Name: "EXTRA0 42",
+			},
+		},
+		{
+			path: "extra1/99",
+			want: &Metadata{
+				Name: "EXTRA1 99",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		url := fmt.Sprintf("%s/%s", baseURL, tt.path)
+		got := metadataFromResponse(t, httpGet(t, url))
+
+		if diff := cmp.Diff(tt.want, got, ignore); diff != "" {
+			t.Errorf("(-want +got):\n%s", diff)
+		}
 	}
 }
