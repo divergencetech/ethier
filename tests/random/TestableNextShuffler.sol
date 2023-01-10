@@ -5,11 +5,30 @@ pragma solidity >=0.8.0 <0.9.0;
 import "../../contracts/random/NextShuffler.sol";
 import "../../contracts/random/PRNG.sol";
 
-contract TestableNextShuffler is NextShuffler {
-    // solhint-disable-next-line no-empty-blocks
-    constructor(uint256 numToShuffle) NextShuffler(numToShuffle) {}
+contract TestableNextShuffler {
+    using PRNG for PRNG.Source;
+    using NextShuffler for NextShuffler.State;
+
+    NextShuffler.State public state;
 
     uint256[] public permutation;
+
+    /// @notice Emited on each call to _next() to allow for thorough testing.
+    event ShuffledWith(uint256 current, uint256 with);
+
+    constructor(uint256 numToShuffle) {
+        state.init(numToShuffle);
+    }
+
+    /**
+     * @notice An instrumented call to `state.next` for testing.
+     */
+    function _next(PRNG.Source src) internal returns (uint256) {
+        uint256 shuffled = state.shuffled;
+        (uint256 choice, uint256 rand) = state.nextWithRand(src);
+        emit ShuffledWith(shuffled, shuffled + rand);
+        return choice;
+    }
 
     function permute(uint64 seed) external {
         permute(keccak256(abi.encodePacked(seed)));
@@ -17,8 +36,12 @@ contract TestableNextShuffler is NextShuffler {
 
     function permute(bytes32 seed) public {
         PRNG.Source src = PRNG.newSource(seed);
-        for (uint256 i = 0; i < NextShuffler.numToShuffle; i++) {
-            permutation.push(NextShuffler._next(src));
+        for (uint256 i = 0; i < state.numToShuffle; i++) {
+            permutation.push(_next(src));
         }
+    }
+
+    function reset() public {
+        state.reset();
     }
 }

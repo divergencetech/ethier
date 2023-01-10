@@ -48,17 +48,21 @@ func TestNextShuffler(t *testing.T) {
 				t.Fatalf("Permute(%d) error %v", tt.seed, err)
 			}
 
-			var got []uint64
-			for i := uint64(0); i < tt.total; i++ {
-				n, err := shuffler.Permutation(nil, new(big.Int).SetUint64(i))
-				if err != nil {
-					t.Fatalf("Permutation(%d) error %v", i, err)
+			runShuffling := func() []uint64 {
+				var got []uint64
+				for i := uint64(0); i < tt.total; i++ {
+					n, err := shuffler.Permutation(nil, new(big.Int).SetUint64(i))
+					if err != nil {
+						t.Fatalf("Permutation(%d) error %v", i, err)
+					}
+					if !n.IsUint64() {
+						t.Fatalf("Permutation(%d).IsUint64() = false; want true", i)
+					}
+					got = append(got, n.Uint64())
 				}
-				if !n.IsUint64() {
-					t.Fatalf("Permutation(%d).IsUint64() = false; want true", i)
-				}
-				got = append(got, n.Uint64())
+				return got
 			}
+			got := runShuffling()
 
 			gotShuffles := make([]int, tt.total)
 			for i := uint64(0); i < tt.total; i++ {
@@ -86,6 +90,12 @@ func TestNextShuffler(t *testing.T) {
 				if uint64(j) >= tt.total {
 					t.Errorf("Index %d shuffled with out-of-range index %d; want within list of length %d", i, j, tt.total)
 				}
+			}
+
+			shuffler.Reset(sim.Acc(0))
+			got = runShuffling()
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("Permutation diff compared to regular Fisher–Yates (-want +got):\n%s", diff)
 			}
 		})
 	}
