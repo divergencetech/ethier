@@ -11,16 +11,16 @@ contract OnlyOnceConsumer is OnlyOnce {
     function limitedFunction1()
         external
         onlyOnce(OnlyOnceConsumer.limitedFunction1.selector)
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     function limitedFunction2()
         external
         onlyOnce(OnlyOnceConsumer.limitedFunction2.selector)
-    {}
+    {} // solhint-disable-line no-empty-blocks
 }
 
 contract OnlyOnceTest is Test {
-    OnlyOnceConsumer c;
+    OnlyOnceConsumer public c;
 
     function setUp() public {
         c = new OnlyOnceConsumer();
