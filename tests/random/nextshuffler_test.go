@@ -40,8 +40,8 @@ func TestNextShuffler(t *testing.T) {
 			// Capture the random values used in the shuffle to (a) check invariants;
 			// and (b) reimplement regular Fisher–Yates shuffle for comparison with the
 			// contract output.
-			rand := make(chan *TestableNextShufflerShuffledWith)
-			shuffler.TestableNextShufflerFilterer.WatchShuffledWith(nil, rand)
+			rand := make(chan *TestableNextShufflerSwappedWith)
+			shuffler.TestableNextShufflerFilterer.WatchSwappedWith(nil, rand)
 			defer close(rand)
 
 			if _, err := shuffler.Permute(sim.Acc(0), tt.seed); err != nil {
@@ -85,10 +85,10 @@ func TestNextShuffler(t *testing.T) {
 			for i, j := range gotShuffles {
 				gotStationary = gotStationary || i == j
 				if i > j {
-					t.Errorf("Index %d shuffled with earlier index %d; want lookahead only", i, j)
+					t.Errorf("Index %d Swapped with earlier index %d; want lookahead only", i, j)
 				}
 				if uint64(j) >= tt.total {
-					t.Errorf("Index %d shuffled with out-of-range index %d; want within list of length %d", i, j, tt.total)
+					t.Errorf("Index %d Swapped with out-of-range index %d; want within list of length %d", i, j, tt.total)
 				}
 			}
 

@@ -71,6 +71,8 @@ library NextShuffler {
      * memory.
      * @dev NB: See the `dev` documentation of this contract re security (or
      * lack thereof) of deterministic shuffling.
+     * @param rand Uniformly distributed random number in
+     * [0, state.numToShuffle - state.shuffled)
      */
     function next(State storage state, uint256 rand)
         internal
@@ -86,9 +88,9 @@ library NextShuffler {
 
         uint256 chosen = _get(state, rand);
 
-        // Even though afull swap of the elements in the list is not needed for
+        // Even though a full swap of the elements in the list is not needed for
         // the algoritm to work, we do it anyway because it allows us to restart
-        // the shuffling at any given point.
+        // the shuffling.
         _set(state, rand, _get(state, shuffled));
         _set(state, shuffled, chosen);
 
@@ -103,13 +105,16 @@ library NextShuffler {
      * memory together with the random number that was used for the drawing.
      * @dev NB: See the `dev` documentation of this contract re security (or
      * lack thereof) of deterministic shuffling.
+     * @dev This is intended to be used if the random number drawn from `src`
+     * that was used for shuffling needs to be reused for something else, e.g.
+     * to thoroughly test the algorithm.
      */
-    function nextWithRand(State storage state, PRNG.Source src)
+    function nextAndRand(State storage state, PRNG.Source src)
         internal
-        returns (uint256, uint256)
+        returns (uint256 choice, uint256 rand)
     {
-        uint256 rand = src.readLessThan(state.numToShuffle - state.shuffled);
-        return (next(state, rand), rand);
+        src.readLessThan(state.numToShuffle - state.shuffled);
+        choice = next(state, rand);
     }
 
     /**
@@ -122,7 +127,7 @@ library NextShuffler {
         internal
         returns (uint256)
     {
-        (uint256 choice, ) = nextWithRand(state, src);
+        (uint256 choice, ) = nextAndRand(state, src);
         return choice;
     }
 

@@ -14,7 +14,7 @@ contract TestableNextShuffler {
     uint256[] public permutation;
 
     /// @notice Emited on each call to _next() to allow for thorough testing.
-    event ShuffledWith(uint256 current, uint256 with);
+    event SwappedWith(uint256 current, uint256 with);
 
     constructor(uint256 numToShuffle) {
         state.init(numToShuffle);
@@ -25,8 +25,8 @@ contract TestableNextShuffler {
      */
     function _next(PRNG.Source src) internal returns (uint256) {
         uint256 shuffled = state.shuffled;
-        (uint256 choice, uint256 rand) = state.nextWithRand(src);
-        emit ShuffledWith(shuffled, shuffled + rand);
+        (uint256 choice, uint256 rand) = state.nextAndRand(src);
+        emit SwappedWith(shuffled, shuffled + rand);
         return choice;
     }
 
