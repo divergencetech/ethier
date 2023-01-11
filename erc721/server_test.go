@@ -35,7 +35,7 @@ func deploy(t *testing.T, totalSupply int64) Interface {
 
 // start starts a new http server with requests handled by srv.Handler(), and
 // returns the base URL of the started server.
-func start(t *testing.T, srv *MetadataServer) string {
+func start(t *testing.T, srv *Server) string {
 	handler, err := srv.Handler()
 	if err != nil {
 		t.Fatalf("%T{%+v}.Handler() error %v", srv, srv, err)
@@ -120,7 +120,7 @@ func TestMetadataServer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 
-			srv := &MetadataServer{
+			srv := &Server{
 				BaseURL:     nil, // will be set to the test-server URL by start()
 				TokenIDBase: 16,
 				Contract:    deploy(t, totalSupply),
@@ -241,7 +241,7 @@ func TestMetadataServer(t *testing.T) {
 }
 
 func TestMultipleMetadataEndpoints(t *testing.T) {
-	srv := &MetadataServer{
+	srv := &Server{
 		Metadata: []MetadataEndpoint{
 			{
 				Path: "/default/:tokenId",
