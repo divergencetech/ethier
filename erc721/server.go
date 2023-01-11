@@ -15,18 +15,14 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-// A MetadataServer handles HTTP routes to serve ERC721 metadata JSON and
-// associated images. If a contract binding is provided, it is checked to ensure
-// that the requested token already exists, thus allowing a MetadataServer to be
-// used for delayed reveals.
-type MetadataServer struct {
+// A Server handles HTTP routes to serve ERC721 metadata JSON and associated
+// images. If a contract binding is provided, it is checked to ensure that the
+// requested token already exists, thus allowing a Server to be used for delayed
+// reveals.
+type Server struct {
 	// BaseURL is the base URL of the server; i.e. everything except the path,
 	// which will be overwritten.
 	BaseURL *url.URL
-	// MetadataPath and ImagePath are the routing paths for metadata and images
-	// respectively. They follow syntax of github.com/julienschmidt/httprouter
-	// and use the TokenIDParam to extract the token ID.
-	MetadataPath, ImagePath string
 	// TokenIDBase, if non-zero, uses a custom base for decoding the token ID,
 	// defaulting to base 10.
 	TokenIDBase int
@@ -37,15 +33,40 @@ type MetadataServer struct {
 
 	// Metadata and Image are responsible for returning a token's metadata and
 	// image, respectively (surprise, surprise!). If Contract is non-nil, the
-	// token is guaranteed to exist if Metadata/Image is called. Only 200, 400,
+	// token is guaranteed to exist if Metadata/Image are called. Only 200, 400,
 	// 404 and 500 are allowed as HTTP codes, and these will be propagated to
-	// the end user.
-	Metadata func(Interface, *TokenID, httprouter.Params) (md *Metadata, httpCode int, err error)
-	Image    func(Interface, *TokenID, httprouter.Params) (img io.Reader, contentType string, httpCode int, err error)
+	// the end user. If more than one endpoint is provided for a given type,
+	// they are selected based on their Path.
+	Metadata []MetadataEndpoint
+	Image    []ImageEndpoint
 }
 
+// A MetadataEndpoint specifies an HTTP path and associated handler for requests
+// matched to the path. The Path follows the syntax of
+// github.com/julienschmidt/httprouter and uses TokenIDParam to extract the
+// token ID.
+type MetadataEndpoint struct {
+	Path    string
+	Handler MetadataHandler
+}
+
+// An ImageEndpoint is the image equivalent of a MetadataEndpoint.
+type ImageEndpoint struct {
+	Path    string
+	Handler ImageHandler
+}
+
+type (
+	// A MetadataHandler returns Metadata for a specified TokenID, bound to an
+	// ERC721 instance that can be accessed via the Interface. It is typically
+	// used in a Server.
+	MetadataHandler func(Interface, *TokenID, httprouter.Params) (md *Metadata, httpCode int, err error)
+	// An ImageHandler is the image equivalent of a MetadataHandler.
+	ImageHandler func(Interface, *TokenID, httprouter.Params) (img io.Reader, contentType string, httpCode int, err error)
+)
+
 // ListenAndServe returns http.ListenAndServe(addr, s.Handler()).
-func (s *MetadataServer) ListenAndServe(addr string) error {
+func (s *Server) ListenAndServe(addr string) error {
 	h, err := s.Handler()
 	if err != nil {
 		return err
@@ -56,21 +77,28 @@ func (s *MetadataServer) ListenAndServe(addr string) error {
 // Handler returns a Handler, for use with http.ListenAndServe(), that handles
 // all requests for metadata and images. Unless the Handler is specifically
 // needed for non-default uses, prefer s.ListenAndServer().
-func (s *MetadataServer) Handler() (http.Handler, error) {
-	r := httprouter.New()
+func (s *Server) Handler() (http.Handler, error) {
+	paths := make(map[string]string)
+	for i, e := range s.Metadata {
+		paths[fmt.Sprintf("Metadata[%d]", i)] = e.Path
+	}
+	for i, e := range s.Image {
+		paths[fmt.Sprintf("Image[%d]", i)] = e.Path
+	}
 
-	for name, path := range map[string]string{
-		"Metadata": s.MetadataPath,
-		"Image":    s.ImagePath,
-	} {
+	for name, path := range paths {
 		if !strings.Contains(path, fullTokenIDParam) {
-			return nil, fmt.Errorf("%sPath %q must contain %q", name, path, fullTokenIDParam)
+			return nil, fmt.Errorf("%s.Path %q must contain %q", name, path, fullTokenIDParam)
 		}
 	}
 
-	r.GET(s.MetadataPath, httpErrHandler(s.metadata))
-	r.GET(s.ImagePath, httpErrHandler(s.images))
-
+	r := httprouter.New()
+	for _, e := range s.Metadata {
+		r.GET(e.Path, s.metadata(e.Handler))
+	}
+	for _, e := range s.Image {
+		r.GET(e.Path, s.images(e.Handler))
+	}
 	return r, nil
 }
 
@@ -130,7 +158,7 @@ type tokenDataFunc func(Interface, *TokenID, httprouter.Params) (body io.Reader,
 
 // tokenDataHandler is a generic handler for any token data, abstracting shared
 // logic from the metadata and image handlers.
-func (s *MetadataServer) tokenDataHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, fnName string, fn tokenDataFunc) error {
+func (s *Server) tokenDataHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, fnName string, fn tokenDataFunc) error {
 	if fn == nil {
 		return errorf(400, "unsupported method %s", fnName)
 	}
@@ -163,34 +191,39 @@ func (s *MetadataServer) tokenDataHandler(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
-// metadata handles requests for metadata, sourcing it from the user-provided
-// s.Metadata() function, and substituting the Image field appropriately such
-// that it will point to the MetadataServer's image endpoint.
-func (s *MetadataServer) metadata(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
-	return s.tokenDataHandler(w, r, params, "Metadata", func(i Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error) {
-		md, code, err := s.Metadata(s.Contract, id, params)
-		if err != nil {
-			return nil, "", code, err
-		}
+// metadata configures requests for metadata, sourcing it from the
+// MetadataHandler function, and substituting the Image field appropriately such
+// that it will point to the Server's first ImageEndpoint, if one is defined.
+func (s *Server) metadata(handler MetadataHandler) httprouter.Handle {
+	h := func(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
+		return s.tokenDataHandler(w, r, params, "Metadata", func(i Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error) {
+			md, code, err := handler(s.Contract, id, params)
+			if err != nil {
+				return nil, "", code, err
+			}
 
-		if md.Image == "" {
-			img := *s.BaseURL
-			img.Path = strings.ReplaceAll(s.ImagePath, fullTokenIDParam, id.Text(s.tokenIDBase()))
-			md.Image = img.String()
-		}
+			if md.Image == "" && len(s.Image) > 0 {
+				img := *s.BaseURL
+				img.Path = strings.ReplaceAll(s.Image[0].Path, fullTokenIDParam, id.Text(s.tokenIDBase()))
+				md.Image = img.String()
+			}
 
-		buf, err := json.Marshal(md)
-		if err != nil {
-			return nil, "", 500, fmt.Errorf("json.Marshal(%T = %+v): %v", md, md, err)
-		}
-		return bytes.NewReader(buf), "application/json", 200, nil
-	})
+			buf, err := json.Marshal(md)
+			if err != nil {
+				return nil, "", 500, fmt.Errorf("json.Marshal(%T = %+v): %v", md, md, err)
+			}
+			return bytes.NewReader(buf), "application/json", 200, nil
+		})
+	}
+	return httpErrHandler(h)
 }
 
 // images handles requests for images, sourcing them from the user-provided
 // s.Images() function.
-func (s *MetadataServer) images(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
-	return s.tokenDataHandler(w, r, params, "Image", s.Image)
+func (s *Server) images(handler ImageHandler) httprouter.Handle {
+	return httpErrHandler(func(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
+		return s.tokenDataHandler(w, r, params, "Image", tokenDataFunc(handler))
+	})
 }
 
 // TokenIDParam is the name of the httprouter parameter matched by metadata and
@@ -206,7 +239,7 @@ const fullTokenIDParam = ":" + TokenIDParam
 // tokenID extracts the `TokenIDParam` from the params. If s.Contract is
 // non-nil, it is used to check that the token already exists—if not then
 // tokenID() returns (nil, nil).
-func (s *MetadataServer) tokenID(params httprouter.Params) (*TokenID, error) {
+func (s *Server) tokenID(params httprouter.Params) (*TokenID, error) {
 	rawID := params.ByName(TokenIDParam)
 	if rawID == "" {
 		return nil, fmt.Errorf("no %q param", TokenIDParam)
@@ -227,7 +260,7 @@ func (s *MetadataServer) tokenID(params httprouter.Params) (*TokenID, error) {
 }
 
 // tokenIDBase returns s.TokenIDBase if non-zero, otherwise it returns 10.
-func (s *MetadataServer) tokenIDBase() int {
+func (s *Server) tokenIDBase() int {
 	switch b := s.TokenIDBase; b {
 	case 0:
 		return 10
