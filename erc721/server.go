@@ -23,10 +23,6 @@ type MetadataServer struct {
 	// BaseURL is the base URL of the server; i.e. everything except the path,
 	// which will be overwritten.
 	BaseURL *url.URL
-	// MetadataPath and ImagePath are the routing paths for metadata and images
-	// respectively. They follow syntax of github.com/julienschmidt/httprouter
-	// and use the TokenIDParam to extract the token ID.
-	MetadataPath, ImagePath string
 	// TokenIDBase, if non-zero, uses a custom base for decoding the token ID,
 	// defaulting to base 10.
 	TokenIDBase int
@@ -39,9 +35,25 @@ type MetadataServer struct {
 	// image, respectively (surprise, surprise!). If Contract is non-nil, the
 	// token is guaranteed to exist if Metadata/Image are called. Only 200, 400,
 	// 404 and 500 are allowed as HTTP codes, and these will be propagated to
-	// the end user.
-	Metadata MetadataHandler
-	Image    ImageHandler
+	// the end user. If more than one endpoint is provided for a given type,
+	// they are selected based on their Path.
+	Metadata []MetadataEndpoint
+	Image    []ImageEndpoint
+}
+
+// A MetadataEndpoint specifies an HTTP path and associated handler for requests
+// matched to the path. The Path follows the syntax of
+// github.com/julienschmidt/httprouter and uses TokenIDParam to extract the
+// token ID.
+type MetadataEndpoint struct {
+	Path    string
+	Handler MetadataHandler
+}
+
+// An ImageEndpoint is the image equivalent of a MetadataEndpoint.
+type ImageEndpoint struct {
+	Path    string
+	Handler ImageHandler
 }
 
 type (
@@ -65,44 +77,29 @@ func (s *MetadataServer) ListenAndServe(addr string) error {
 // Handler returns a Handler, for use with http.ListenAndServe(), that handles
 // all requests for metadata and images. Unless the Handler is specifically
 // needed for non-default uses, prefer s.ListenAndServer().
-//
-// The optional extra endpoints function identically to
-// (s.MetadataPath,s.Metadata) and allow specification of different metadata
-// based on URL pattern.
-func (s *MetadataServer) Handler(endpoints ...*MetadataEndpoint) (http.Handler, error) {
-	paths := map[string]string{
-		"Metadata": s.MetadataPath,
-		"Image":    s.ImagePath,
+func (s *MetadataServer) Handler() (http.Handler, error) {
+	paths := make(map[string]string)
+	for i, e := range s.Metadata {
+		paths[fmt.Sprintf("Metadata[%d]", i)] = e.Path
 	}
-	for i, e := range endpoints {
-		paths[fmt.Sprintf("endpoint[%d]", i)] = e.Path
+	for i, e := range s.Image {
+		paths[fmt.Sprintf("Image[%d]", i)] = e.Path
 	}
+
 	for name, path := range paths {
 		if !strings.Contains(path, fullTokenIDParam) {
-			return nil, fmt.Errorf("%sPath %q must contain %q", name, path, fullTokenIDParam)
+			return nil, fmt.Errorf("%s.Path %q must contain %q", name, path, fullTokenIDParam)
 		}
 	}
 
 	r := httprouter.New()
-
-	endpoints = append(endpoints, &MetadataEndpoint{
-		Path:    s.MetadataPath,
-		Handler: s.Metadata,
-	})
-	for _, e := range endpoints {
+	for _, e := range s.Metadata {
 		r.GET(e.Path, s.metadata(e.Handler))
 	}
-
-	r.GET(s.ImagePath, httpErrHandler(s.images))
-
+	for _, e := range s.Image {
+		r.GET(e.Path, s.images(e.Handler))
+	}
 	return r, nil
-}
-
-// A MetadataEndpoint specifies an HTTP path and associated handler for requests
-// matched to the path. See MetadataServer.MetadataPath regarding path matching.
-type MetadataEndpoint struct {
-	Path    string
-	Handler MetadataHandler
 }
 
 // httpErrHandler allows httprouter.Handle-like functions to return errors. If
@@ -196,7 +193,7 @@ func (s *MetadataServer) tokenDataHandler(w http.ResponseWriter, r *http.Request
 
 // metadata configures requests for metadata, sourcing it from the
 // MetadataHandler function, and substituting the Image field appropriately such
-// that it will point to the MetadataServer's image endpoint.
+// that it will point to the MetadataServer's first image endpoint.
 func (s *MetadataServer) metadata(handler MetadataHandler) httprouter.Handle {
 	h := func(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
 		return s.tokenDataHandler(w, r, params, "Metadata", func(i Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error) {
@@ -207,7 +204,7 @@ func (s *MetadataServer) metadata(handler MetadataHandler) httprouter.Handle {
 
 			if md.Image == "" {
 				img := *s.BaseURL
-				img.Path = strings.ReplaceAll(s.ImagePath, fullTokenIDParam, id.Text(s.tokenIDBase()))
+				img.Path = strings.ReplaceAll(s.Image[0].Path, fullTokenIDParam, id.Text(s.tokenIDBase()))
 				md.Image = img.String()
 			}
 
@@ -223,8 +220,10 @@ func (s *MetadataServer) metadata(handler MetadataHandler) httprouter.Handle {
 
 // images handles requests for images, sourcing them from the user-provided
 // s.Images() function.
-func (s *MetadataServer) images(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
-	return s.tokenDataHandler(w, r, params, "Image", tokenDataFunc(s.Image))
+func (s *MetadataServer) images(handler ImageHandler) httprouter.Handle {
+	return httpErrHandler(func(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
+		return s.tokenDataHandler(w, r, params, "Image", tokenDataFunc(handler))
+	})
 }
 
 // TokenIDParam is the name of the httprouter parameter matched by metadata and

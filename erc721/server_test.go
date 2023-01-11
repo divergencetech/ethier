@@ -34,10 +34,9 @@ func deploy(t *testing.T, totalSupply int64) Interface {
 }
 
 // start starts a new http server with requests handled by srv.Handler(), and
-// returns the base URL of the started server. Optional extra endpoints are
-// propagated to srv.Handler(), unchanged.
-func start(t *testing.T, srv *MetadataServer, endpoints ...*MetadataEndpoint) string {
-	handler, err := srv.Handler(endpoints...)
+// returns the base URL of the started server.
+func start(t *testing.T, srv *MetadataServer) string {
+	handler, err := srv.Handler()
 	if err != nil {
 		t.Fatalf("%T{%+v}.Handler() error %v", srv, srv, err)
 	}
@@ -101,7 +100,7 @@ func TestMetadataServer(t *testing.T) {
 	tests := []struct {
 		Name                  string
 		ExternalImageURL      string
-		Image                 func(_ Interface, id *TokenID, params httprouter.Params) (io.Reader, string, int, error)
+		Image                 ImageHandler
 		wantInternalImageCode int
 	}{
 		{
@@ -122,20 +121,24 @@ func TestMetadataServer(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 
 			srv := &MetadataServer{
-				BaseURL:      nil, // will be set to the test-server URL by start()
-				MetadataPath: "/metadata/:tokenId",
-				ImagePath:    "/image/:tokenId",
-				TokenIDBase:  16,
-				Contract:     deploy(t, totalSupply),
-				Metadata: func(_ Interface, id *TokenID, params httprouter.Params) (*Metadata, int, error) {
-					md := Metadata{
-						Name:  fmt.Sprintf("Token %s", id),
-						Image: tt.ExternalImageURL,
-					}
+				BaseURL:     nil, // will be set to the test-server URL by start()
+				TokenIDBase: 16,
+				Contract:    deploy(t, totalSupply),
+				Metadata: []MetadataEndpoint{{
+					Path: "/metadata/:tokenId",
+					Handler: func(_ Interface, id *TokenID, params httprouter.Params) (*Metadata, int, error) {
+						md := Metadata{
+							Name:  fmt.Sprintf("Token %s", id),
+							Image: tt.ExternalImageURL,
+						}
 
-					return &md, 200, nil
-				},
-				Image: tt.Image,
+						return &md, 200, nil
+					},
+				}},
+				Image: []ImageEndpoint{{
+					Path:    "/image/:tokenId",
+					Handler: tt.Image,
+				}},
 			}
 			baseURL := start(t, srv)
 			tokenURL := func(id int) string {
@@ -239,40 +242,54 @@ func TestMetadataServer(t *testing.T) {
 
 func TestMultipleMetadataEndpoints(t *testing.T) {
 	srv := &MetadataServer{
-		MetadataPath: "/default/:tokenId",
-		ImagePath:    "/images/:tokenId",
-		Metadata: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
-			md := Metadata{
-				Name: fmt.Sprintf("DEFAULT %s", id),
-			}
-			return &md, 200, nil
+		Metadata: []MetadataEndpoint{
+			{
+				Path: "/default/:tokenId",
+				Handler: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
+					md := Metadata{
+						Name: fmt.Sprintf("DEFAULT %s", id),
+					}
+					return &md, 200, nil
+				},
+			},
+			{
+				Path: "/extra/:tokenId",
+				Handler: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
+					md := Metadata{
+						Name: fmt.Sprintf("EXTRA %s", id),
+					}
+					return &md, 200, nil
+				},
+			},
+			{
+				Path: "/with-explicit-image/:tokenId",
+				Handler: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
+					md := Metadata{
+						Name:  fmt.Sprintf("EXPLICIT %s", id),
+						Image: fmt.Sprintf("explicit-image-path/%s", id),
+					}
+					return &md, 200, nil
+				},
+			},
+		},
+		Image: []ImageEndpoint{
+			{
+				// This first one MUST be added to the Metadata if the Image
+				// field is empty.
+				Path: "/images/:tokenId",
+			},
+			{
+				Path: "/other-images/:tokenId",
+			},
 		},
 	}
 
-	extra := []*MetadataEndpoint{
-		{
-			Path: "/extra0/:tokenId",
-			Handler: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
-				md := Metadata{
-					Name: fmt.Sprintf("EXTRA0 %s", id),
-				}
-				return &md, 200, nil
-			},
-		},
-		{
-			Path: "/extra1/:tokenId",
-			Handler: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
-				md := Metadata{
-					Name: fmt.Sprintf("EXTRA1 %s", id),
-				}
-				return &md, 200, nil
-			},
-		},
+	baseURL := start(t, srv)
+	imagePath := func(id int) string {
+		return fmt.Sprintf("%s/images/%d", baseURL, id)
 	}
 
-	baseURL := start(t, srv, extra...)
-
-	ignore := cmpopts.IgnoreFields(Metadata{}, "Image")
+	ignore := cmpopts.IgnoreFields(Metadata{})
 	tests := []struct {
 		path string
 		want *Metadata
@@ -280,25 +297,29 @@ func TestMultipleMetadataEndpoints(t *testing.T) {
 		{
 			path: "default/0",
 			want: &Metadata{
-				Name: "DEFAULT 0",
+				Name:  "DEFAULT 0",
+				Image: imagePath(0),
 			},
 		},
 		{
 			path: "default/42",
 			want: &Metadata{
-				Name: "DEFAULT 42",
+				Name:  "DEFAULT 42",
+				Image: imagePath(42),
 			},
 		},
 		{
-			path: "extra0/42",
+			path: "extra/42",
 			want: &Metadata{
-				Name: "EXTRA0 42",
+				Name:  "EXTRA 42",
+				Image: imagePath(42),
 			},
 		},
 		{
-			path: "extra1/99",
+			path: "with-explicit-image/99",
 			want: &Metadata{
-				Name: "EXTRA1 99",
+				Name:  "EXPLICIT 99",
+				Image: "explicit-image-path/99",
 			},
 		},
 	}
