@@ -9,13 +9,30 @@ import {OnlyOnce} from "../../contracts/utils/OnlyOnce.sol";
 
 // solhint-disable no-empty-blocks
 contract OnlyOnceConsumer is OnlyOnce {
-    function limitedFunction1() external onlyOnce {}
+    bytes32 public constant SHARED_IDENTIFIER = keccak256("shared");
 
-    function limitedFunction2(uint256) external onlyOnce {}
+    function autoLimited1() external onlyOnce {}
 
-    function limitedFunction3()
+    function autoLimited2(uint256) external onlyOnce {}
+
+    function explicitlyLimited1()
         external
-        onlyOnceByIdentifier(OnlyOnceConsumer.limitedFunction3.selector)
+        onlyOnceByIdentifier(OnlyOnceConsumer.explicitlyLimited1.selector)
+    {}
+
+    function explicitlyLimited2()
+        external
+        onlyOnceByIdentifier(OnlyOnceConsumer.explicitlyLimited2.selector)
+    {}
+
+    function sharedLimited1()
+        external
+        onlyOnceByIdentifier(SHARED_IDENTIFIER)
+    {}
+
+    function sharedLimited2()
+        external
+        onlyOnceByIdentifier(SHARED_IDENTIFIER)
     {}
 }
 
@@ -28,14 +45,18 @@ contract OnlyOnceTest is Test {
         c = new OnlyOnceConsumer();
     }
 
-    function _testCannotCallTwice(function() external func) internal {
-        func();
+    function _expectRevertWithAlreadyExecuted(bytes32 identifier) internal {
         vm.expectRevert(
             abi.encodeWithSelector(
                 OnlyOnce.FunctionAlreadyExecuted.selector,
-                func.selector
+                identifier
             )
         );
+    }
+
+    function _testCannotCallTwice(function() external func) internal {
+        func();
+        _expectRevertWithAlreadyExecuted(func.selector);
         func();
     }
 
@@ -45,12 +66,7 @@ contract OnlyOnceTest is Test {
         uint256 param2
     ) internal {
         func(param1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OnlyOnce.FunctionAlreadyExecuted.selector,
-                func.selector
-            )
-        );
+        _expectRevertWithAlreadyExecuted(func.selector);
         func(param2);
     }
 
@@ -60,8 +76,15 @@ contract OnlyOnceTest is Test {
         // This test also ensures that calling one limited function does not
         // affect the executability of the other.
 
-        _testCannotCallTwice(c.limitedFunction1);
-        _testCannotCallTwice(c.limitedFunction2, param1, param2);
-        _testCannotCallTwice(c.limitedFunction3);
+        _testCannotCallTwice(c.autoLimited1);
+        _testCannotCallTwice(c.autoLimited2, param1, param2);
+        _testCannotCallTwice(c.explicitlyLimited1);
+        _testCannotCallTwice(c.explicitlyLimited2);
+    }
+
+    function testSharedIdentifier() public {
+        c.sharedLimited1();
+        _expectRevertWithAlreadyExecuted(c.SHARED_IDENTIFIER());
+        c.sharedLimited2();
     }
 }

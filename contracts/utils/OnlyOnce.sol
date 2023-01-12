@@ -42,10 +42,10 @@ contract OnlyOnce {
 
     /**
      * @notice Ensures that the modified function can only be executed once.
-     * @dev This modifier MUST NOT be used on functions that are either public
-     * or internal. The modifier uses the function selector of the current
-     * calldata context as identifier, which can have unintended side-effects
-     * for internally used functions.
+     * @dev This modifier MUST only be used on functions that are external (not
+     * public nor internal). The modifier uses the function selector of the
+     * current calldata context as identifier, which can have unintended
+     * side-effects for internally used functions.
      */
     modifier onlyOnce() {
         bytes32 selector;
