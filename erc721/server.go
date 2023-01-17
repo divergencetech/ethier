@@ -202,7 +202,7 @@ func (s *Server) metadata(handler MetadataHandler) httprouter.Handle {
 				return nil, "", code, err
 			}
 
-			if md.Image == "" && len(s.Image) > 0 {
+			if md.Image == "" && len(s.Image) > 0 && md.AnimationURL == "" {
 				img := *s.BaseURL
 				img.Path = strings.ReplaceAll(s.Image[0].Path, fullTokenIDParam, id.Text(s.tokenIDBase()))
 				md.Image = img.String()

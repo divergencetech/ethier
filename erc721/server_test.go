@@ -333,3 +333,81 @@ func TestMultipleMetadataEndpoints(t *testing.T) {
 		}
 	}
 }
+
+func TestInternalImage(t *testing.T) {
+	tests := []struct {
+		name            string
+		metadataHandler MetadataHandler
+		wantImage       func(baseURL string, id int) string
+	}{
+		{
+			name: "Empty",
+			metadataHandler: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
+				md := Metadata{
+					Name: fmt.Sprintf("DEFAULT %s", id),
+				}
+				return &md, 200, nil
+			},
+			wantImage: func(baseURL string, id int) string {
+				return fmt.Sprintf("%s/images/%d", baseURL, id)
+			},
+		},
+		{
+			name: "With animation",
+			metadataHandler: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
+				md := Metadata{
+					Name:         fmt.Sprintf("DEFAULT %s", id),
+					AnimationURL: fmt.Sprintf("foo://bar/%s", id),
+				}
+				return &md, 200, nil
+			},
+			wantImage: func(baseURL string, id int) string {
+				return ""
+			},
+		},
+		{
+			name: "With image",
+			metadataHandler: func(_ Interface, id *TokenID, _ httprouter.Params) (*Metadata, int, error) {
+				md := Metadata{
+					Name:  fmt.Sprintf("DEFAULT %s", id),
+					Image: fmt.Sprintf("foo://bar/%s", id),
+				}
+				return &md, 200, nil
+			},
+			wantImage: func(baseURL string, id int) string {
+				return fmt.Sprintf("foo://bar/%d", id)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+
+		t.Run(tt.name, func(t *testing.T) {
+			srv := &Server{
+				Metadata: []MetadataEndpoint{
+					{
+						Path:    "/metadata/:tokenId",
+						Handler: tt.metadataHandler,
+					},
+				},
+				Image: []ImageEndpoint{
+					{
+						Path: "/images/:tokenId",
+					},
+				},
+			}
+			baseURL := start(t, srv)
+
+			for id := 0; id < 20; id++ {
+				t.Run(fmt.Sprintf("token %d", id), func(t *testing.T) {
+					url := fmt.Sprintf("%s/metadata/%d", baseURL, id)
+					got := metadataFromResponse(t, httpGet(t, url))
+
+					if diff := cmp.Diff(tt.wantImage(baseURL, id), got.Image); diff != "" {
+						t.Errorf("(-want +got):\n%s", diff)
+					}
+				})
+			}
+		})
+	}
+}
