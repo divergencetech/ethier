@@ -404,7 +404,7 @@ func TestInternalImage(t *testing.T) {
 					got := metadataFromResponse(t, httpGet(t, url))
 
 					if diff := cmp.Diff(tt.wantImage(baseURL, id), got.Image); diff != "" {
-						t.Errorf("(-want +got):\n%s", diff)
+						t.Errorf("Metadata.Image (-want +got):\n%s", diff)
 					}
 				})
 			}
