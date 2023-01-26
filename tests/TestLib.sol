@@ -3,6 +3,8 @@
 pragma solidity ^0.8.15;
 
 import {stdJson, Vm} from "forge-std/Components.sol";
+import {Test as Test_} from "forge-std/Test.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 library TestLib {
     using stdJson for string;
@@ -56,5 +58,23 @@ library TestLib {
 
         // Checking the echoed exit code of the script
         return keccak256(re) == keccak256("0");
+    }
+}
+
+contract Test is Test_ {
+    function missingRoleError(address account, bytes32 role)
+        public
+        pure
+        returns (bytes memory)
+    {
+        return
+            bytes(
+                string.concat(
+                    "AccessControl: account ",
+                    Strings.toHexString(account),
+                    " is missing role ",
+                    vm.toString(role)
+                )
+            );
     }
 }
