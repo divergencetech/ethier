@@ -16,6 +16,7 @@ interface IERC4906Events {
 }
 
 /// @title EIP-721 Metadata Update Extension
+// solhint-disable-next-line no-empty-blocks
 interface IERC4906 is IERC165, IERC4906Events {
 
 }

@@ -9,7 +9,7 @@ import {Test} from "../TestLib.sol";
 contract TestableERC721ACommon is ERC721ACommon {
     constructor(address admin, address steerer)
         ERC721ACommon(admin, steerer, "Test", "T", payable(address(1)), 0)
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     function mint(uint256 num) public {
         _mint(msg.sender, num);
