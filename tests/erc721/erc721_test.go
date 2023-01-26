@@ -51,7 +51,10 @@ const (
 )
 
 // Set during deployment. Effectively constant.
-var steeringRole [32]byte
+var (
+	adminRole    [32]byte
+	steeringRole [32]byte
+)
 
 func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721ACommon, *ERC721Filterer) {
 	t.Helper()
@@ -74,6 +77,10 @@ func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721ACommon, *E
 	filter, err := NewERC721Filterer(addr, sim)
 	if err != nil {
 		t.Fatalf("NewERC721RedeemerFilterer() error %v", err)
+	}
+
+	if adminRole, err = nft.DEFAULTADMINROLE(nil); err != nil {
+		t.Fatalf("nft.DEFAULT_ADMIN_ROLE(): %v", err)
 	}
 
 	if steeringRole, err = nft.DEFAULTSTEERINGROLE(nil); err != nil {
@@ -264,5 +271,19 @@ func TestPause(t *testing.T) {
 	check := revert.Checker("ERC721ACommon: paused")
 	if diff := check.Diff(nft.MintN(sim.Acc(deployer), big.NewInt(1))); diff != "" {
 		t.Errorf("MintN() while paused; %s", diff)
+	}
+}
+
+func TestRoleAssignment(t *testing.T) {
+	sim, nft, _ := deploy(t)
+
+	sim.Must(t, "grantRole(STEERING_ROLE, approved)")(nft.GrantRole(sim.Acc(deployer), steeringRole, sim.Addr(approved)))
+
+	if hasRole, err := nft.HasRole(nil, steeringRole, sim.Addr(approved)); err != nil || !hasRole {
+		t.Errorf("HasRole(STEERING_ROLE, approved) got %t, err = %v; want %t, nil err", hasRole, err, true)
+	}
+
+	if diff := revert.MissingRole(sim.Addr(approved), adminRole).Diff(nft.GrantRole(sim.Acc(approved), adminRole, sim.Addr(approved))); diff != "" {
+		t.Errorf("grantRole(ADMIN_ROLE, approved, [as STEERING_ROLE]) %s", diff)
 	}
 }
