@@ -2,6 +2,10 @@
 package revert
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/h-fam/errdiff"
 )
 
@@ -20,6 +24,10 @@ const (
 	Paused             = Checker("Pausable: paused")
 	Reentrant          = Checker("ReentrancyGuard: reentrant call")
 )
+
+func MissingRole(account common.Address, role [32]byte) Checker {
+	return Checker(fmt.Sprintf("AccessControl: account %s is missing role 0x%x", strings.ToLower(account.Hex()), role))
+}
 
 // Checkers for ethier libraries and contracts.
 const (

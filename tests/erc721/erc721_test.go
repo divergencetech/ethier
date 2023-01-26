@@ -50,6 +50,9 @@ const (
 	notExists
 )
 
+// Set during deployment. Effectively constant.
+var steeringRole [32]byte
+
 func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721ACommon, *ERC721Filterer) {
 	t.Helper()
 
@@ -71,6 +74,10 @@ func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721ACommon, *E
 	filter, err := NewERC721Filterer(addr, sim)
 	if err != nil {
 		t.Fatalf("NewERC721RedeemerFilterer() error %v", err)
+	}
+
+	if steeringRole, err = nft.DEFAULTSTEERINGROLE(nil); err != nil {
+		t.Fatalf("nft.DEFAULT_STEERING_ROLE(): %v", err)
 	}
 
 	return sim, nft, filter
@@ -182,7 +189,7 @@ func TestRoyalties(t *testing.T) {
 		}
 	}
 
-	if diff := revert.OnlyOwner.Diff(nft.SetDefaultRoyalty(sim.Acc(vandal), sim.Addr(vandal), big.NewInt(1000))); diff != "" {
+	if diff := revert.MissingRole(sim.Addr(vandal), steeringRole).Diff(nft.SetDefaultRoyalty(sim.Acc(vandal), sim.Addr(vandal), big.NewInt(1000))); diff != "" {
 		t.Errorf("SetDefaultRoyalty([as vandal]) %s", diff)
 	}
 }
@@ -238,7 +245,7 @@ func TestBaseTokenURI(t *testing.T) {
 
 	// OpenZeppelin's ERC721 returns an empty string if no base is set.
 	wantURI(t, 1, "")
-	if diff := revert.OnlyOwner.Diff(nft.SetBaseTokenURI(sim.Acc(vandal), "bad")); diff != "" {
+	if diff := revert.MissingRole(sim.Addr(vandal), steeringRole).Diff(nft.SetBaseTokenURI(sim.Acc(vandal), "bad")); diff != "" {
 		t.Errorf("SetBaseTokenURI([as vandal]) %s", diff)
 	}
 	wantURI(t, 1, "")
