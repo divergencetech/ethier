@@ -2,13 +2,13 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessControlEnumerable} from "../utils/AccessControlEnumerable.sol";
 
 /**
 @notice ERC721 extension that overrides the OpenZeppelin _baseURI() function to
 return a prefix that can be set by the contract owner.
  */
-contract BaseTokenURI is Ownable {
+contract BaseTokenURI is AccessControlEnumerable {
     /// @notice Base token URI used as a prefix by tokenURI().
     string public baseTokenURI;
 
@@ -17,7 +17,10 @@ contract BaseTokenURI is Ownable {
     }
 
     /// @notice Sets the base token URI prefix.
-    function setBaseTokenURI(string memory _baseTokenURI) public onlyOwner {
+    function setBaseTokenURI(string memory _baseTokenURI)
+        public
+        onlyRole(DEFAULT_STEERING_ROLE)
+    {
         baseTokenURI = _baseTokenURI;
     }
 

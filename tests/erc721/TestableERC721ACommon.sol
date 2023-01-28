@@ -2,14 +2,22 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-import "../../contracts/erc721/ERC721ACommon.sol";
-import "../../contracts/erc721/BaseTokenURI.sol";
+import {ERC721ACommon, ERC721A} from "../../contracts/erc721/ERC721ACommon.sol";
+import {BaseTokenURI} from "../../contracts/erc721/BaseTokenURI.sol";
+import {AccessControlEnumerable} from "../../contracts/utils/AccessControlEnumerable.sol";
 
 /// @notice Exposes a functions modified with the modifiers under test.
 contract TestableERC721ACommon is ERC721ACommon, BaseTokenURI {
     // solhint-disable-next-line no-empty-blocks
     constructor(address payable royaltyReciever, uint96 royaltyBasisPoints)
-        ERC721ACommon("Token", "JRR", royaltyReciever, royaltyBasisPoints)
+        ERC721ACommon(
+            msg.sender,
+            msg.sender,
+            "Token",
+            "JRR",
+            royaltyReciever,
+            royaltyBasisPoints
+        )
         BaseTokenURI("")
     {} // solhint-disable-line no-empty-blocks
 
@@ -42,5 +50,18 @@ contract TestableERC721ACommon is ERC721ACommon, BaseTokenURI {
         returns (string memory)
     {
         return BaseTokenURI._baseURI();
+    }
+
+    /// @notice Overrides supportsInterface as required by inheritance.
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(ERC721ACommon, AccessControlEnumerable)
+        returns (bool)
+    {
+        return
+            ERC721ACommon.supportsInterface(interfaceId) ||
+            AccessControlEnumerable.supportsInterface(interfaceId);
     }
 }
