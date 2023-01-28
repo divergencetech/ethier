@@ -6,16 +6,14 @@ import {ERC721A} from "erc721a/contracts/ERC721A.sol";
 import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
 import {AccessControlEnumerable} from "../utils/AccessControlEnumerable.sol";
 import {AccessControlPausable} from "../utils/AccessControlPausable.sol";
+import {ERC4906} from "./ERC4906.sol";
 
 /**
 @notice An ERC721A contract with common functionality:
  - Pausable with toggling functions exposed to Owner only
  - ERC2981 royalties
  */
-contract ERC721ACommon is ERC721A, AccessControlPausable, ERC2981 {
-    /// @param admin Address granted DEFAULT_ADMIN_ROLE.
-    /// @param steerer Address allowed to make general modifications to contract
-    /// behaviour by being granted DEFAULT_STEERING_ROLE.
+contract ERC721ACommon is ERC721A, AccessControlPausable, ERC2981, ERC4906 {
     constructor(
         address admin,
         address steerer,
@@ -60,13 +58,14 @@ contract ERC721ACommon is ERC721A, AccessControlPausable, ERC2981 {
         public
         view
         virtual
-        override(ERC721A, AccessControlEnumerable, ERC2981)
+        override(ERC721A, AccessControlEnumerable, ERC2981, ERC4906)
         returns (bool)
     {
         return
             ERC721A.supportsInterface(interfaceId) ||
             ERC2981.supportsInterface(interfaceId) ||
-            AccessControlEnumerable.supportsInterface(interfaceId);
+            AccessControlEnumerable.supportsInterface(interfaceId) ||
+            ERC4906.supportsInterface(interfaceId);
     }
 
     /// @notice Sets the royalty receiver and percentage (in units of basis
@@ -77,5 +76,15 @@ contract ERC721ACommon is ERC721A, AccessControlPausable, ERC2981 {
         onlyRole(DEFAULT_STEERING_ROLE)
     {
         _setDefaultRoyalty(receiver, basisPoints);
+    }
+
+    function emitMetadataUpdateForAll()
+        external
+        onlyRole(DEFAULT_STEERING_ROLE)
+    {
+        // EIP4906 is unfortunately quite vague on whether the `toTokenId` in
+        // the following event is included or not. We hence use `totalSupply()`
+        // to ensure that the last actual `tokenId` is included in any case.
+        _refreshMetadata(0, totalSupply());
     }
 }
