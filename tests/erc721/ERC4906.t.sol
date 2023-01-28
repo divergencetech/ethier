@@ -39,7 +39,7 @@ contract ERC4906Test is Test, IERC4906Events {
         }
 
         vm.prank(sender);
-        token.refreshMetadata();
+        token.emitMetadataUpdateForAll();
     }
 
     function testEmitBatch(uint256 numMint) public {

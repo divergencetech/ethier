@@ -78,7 +78,10 @@ contract ERC721ACommon is ERC721A, AccessControlPausable, ERC2981, ERC4906 {
         _setDefaultRoyalty(receiver, basisPoints);
     }
 
-    function refreshMetadata() external onlyRole(DEFAULT_STEERING_ROLE) {
+    function emitMetadataUpdateForAll()
+        external
+        onlyRole(DEFAULT_STEERING_ROLE)
+    {
         // EIP4906 is unfortunately quite vague on whether the `toTokenId` in
         // the following event is included or not. We hence use `totalSupply()`
         // to ensure that the last actual `tokenId` is included in any case.
