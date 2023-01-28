@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/h-fam/errdiff"
 )
@@ -25,8 +27,17 @@ const (
 	Reentrant          = Checker("ReentrancyGuard: reentrant call")
 )
 
+// MissingRole returns a Checker that checks that a transaction reverts because the account requires but does not have the specified role.
 func MissingRole(account common.Address, role [32]byte) Checker {
 	return Checker(fmt.Sprintf("AccessControl: account %s is missing role 0x%x", strings.ToLower(account.Hex()), role))
+}
+
+// MissingRoleByName returns a Checker that checks that a transaction reverts because the account requires but does not have the specified role name.
+func MissingRoleByName(account common.Address, name string) Checker {
+	h := crypto.Keccak256([]byte(name))
+	var role [32]byte
+	copy(role[:], h)
+	return MissingRole(account, role)
 }
 
 // Checkers for ethier libraries and contracts.
