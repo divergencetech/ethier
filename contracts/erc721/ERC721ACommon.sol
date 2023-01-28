@@ -4,7 +4,6 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import {ERC721A} from "erc721a/contracts/ERC721A.sol";
 import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
-// import {AccessControlEnumerable} from "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import {AccessControlEnumerable} from "../utils/AccessControlEnumerable.sol";
 import {AccessControlPausable} from "../utils/AccessControlPausable.sol";
 
@@ -14,6 +13,9 @@ import {AccessControlPausable} from "../utils/AccessControlPausable.sol";
  - ERC2981 royalties
  */
 contract ERC721ACommon is ERC721A, AccessControlPausable, ERC2981 {
+    /// @param admin Address granted DEFAULT_ADMIN_ROLE.
+    /// @param steerer Address allowed to make general modifications to contract
+    /// behaviour by being granted DEFAULT_STEERING_ROLE.
     constructor(
         address admin,
         address steerer,

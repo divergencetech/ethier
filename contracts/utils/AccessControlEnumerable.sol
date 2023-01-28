@@ -5,6 +5,9 @@ pragma solidity >=0.8.0 <0.9.0;
 import {AccessControlEnumerable as ACE} from "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 
 contract AccessControlEnumerable is ACE {
+    /// @notice The default role intended to perform access-restricted actions.
+    /// @dev We are using this instead of DEFAULT_ADMIN_ROLE because the latter
+    /// is intended to grant/revoke roles and will be secured differently.
     bytes32 public constant DEFAULT_STEERING_ROLE =
         keccak256("DEFAULT_STEERING_ROLE");
 

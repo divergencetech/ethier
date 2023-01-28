@@ -48,15 +48,18 @@ func accountName(id int) string {
 const (
 	exists = iota
 	notExists
+	adminRoleName    = "DEFAULT_ADMIN_ROLE"
+	steeringRoleName = "DEFAULT_STEERING_ROLE"
 )
 
-// Set during deployment. Effectively constant.
-var (
-	adminRole    [32]byte
-	steeringRole [32]byte
-)
+type deployed struct {
+	sim                     *ethtest.SimulatedBackend
+	nft                     *TestableERC721ACommon
+	filter                  *ERC721Filterer
+	adminRole, steeringRole [32]byte
+}
 
-func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721ACommon, *ERC721Filterer) {
+func deploy(t *testing.T) deployed {
 	t.Helper()
 
 	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
@@ -79,19 +82,21 @@ func deploy(t *testing.T) (*ethtest.SimulatedBackend, *TestableERC721ACommon, *E
 		t.Fatalf("NewERC721RedeemerFilterer() error %v", err)
 	}
 
-	if adminRole, err = nft.DEFAULTADMINROLE(nil); err != nil {
+	adminRole, err := nft.DEFAULTADMINROLE(nil)
+	if err != nil {
 		t.Fatalf("nft.DEFAULT_ADMIN_ROLE(): %v", err)
 	}
-
-	if steeringRole, err = nft.DEFAULTSTEERINGROLE(nil); err != nil {
+	steeringRole, err := nft.DEFAULTSTEERINGROLE(nil)
+	if err != nil {
 		t.Fatalf("nft.DEFAULT_STEERING_ROLE(): %v", err)
 	}
 
-	return sim, nft, filter
+	return deployed{sim, nft, filter, adminRole, steeringRole}
 }
 
 func TestModifiers(t *testing.T) {
-	_, nft, _ := deploy(t)
+	d := deploy(t)
+	nft := d.nft
 
 	tests := []struct {
 		name           string
@@ -121,7 +126,9 @@ func TestModifiers(t *testing.T) {
 }
 
 func TestOnlyApprovedOrOwner(t *testing.T) {
-	sim, nft, _ := deploy(t)
+	dep := deploy(t)
+	sim := dep.sim
+	nft := dep.nft
 
 	tests := []struct {
 		name           string
@@ -156,7 +163,9 @@ func TestOnlyApprovedOrOwner(t *testing.T) {
 }
 
 func TestRoyalties(t *testing.T) {
-	sim, nft, _ := deploy(t)
+	dep := deploy(t)
+	sim := dep.sim
+	nft := dep.nft
 
 	tests := []struct {
 		setConfig         bool
@@ -196,13 +205,14 @@ func TestRoyalties(t *testing.T) {
 		}
 	}
 
-	if diff := revert.MissingRole(sim.Addr(vandal), steeringRole).Diff(nft.SetDefaultRoyalty(sim.Acc(vandal), sim.Addr(vandal), big.NewInt(1000))); diff != "" {
+	if diff := revert.MissingRoleByName(sim.Addr(vandal), steeringRoleName).Diff(nft.SetDefaultRoyalty(sim.Acc(vandal), sim.Addr(vandal), big.NewInt(1000))); diff != "" {
 		t.Errorf("SetDefaultRoyalty([as vandal]) %s", diff)
 	}
 }
 
 func TestInterfaceSupport(t *testing.T) {
-	_, nft, _ := deploy(t)
+	dep := deploy(t)
+	nft := dep.nft
 
 	tests := []struct {
 		interfaceID string
@@ -237,7 +247,9 @@ func TestInterfaceSupport(t *testing.T) {
 }
 
 func TestBaseTokenURI(t *testing.T) {
-	sim, nft, _ := deploy(t)
+	dep := deploy(t)
+	sim := dep.sim
+	nft := dep.nft
 
 	const quantity = 50
 	sim.Must(t, "MintN(%d)", quantity)(nft.MintN(sim.Acc(deployer), big.NewInt(quantity)))
@@ -252,7 +264,7 @@ func TestBaseTokenURI(t *testing.T) {
 
 	// OpenZeppelin's ERC721 returns an empty string if no base is set.
 	wantURI(t, 1, "")
-	if diff := revert.MissingRole(sim.Addr(vandal), steeringRole).Diff(nft.SetBaseTokenURI(sim.Acc(vandal), "bad")); diff != "" {
+	if diff := revert.MissingRoleByName(sim.Addr(vandal), steeringRoleName).Diff(nft.SetBaseTokenURI(sim.Acc(vandal), "bad")); diff != "" {
 		t.Errorf("SetBaseTokenURI([as vandal]) %s", diff)
 	}
 	wantURI(t, 1, "")
@@ -265,7 +277,9 @@ func TestBaseTokenURI(t *testing.T) {
 }
 
 func TestPause(t *testing.T) {
-	sim, nft, _ := deploy(t)
+	dep := deploy(t)
+	sim := dep.sim
+	nft := dep.nft
 
 	sim.Must(t, "Pause()")(nft.Pause(sim.Acc(deployer)))
 	check := revert.Checker("ERC721ACommon: paused")
@@ -275,15 +289,18 @@ func TestPause(t *testing.T) {
 }
 
 func TestRoleAssignment(t *testing.T) {
-	sim, nft, _ := deploy(t)
+	dep := deploy(t)
+	sim := dep.sim
+	nft := dep.nft
 
-	sim.Must(t, "grantRole(STEERING_ROLE, approved)")(nft.GrantRole(sim.Acc(deployer), steeringRole, sim.Addr(approved)))
+	sim.Must(t, "grantRole(STEERING_ROLE, approved)")(nft.GrantRole(sim.Acc(deployer), dep.steeringRole, sim.Addr(approved)))
 
-	if hasRole, err := nft.HasRole(nil, steeringRole, sim.Addr(approved)); err != nil || !hasRole {
-		t.Errorf("HasRole(STEERING_ROLE, approved) got %t, err = %v; want %t, nil err", hasRole, err, true)
+	if got, err := nft.HasRole(nil, dep.steeringRole, sim.Addr(approved)); err != nil || !got {
+		t.Errorf("HasRole(STEERING_ROLE, approved) got %t, err = %v; want %t, nil err", got, err, true)
 	}
 
-	if diff := revert.MissingRole(sim.Addr(approved), adminRole).Diff(nft.GrantRole(sim.Acc(approved), adminRole, sim.Addr(approved))); diff != "" {
+	check := revert.MissingRole(sim.Addr(approved), dep.adminRole)
+	if diff := check.Diff(nft.GrantRole(sim.Acc(approved), dep.adminRole, sim.Addr(approved))); diff != "" {
 		t.Errorf("grantRole(ADMIN_ROLE, approved, [as STEERING_ROLE]) %s", diff)
 	}
 }
