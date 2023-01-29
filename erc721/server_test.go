@@ -20,11 +20,19 @@ import (
 	contract "github.com/divergencetech/ethier/tests/erc721"
 )
 
+const (
+	deployer = iota
+	admin
+	steerer
+
+	numAccounts // last account + 1 ;)
+)
+
 func deploy(t *testing.T, totalSupply int64) Interface {
 	t.Helper()
 
-	sim := ethtest.NewSimulatedBackendTB(t, 1)
-	_, _, nft, err := contract.DeployTestableERC721ACommon(sim.Acc(0), sim, common.Address{1}, big.NewInt(0))
+	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
+	_, _, nft, err := contract.DeployTestableERC721ACommon(sim.Acc(deployer), sim, sim.Addr(admin), sim.Addr(steerer), common.Address{1}, big.NewInt(0))
 	if err != nil {
 		t.Fatalf("DeployTestableERC721ACommon(): %v", err)
 	}
