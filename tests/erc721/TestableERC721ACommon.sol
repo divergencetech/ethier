@@ -9,10 +9,15 @@ import {AccessControlEnumerable} from "../../contracts/utils/AccessControlEnumer
 /// @notice Exposes a functions modified with the modifiers under test.
 contract TestableERC721ACommon is ERC721ACommon, BaseTokenURI {
     // solhint-disable-next-line no-empty-blocks
-    constructor(address payable royaltyReciever, uint96 royaltyBasisPoints)
+    constructor(
+        address admin,
+        address steerer,
+        address payable royaltyReciever,
+        uint96 royaltyBasisPoints
+    )
         ERC721ACommon(
-            msg.sender,
-            msg.sender,
+            admin,
+            steerer,
             "Token",
             "JRR",
             royaltyReciever,

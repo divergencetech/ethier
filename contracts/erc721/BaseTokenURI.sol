@@ -13,14 +13,20 @@ contract BaseTokenURI is AccessControlEnumerable {
     string public baseTokenURI;
 
     constructor(string memory _baseTokenURI) {
-        setBaseTokenURI(_baseTokenURI);
+        _setBaseTokenURI(_baseTokenURI);
     }
 
     /// @notice Sets the base token URI prefix.
+    /// @dev Only callable by the contract steerer.
     function setBaseTokenURI(string memory _baseTokenURI)
         public
         onlyRole(DEFAULT_STEERING_ROLE)
     {
+        _setBaseTokenURI(_baseTokenURI);
+    }
+
+    /// @notice Sets the base token URI prefix.
+    function _setBaseTokenURI(string memory _baseTokenURI) internal virtual {
         baseTokenURI = _baseTokenURI;
     }
 

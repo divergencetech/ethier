@@ -16,6 +16,8 @@ import (
 // Actors in the tests
 const (
 	deployer = iota
+	admin
+	steerer
 	tokenOwner
 	tokenOwner2
 	tokenReceiver
@@ -31,6 +33,10 @@ func accountName(id int) string {
 	switch id {
 	case deployer:
 		return "contract deployer"
+	case admin:
+		return "contract admin"
+	case steerer:
+		return "contract steerer"
 	case tokenOwner:
 		return "token owner"
 	case approved:
@@ -65,7 +71,7 @@ func deploy(t *testing.T) deployed {
 	sim := ethtest.NewSimulatedBackendTB(t, numAccounts)
 	openseatest.DeployProxyRegistryTB(t, sim)
 
-	addr, _, nft, err := DeployTestableERC721ACommon(sim.Acc(deployer), sim, sim.Addr(royaltyReceiver), big.NewInt(750))
+	addr, _, nft, err := DeployTestableERC721ACommon(sim.Acc(deployer), sim, sim.Addr(admin), sim.Addr(steerer), sim.Addr(royaltyReceiver), big.NewInt(750))
 	if err != nil {
 		t.Fatalf("TestableERC721ACommon() error %v", err)
 	}
@@ -189,7 +195,7 @@ func TestRoyalties(t *testing.T) {
 
 	for _, tt := range tests {
 		if tt.setConfig {
-			sim.Must(t, "nft.SetDefaultRoyalty(%s, %d)", tt.newReceiver, big.NewInt(tt.newBasisPoints))(nft.SetDefaultRoyalty(sim.Acc(deployer), tt.newReceiver, big.NewInt(tt.newBasisPoints)))
+			sim.Must(t, "nft.SetDefaultRoyalty(%s, %d)", tt.newReceiver, big.NewInt(tt.newBasisPoints))(nft.SetDefaultRoyalty(sim.Acc(steerer), tt.newReceiver, big.NewInt(tt.newBasisPoints)))
 		}
 
 		wantReceiver := sim.Addr(royaltyReceiver)
@@ -271,7 +277,7 @@ func TestBaseTokenURI(t *testing.T) {
 	wantURI(t, 42, "")
 
 	const base = "good/"
-	sim.Must(t, "SetBaseTokenURI(%q)", base)(nft.SetBaseTokenURI(sim.Acc(deployer), base))
+	sim.Must(t, "SetBaseTokenURI(%q)", base)(nft.SetBaseTokenURI(sim.Acc(steerer), base))
 	wantURI(t, 7, "good/7")
 	wantURI(t, 42, "good/42")
 }
@@ -281,7 +287,7 @@ func TestPause(t *testing.T) {
 	sim := dep.sim
 	nft := dep.nft
 
-	sim.Must(t, "Pause()")(nft.Pause(sim.Acc(deployer)))
+	sim.Must(t, "Pause()")(nft.Pause(sim.Acc(steerer)))
 	check := revert.Checker("ERC721ACommon: paused")
 	if diff := check.Diff(nft.MintN(sim.Acc(deployer), big.NewInt(1))); diff != "" {
 		t.Errorf("MintN() while paused; %s", diff)
@@ -293,7 +299,7 @@ func TestRoleAssignment(t *testing.T) {
 	sim := dep.sim
 	nft := dep.nft
 
-	sim.Must(t, "grantRole(STEERING_ROLE, approved)")(nft.GrantRole(sim.Acc(deployer), dep.steeringRole, sim.Addr(approved)))
+	sim.Must(t, "grantRole(STEERING_ROLE, approved)")(nft.GrantRole(sim.Acc(admin), dep.steeringRole, sim.Addr(approved)))
 
 	if got, err := nft.HasRole(nil, dep.steeringRole, sim.Addr(approved)); err != nil || !got {
 		t.Errorf("HasRole(STEERING_ROLE, approved) got %t, err = %v; want %t, nil err", got, err, true)
