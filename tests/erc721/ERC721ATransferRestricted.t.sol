@@ -3,6 +3,7 @@
 pragma solidity ^0.8.15;
 
 import {Test} from "../TestLib.sol";
+import {console2} from "forge-std/console2.sol";
 
 import {IERC721A} from "erc721a/contracts/IERC721A.sol";
 import {ERC721ACommon} from "../../contracts/erc721/ERC721ACommon.sol";
@@ -237,14 +238,14 @@ contract TransferBehaviourTest is Test {
         address from;
         address to;
         uint8 tokenId;
-        uint8 transferFunction; // Sadly no fuzzing for enums
+        uint8 transferFunction; // Unfortunately fuzzing for enums is buggy
     }
 
     struct TransferTestCase {
         TransferTestFuzzParams fuzz;
         address transferCaller;
-        bool approve;
-        bool approveForAll;
+        bool callerApproved;
+        bool callerApprovedForAll;
     }
 
     function _expectRevertIfLocked(bool locked, bytes memory error) internal {
@@ -257,20 +258,26 @@ contract TransferBehaviourTest is Test {
         _checkAndSetup(ttt.fuzz.from, ttt.fuzz.to, ttt.fuzz.tokenId);
 
         if (ttt.transferCaller != ttt.fuzz.from) {
-            if (ttt.approve) {
+            if (ttt.callerApproved) {
                 _expectRevertIfLocked(tt.wantTransfersLocked, _lockedErr);
                 vm.prank(ttt.fuzz.from);
                 token.approve(ttt.transferCaller, ttt.fuzz.tokenId);
             }
-            if (ttt.approveForAll) {
+            if (ttt.callerApprovedForAll) {
                 _expectRevertIfLocked(tt.wantTransfersLocked, _lockedErr);
                 vm.prank(ttt.fuzz.from);
                 token.setApprovalForAll(ttt.transferCaller, true);
             }
         }
 
-        if (ttt.transferCaller != ttt.fuzz.from) {
-            _expectRevertIfLocked(tt.wantTransfersLocked, _notApprovedErr);
+        if (
+            ttt.transferCaller != ttt.fuzz.from &&
+            ((!ttt.callerApproved && !ttt.callerApprovedForAll) ||
+                // We also revert with `_notApprovedErr` in this case because
+                // the approval could not be granted in the setup above.
+                tt.wantTransfersLocked)
+        ) {
+            vm.expectRevert(_notApprovedErr);
         } else {
             _expectRevertIfLocked(tt.wantTransfersLocked, _lockedErr);
         }
@@ -308,8 +315,23 @@ contract TransferBehaviourTest is Test {
             TransferTestCase({
                 fuzz: fuzz,
                 transferCaller: fuzz.from,
-                approve: false,
-                approveForAll: false
+                callerApproved: false,
+                callerApprovedForAll: false
+            })
+        );
+    }
+
+    function testVandalTransfer(
+        TransferTestFuzzParams memory fuzz,
+        address vandal
+    ) public {
+        vm.assume(vandal != fuzz.from);
+        _testTransferFrom(
+            TransferTestCase({
+                fuzz: fuzz,
+                transferCaller: vandal,
+                callerApproved: false,
+                callerApprovedForAll: false
             })
         );
     }
@@ -323,8 +345,8 @@ contract TransferBehaviourTest is Test {
             TransferTestCase({
                 fuzz: fuzz,
                 transferCaller: caller,
-                approve: true,
-                approveForAll: false
+                callerApproved: true,
+                callerApprovedForAll: false
             })
         );
     }
@@ -338,8 +360,8 @@ contract TransferBehaviourTest is Test {
             TransferTestCase({
                 fuzz: fuzz,
                 transferCaller: caller,
-                approve: false,
-                approveForAll: true
+                callerApproved: false,
+                callerApprovedForAll: true
             })
         );
     }
