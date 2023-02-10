@@ -256,8 +256,12 @@ contract TransferBehaviourTest is Test {
 
     function _testTransferFrom(TransferTestCase memory ttt) internal {
         _checkAndSetup(ttt.fuzz.from, ttt.fuzz.to, ttt.fuzz.tokenId);
+        TransferFunction transferFunction = TransferFunction(
+            ttt.fuzz.transferFunction % uint8(type(TransferFunction).max)
+        );
 
-        if (ttt.transferCaller != ttt.fuzz.from) {
+        bool differentCaller = ttt.transferCaller != ttt.fuzz.from;
+        if (differentCaller) {
             if (ttt.callerApproved) {
                 _expectRevertIfLocked(tt.wantTransfersLocked, _lockedErr);
                 vm.prank(ttt.fuzz.from);
@@ -270,33 +274,35 @@ contract TransferBehaviourTest is Test {
             }
         }
 
-        if (
-            ttt.transferCaller != ttt.fuzz.from &&
-            ((!ttt.callerApproved && !ttt.callerApprovedForAll) ||
-                // We also revert with `_notApprovedErr` in this case because
-                // the approval could not be granted in the setup above.
-                tt.wantTransfersLocked)
-        ) {
-            vm.expectRevert(_notApprovedErr);
-        } else {
-            _expectRevertIfLocked(tt.wantTransfersLocked, _lockedErr);
-        }
+        bool approved = token.getApproved(ttt.fuzz.tokenId) ==
+            ttt.transferCaller ||
+            token.isApprovedForAll(ttt.fuzz.from, ttt.transferCaller);
 
-        TransferFunction tf = TransferFunction(
-            ttt.fuzz.transferFunction % uint8(type(TransferFunction).max)
-        );
+        bool locked = tt.wantTransfersLocked &&
+            transferFunction != TransferFunction.BypassedTransferFrom;
+
+        bytes memory err;
+        if (locked) {
+            err = _lockedErr;
+        }
+        if (differentCaller && !approved) {
+            err = _notApprovedErr;
+        }
+        bool fails = err.length > 0;
+        _expectRevertIfLocked(fails, err);
+
         vm.prank(ttt.transferCaller);
-        if (tf == TransferFunction.TransferFrom) {
+        if (transferFunction == TransferFunction.TransferFrom) {
             token.transferFrom(ttt.fuzz.from, ttt.fuzz.to, ttt.fuzz.tokenId);
         }
-        if (tf == TransferFunction.SafeTransferFrom) {
+        if (transferFunction == TransferFunction.SafeTransferFrom) {
             token.safeTransferFrom(
                 ttt.fuzz.from,
                 ttt.fuzz.to,
                 ttt.fuzz.tokenId
             );
         }
-        if (tf == TransferFunction.BypassedTransferFrom) {
+        if (transferFunction == TransferFunction.BypassedTransferFrom) {
             token.bypassedTransferFrom(
                 ttt.fuzz.from,
                 ttt.fuzz.to,
@@ -306,7 +312,7 @@ contract TransferBehaviourTest is Test {
 
         assertEq(
             token.ownerOf(ttt.fuzz.tokenId),
-            tt.wantTransfersLocked ? ttt.fuzz.from : ttt.fuzz.to
+            fails ? ttt.fuzz.from : ttt.fuzz.to
         );
     }
 
