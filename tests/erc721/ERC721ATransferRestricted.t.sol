@@ -227,133 +227,151 @@ contract TransferBehaviourTest is Test {
         token.setTransferRestriction(tt.restriction);
     }
 
-    function testOwnerTransfer(
-        address alice,
-        address bob,
-        uint8 tokenId
-    ) public {
-        _checkAndSetup(alice, bob, tokenId);
-        bool locked = tt.wantTransfersLocked;
+    enum TransferFunction {
+        TransferFrom,
+        SafeTransferFrom,
+        BypassedTransferFrom
+    }
 
+    struct TransferTestFuzzParams {
+        address from;
+        address to;
+        uint8 tokenId;
+        uint8 transferFunction; // Sadly no fuzzing for enums
+    }
+
+    struct TransferTestCase {
+        TransferTestFuzzParams fuzz;
+        address transferCaller;
+        bool approve;
+        bool approveForAll;
+    }
+
+    function _expectRevertIfLocked(bool locked, bytes memory error) internal {
         if (locked) {
-            vm.expectRevert(_lockedErr);
+            vm.expectRevert(error);
         }
-        vm.prank(alice);
-        token.transferFrom(alice, bob, 0);
+    }
+
+    function _testTransferFrom(TransferTestCase memory ttt) internal {
+        _checkAndSetup(ttt.fuzz.from, ttt.fuzz.to, ttt.fuzz.tokenId);
+
+        if (ttt.transferCaller != ttt.fuzz.from) {
+            if (ttt.approve) {
+                _expectRevertIfLocked(tt.wantTransfersLocked, _lockedErr);
+                vm.prank(ttt.fuzz.from);
+                token.approve(ttt.transferCaller, ttt.fuzz.tokenId);
+            }
+            if (ttt.approveForAll) {
+                _expectRevertIfLocked(tt.wantTransfersLocked, _lockedErr);
+                vm.prank(ttt.fuzz.from);
+                token.setApprovalForAll(ttt.transferCaller, true);
+            }
+        }
+
+        if (ttt.transferCaller != ttt.fuzz.from) {
+            _expectRevertIfLocked(tt.wantTransfersLocked, _notApprovedErr);
+        } else {
+            _expectRevertIfLocked(tt.wantTransfersLocked, _lockedErr);
+        }
+
+        TransferFunction tf = TransferFunction(
+            ttt.fuzz.transferFunction % uint8(type(TransferFunction).max)
+        );
+        vm.prank(ttt.transferCaller);
+        if (tf == TransferFunction.TransferFrom) {
+            token.transferFrom(ttt.fuzz.from, ttt.fuzz.to, ttt.fuzz.tokenId);
+        }
+        if (tf == TransferFunction.SafeTransferFrom) {
+            token.safeTransferFrom(
+                ttt.fuzz.from,
+                ttt.fuzz.to,
+                ttt.fuzz.tokenId
+            );
+        }
+        if (tf == TransferFunction.BypassedTransferFrom) {
+            token.bypassedTransferFrom(
+                ttt.fuzz.from,
+                ttt.fuzz.to,
+                ttt.fuzz.tokenId
+            );
+        }
 
         assertEq(
-            token.balanceOf(alice),
-            token.totalSupply() - (locked ? 0 : 1)
+            token.ownerOf(ttt.fuzz.tokenId),
+            tt.wantTransfersLocked ? ttt.fuzz.from : ttt.fuzz.to
         );
-        assertEq(token.balanceOf(bob), locked ? 0 : 1);
+    }
+
+    function testOwnerTransfer(TransferTestFuzzParams memory fuzz) public {
+        _testTransferFrom(
+            TransferTestCase({
+                fuzz: fuzz,
+                transferCaller: fuzz.from,
+                approve: false,
+                approveForAll: false
+            })
+        );
     }
 
     function testApprovedTransfer(
-        address alice,
-        address bob,
-        uint8 tokenId
+        TransferTestFuzzParams memory fuzz,
+        address caller
     ) public {
-        _checkAndSetup(alice, bob, tokenId);
-        bool locked = tt.wantTransfersLocked;
-
-        if (locked) {
-            vm.expectRevert(_lockedErr);
-        }
-        vm.prank(alice);
-        token.approve(bob, 0);
-
-        if (locked) {
-            vm.expectRevert(_notApprovedErr);
-        }
-        vm.prank(bob);
-        token.transferFrom(alice, bob, 0);
-
-        assertEq(
-            token.balanceOf(alice),
-            token.totalSupply() - (locked ? 0 : 1)
+        vm.assume(caller != fuzz.from);
+        _testTransferFrom(
+            TransferTestCase({
+                fuzz: fuzz,
+                transferCaller: caller,
+                approve: true,
+                approveForAll: false
+            })
         );
-        assertEq(token.balanceOf(bob), locked ? 0 : 1);
     }
 
     function testApprovedForAllTransfer(
-        address alice,
-        address bob,
-        uint8 tokenId
+        TransferTestFuzzParams memory fuzz,
+        address caller
     ) public {
-        _checkAndSetup(alice, bob, tokenId);
-        bool locked = tt.wantTransfersLocked;
-
-        if (locked) {
-            vm.expectRevert(_lockedErr);
-        }
-        vm.prank(alice);
-        token.setApprovalForAll(bob, true);
-
-        if (locked) {
-            vm.expectRevert(_notApprovedErr);
-        }
-        vm.prank(bob);
-        token.transferFrom(alice, bob, 0);
-
-        assertEq(
-            token.balanceOf(alice),
-            token.totalSupply() - (locked ? 0 : 1)
+        vm.assume(caller != fuzz.from);
+        _testTransferFrom(
+            TransferTestCase({
+                fuzz: fuzz,
+                transferCaller: caller,
+                approve: false,
+                approveForAll: true
+            })
         );
-        assertEq(token.balanceOf(bob), locked ? 0 : 1);
     }
 
     function testMint(address alice, uint8 num) public {
         vm.assume(alice != address(0));
         vm.assume(num > 0);
         token.setTransferRestriction(tt.restriction);
+        uint256 startSupply = token.totalSupply();
 
-        uint256 totalSupply = token.totalSupply();
-
-        bool locked = tt.wantMintLocked;
-        if (locked) {
-            vm.expectRevert(_lockedErr);
-        }
+        _expectRevertIfLocked(tt.wantMintLocked, _lockedErr);
         token.mint(alice, num);
 
-        assertEq(token.balanceOf(alice), totalSupply + (locked ? 0 : num));
+        assertEq(
+            token.balanceOf(alice),
+            startSupply + (tt.wantMintLocked ? 0 : num)
+        );
     }
 
-    function testBurn(
-        address alice,
-        address bob,
-        uint8 tokenId
-    ) public {
-        _checkAndSetup(alice, bob, tokenId);
-        uint256 totalSupply = token.totalSupply();
-        bool locked = tt.wantBurnLocked;
+    function testBurn(address alice, uint8 tokenId) public {
+        vm.assume(alice != address(0));
+        token.mint(alice, uint256(tokenId) + 1);
+        token.setTransferRestriction(tt.restriction);
+        uint256 startSupply = token.totalSupply();
 
-        if (locked) {
-            vm.expectRevert(_lockedErr);
-        }
+        _expectRevertIfLocked(tt.wantBurnLocked, _lockedErr);
         token.burn(tokenId);
 
-        assertEq(token.balanceOf(alice), totalSupply - (locked ? 0 : 1));
-    }
-
-    function testBypassedTransfer(
-        address alice,
-        address bob,
-        uint8 tokenId
-    ) public {
-        _checkAndSetup(alice, bob, tokenId);
-
-        vm.prank(alice);
-        token.bypassedTransferFrom(alice, bob, 0);
-
-        assertEq(token.balanceOf(alice), token.totalSupply() - 1);
-        assertEq(token.balanceOf(bob), 1);
-
-        // To make sure the bypass restores the right settings afterwards.
-        if (tt.wantTransfersLocked) {
-            vm.expectRevert(_lockedErr);
-        }
-        vm.prank(bob);
-        token.transferFrom(bob, alice, 0);
+        assertEq(
+            token.balanceOf(alice),
+            startSupply - (tt.wantBurnLocked ? 0 : 1)
+        );
     }
 }
 
