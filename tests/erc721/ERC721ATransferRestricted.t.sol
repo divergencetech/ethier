@@ -18,7 +18,7 @@ contract TestableERC721ATransferRestricted is ERC721ATransferRestricted {
             payable(address(0xdead)),
             0
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     function mint(address to, uint256 amount) public {
         _mint(to, amount);
@@ -367,7 +367,7 @@ contract NoneRestrictionTest is TransferBehaviourTest {
                 wantBurnLocked: false
             })
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 }
 
 contract OnlyMintRestrictionTest is TransferBehaviourTest {
@@ -380,7 +380,7 @@ contract OnlyMintRestrictionTest is TransferBehaviourTest {
                 wantBurnLocked: true
             })
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 }
 
 contract OnlyBurnRestrictionTest is TransferBehaviourTest {
@@ -393,7 +393,7 @@ contract OnlyBurnRestrictionTest is TransferBehaviourTest {
                 wantBurnLocked: false
             })
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 }
 
 contract FrozenRestrictionTest is TransferBehaviourTest {
@@ -406,5 +406,5 @@ contract FrozenRestrictionTest is TransferBehaviourTest {
                 wantBurnLocked: true
             })
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 }
