@@ -256,27 +256,31 @@ contract TransferBehaviourTest is Test {
 
     function _testTransferFrom(TransferTestCase memory ttt) internal {
         _checkAndSetup(ttt.fuzz.from, ttt.fuzz.to, ttt.fuzz.tokenId);
+        vm.assume(ttt.transferCaller != address(0));
         TransferFunction transferFunction = TransferFunction(
             ttt.fuzz.transferFunction % uint8(type(TransferFunction).max)
         );
 
         bool differentCaller = ttt.transferCaller != ttt.fuzz.from;
-        if (differentCaller) {
-            if (ttt.callerApproved) {
-                _expectRevertIfLocked(tt.wantTransfersLocked, _lockedErr);
-                vm.prank(ttt.fuzz.from);
-                token.approve(ttt.transferCaller, ttt.fuzz.tokenId);
+        bool differentCallerApproved = false;
+        if (differentCaller && ttt.callerApproved) {
+            if (tt.wantTransfersLocked) {
+                vm.expectRevert(_lockedErr);
+            } else {
+                differentCallerApproved = true;
             }
-            if (ttt.callerApprovedForAll) {
-                _expectRevertIfLocked(tt.wantTransfersLocked, _lockedErr);
-                vm.prank(ttt.fuzz.from);
-                token.setApprovalForAll(ttt.transferCaller, true);
-            }
+            vm.prank(ttt.fuzz.from);
+            token.approve(ttt.transferCaller, ttt.fuzz.tokenId);
         }
-
-        bool approved = token.getApproved(ttt.fuzz.tokenId) ==
-            ttt.transferCaller ||
-            token.isApprovedForAll(ttt.fuzz.from, ttt.transferCaller);
+        if (differentCaller && ttt.callerApprovedForAll) {
+            if (tt.wantTransfersLocked) {
+                vm.expectRevert(_lockedErr);
+            } else {
+                differentCallerApproved = true;
+            }
+            vm.prank(ttt.fuzz.from);
+            token.setApprovalForAll(ttt.transferCaller, true);
+        }
 
         bool locked = tt.wantTransfersLocked &&
             transferFunction != TransferFunction.BypassedTransferFrom;
@@ -285,7 +289,7 @@ contract TransferBehaviourTest is Test {
         if (locked) {
             err = _lockedErr;
         }
-        if (differentCaller && !approved) {
+        if (differentCaller && !differentCallerApproved) {
             err = _notApprovedErr;
         }
         bool fails = err.length > 0;
