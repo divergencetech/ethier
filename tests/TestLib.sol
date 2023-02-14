@@ -77,4 +77,136 @@ contract Test is Test_ {
                 )
             );
     }
+
+    function toUint256s(uint8[1] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint8[2] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint8[3] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint8[4] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint8[5] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint8[6] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint16[1] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint16[2] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint16[3] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint16[4] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint16[5] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
+
+    function toUint256s(uint16[6] memory input)
+        public
+        pure
+        returns (uint256[] memory output)
+    {
+        output = new uint256[](input.length);
+        for (uint256 i; i < input.length; ++i) {
+            output[i] = input[i];
+        }
+    }
 }

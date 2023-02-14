@@ -2,12 +2,11 @@
 // Copyright (c) 2021 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-import {ERC721ACommon, ERC721A} from "../../contracts/erc721/ERC721ACommon.sol";
-import {BaseTokenURI} from "../../contracts/erc721/BaseTokenURI.sol";
-import {AccessControlEnumerable} from "../../contracts/utils/AccessControlEnumerable.sol";
+import {ERC721ACommon} from "../../contracts/erc721/ERC721ACommon.sol";
+import {ERC721ACommonBaseTokenURI, BaseTokenURI} from "../../contracts/erc721/BaseTokenURI.sol";
 
 /// @notice Exposes a functions modified with the modifiers under test.
-contract TestableERC721ACommon is ERC721ACommon, BaseTokenURI {
+contract TestableERC721ACommon is ERC721ACommonBaseTokenURI {
     // solhint-disable-next-line no-empty-blocks
     constructor(
         address admin,
@@ -31,11 +30,11 @@ contract TestableERC721ACommon is ERC721ACommon, BaseTokenURI {
     }
 
     function mintN(uint256 num) public {
-        ERC721A._safeMint(msg.sender, num);
+        super._safeMint(msg.sender, num);
     }
 
     function burn(uint256 tokenId) public {
-        ERC721A._burn(tokenId);
+        super._burn(tokenId);
     }
 
     /// @dev For testing the tokenExists() modifier.
@@ -47,26 +46,4 @@ contract TestableERC721ACommon is ERC721ACommon, BaseTokenURI {
         public
         onlyApprovedOrOwner(tokenId)
     {} // solhint-disable-line no-empty-blocks
-
-    function _baseURI()
-        internal
-        view
-        override(ERC721A, BaseTokenURI)
-        returns (string memory)
-    {
-        return BaseTokenURI._baseURI();
-    }
-
-    /// @notice Overrides supportsInterface as required by inheritance.
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(ERC721ACommon, AccessControlEnumerable)
-        returns (bool)
-    {
-        return
-            ERC721ACommon.supportsInterface(interfaceId) ||
-            AccessControlEnumerable.supportsInterface(interfaceId);
-    }
 }
