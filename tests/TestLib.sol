@@ -2,7 +2,8 @@
 // Copyright (c) 2022 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity ^0.8.15;
 
-import {stdJson, Vm} from "forge-std/Components.sol";
+import {stdJson} from "forge-std/StdJson.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {Test as Test_} from "forge-std/Test.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
