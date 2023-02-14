@@ -63,8 +63,8 @@ abstract contract ERC721ATransferRestrictedBase is ERC721ACommon {
      * restriction-bypass implementation might be susceptible to reentrancy
      * exploits under certain conditions and therefore have unintended
      * side-effects.
-     * To be safe, one MUST NOT use this method with functions that pass control
-     * to unknown actors (like `ERC721.safeTransferFrom`).
+     * To be safe, one MUST carefully make sure that the wrapped method never
+     * passes control to unknown actors (like `ERC721.safeTransferFrom`).
      */
     modifier bypassTransferRestriction() {
         _bypass = true;
