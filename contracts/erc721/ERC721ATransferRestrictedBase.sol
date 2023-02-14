@@ -57,8 +57,14 @@ abstract contract ERC721ATransferRestrictedBase is ERC721ACommon {
         returns (TransferRestriction);
 
     /**
-     * @notice Modifier that allows functions to bypass the transfer
+     * @notice Modifier that allows a given context to bypass the transfer
      * restriction.
+     * @dev ATTENTION: This modifier must be used with utmost care!! The
+     * restriction-bypass implementation might be susceptible to reentrancy
+     * exploits under certain conditions and therefore have unintended
+     * side-effects.
+     * To be safe, one MUST NOT use this method with functions that pass control
+     * to unknown actors (like `ERC721.safeTransferFrom`).
      */
     modifier bypassTransferRestriction() {
         _bypass = true;
