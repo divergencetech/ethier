@@ -36,19 +36,6 @@ contract TestableERC721ATransferRestricted is ERC721ATransferRestricted {
     ) public bypassTransferRestriction {
         transferFrom(from, to, tokenId);
     }
-
-    uint256 public callCounter;
-
-    function bypassedWithReentrancy() external bypassTransferRestriction {
-        callCounter++;
-
-        if (callCounter > 1) {
-            callCounter = 0;
-            return;
-        } else {
-            this.bypassedWithReentrancy();
-        }
-    }
 }
 
 contract ERC721ATransferRestrictedGeneralTest is Test {
@@ -417,16 +404,6 @@ contract TransferBehaviourTest is Test {
             token.balanceOf(alice),
             startSupply - (tt.wantBurnLocked ? 0 : 1)
         );
-    }
-
-    function testBypassReentrancyReverts(address caller) public {
-        token.setTransferRestriction(tt.restriction);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ERC721ATransferRestrictedBase.AlreadyBypassed.selector
-            )
-        );
-        token.bypassedWithReentrancy();
     }
 }
 

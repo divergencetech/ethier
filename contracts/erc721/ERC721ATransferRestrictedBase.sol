@@ -32,11 +32,6 @@ abstract contract ERC721ATransferRestrictedBase is ERC721ACommon {
      */
     error DisallowedByTransferRestriction();
 
-    /**
-     * @notice Thrown if a transfer restriction bypass is already active.
-     */
-    error AlreadyBypassed();
-
     // =========================================================================
     //                           Errors
     // =========================================================================
@@ -64,13 +59,8 @@ abstract contract ERC721ATransferRestrictedBase is ERC721ACommon {
     /**
      * @notice Modifier that allows functions to bypass the transfer
      * restriction.
-     * @dev Reverts if a bypass is already active, effectively acting as
-     * reentrancy guard.
      */
     modifier bypassTransferRestriction() {
-        if (_bypass) {
-            revert AlreadyBypassed();
-        }
         _bypass = true;
         _;
         _bypass = false;
