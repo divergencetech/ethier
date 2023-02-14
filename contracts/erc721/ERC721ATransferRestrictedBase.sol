@@ -121,7 +121,7 @@ abstract contract ERC721ATransferRestrictedBase is ERC721ACommon {
         override
         returns (bool)
     {
-        if (!_bypass && transferRestriction() != TransferRestriction.None) {
+        if (transferRestriction() != TransferRestriction.None && !_bypass) {
             return false;
         }
 
@@ -137,7 +137,7 @@ abstract contract ERC721ATransferRestrictedBase is ERC721ACommon {
         virtual
         override
     {
-        if (!_bypass && transferRestriction() != TransferRestriction.None) {
+        if (transferRestriction() != TransferRestriction.None && !_bypass) {
             revert DisallowedByTransferRestriction();
         }
 
@@ -154,7 +154,7 @@ abstract contract ERC721ATransferRestrictedBase is ERC721ACommon {
         virtual
         override
     {
-        if (!_bypass && transferRestriction() != TransferRestriction.None) {
+        if (transferRestriction() != TransferRestriction.None && !_bypass) {
             revert DisallowedByTransferRestriction();
         }
 
