@@ -10,4 +10,7 @@ fs_permissions = [
     { access = "write", path = "/tmp"},
 ]
 
+[fuzz]
+runs=4096
+
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
