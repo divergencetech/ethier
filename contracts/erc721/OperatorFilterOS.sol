@@ -22,11 +22,13 @@ abstract contract OperatorFilterOS is ERC721ACommon, DefaultOperatorFilterer {
         onlyRole(DEFAULT_STEERING_ROLE)
         returns (bytes memory)
     {
+        // solhint-disable-next-line avoid-low-level-calls
         (bool ok, bytes memory ret) = address(OPERATOR_FILTER_REGISTRY).call(
             cdata
         );
         if (!ok) {
             if (ret.length == 0) {
+                // solhint-disable-next-line reason-string
                 revert();
             }
             assembly {

@@ -24,7 +24,7 @@ contract TestableToken is OperatorFilterOS {
             payable(address(0xFEE)),
             750
         )
-    {}
+    {} // solhint-disable-line no-empty-blocks
 
     function mint(address to, uint256 num) public {
         _mint(to, num);
