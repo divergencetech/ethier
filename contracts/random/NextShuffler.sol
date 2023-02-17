@@ -142,7 +142,7 @@ library NextShuffler {
     /**
      * @notice Restarts the shuffler, such that all elements can be drawn again.
      * @dev Restarting does not clear the internal permutation. Running the
-     * the shuffle again with same seed after restarting might, therefore,
+     * shuffle again with same seed after restarting might, therefore,
      * yield different results.
      */
     function restart(State storage state) internal {
