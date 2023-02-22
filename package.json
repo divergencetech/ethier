@@ -1,6 +1,6 @@
 {
   "name": "@divergencetech/ethier",
-  "version": "0.53.0",
+  "version": "0.54.0",
   "description": "Golang and Solidity SDK to make Ethereum development ethier",
   "main": "\"\"",
   "scripts": {
@@ -28,7 +28,8 @@
     "@chainlink/contracts": "^0.3.0",
     "@openzeppelin/contracts": "4.7.3",
     "@openzeppelin/contracts-upgradeable": "4.7.3",
-    "erc721a": "4.2.3"
+    "erc721a": "4.2.3",
+    "operator-filter-registry": "^1.4.0"
   },
   "directories": {
     "test": "tests"
