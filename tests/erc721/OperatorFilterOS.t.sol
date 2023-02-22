@@ -71,6 +71,11 @@ contract ERC721ATransferRestrictedGeneralTest is
     }
 
     function testForwardUnsubscribe(bool copyExistingEntries) public {
+        assertEq(
+            registry.subscriptionOf(address(token)),
+            CANONICAL_CORI_SUBSCRIPTION
+        );
+
         vm.prank(steerer);
         token.callOperatorFilterRegistry(
             abi.encodeWithSelector(
@@ -79,6 +84,31 @@ contract ERC721ATransferRestrictedGeneralTest is
                 copyExistingEntries
             )
         );
+        assertEq(registry.subscriptionOf(address(token)), address(0));
+    }
+
+    function testForwardSubscribe(address newSubscription) public {
+        vm.assume(newSubscription != address(0));
+        vm.assume(newSubscription != address(token));
+        vm.assume(newSubscription != CANONICAL_CORI_SUBSCRIPTION);
+
+        vm.prank(newSubscription);
+        registry.register(newSubscription);
+
+        assertEq(
+            registry.subscriptionOf(address(token)),
+            CANONICAL_CORI_SUBSCRIPTION
+        );
+
+        vm.prank(steerer);
+        token.callOperatorFilterRegistry(
+            abi.encodeWithSelector(
+                OperatorFilterRegistry.subscribe.selector,
+                address(token),
+                newSubscription
+            )
+        );
+        assertEq(registry.subscriptionOf(address(token)), newSubscription);
     }
 
     function testForwardSubscribeWithError() public {

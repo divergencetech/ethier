@@ -2,13 +2,16 @@
 // Copyright (c) 2023 the ethier authors (github.com/divergencetech/ethier)
 pragma solidity >=0.8.0 <0.9.0;
 
-import {ERC721A, ERC721ACommon} from "./ERC721ACommon.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {DefaultOperatorFilterer} from "operator-filter-registry/src/DefaultOperatorFilterer.sol";
+import {ERC721A, ERC721ACommon} from "./ERC721ACommon.sol";
 
 /**
  * @notice ERC721ACommon extension that adds Opensea's operator filtering.
  */
 abstract contract OperatorFilterOS is ERC721ACommon, DefaultOperatorFilterer {
+    using Address for address;
+
     /**
      * @notice Calling the operator filter registry with given calldata.
      * @dev The registry contract did not foresee role-based contract access
@@ -22,21 +25,7 @@ abstract contract OperatorFilterOS is ERC721ACommon, DefaultOperatorFilterer {
         onlyRole(DEFAULT_STEERING_ROLE)
         returns (bytes memory)
     {
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool ok, bytes memory ret) = address(OPERATOR_FILTER_REGISTRY).call(
-            cdata
-        );
-        if (!ok) {
-            if (ret.length == 0) {
-                // solhint-disable-next-line reason-string
-                revert();
-            }
-            assembly {
-                revert(add(ret, 32), mload(ret))
-            }
-        }
-
-        return ret;
+        return address(OPERATOR_FILTER_REGISTRY).functionCall(cdata);
     }
 
     // =========================================================================
