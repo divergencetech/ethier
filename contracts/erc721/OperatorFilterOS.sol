@@ -34,6 +34,7 @@ abstract contract OperatorFilterOS is ERC721ACommon, DefaultOperatorFilterer {
 
     function setApprovalForAll(address operator, bool approved)
         public
+        virtual
         override
         onlyAllowedOperatorApproval(operator)
     {
@@ -43,6 +44,7 @@ abstract contract OperatorFilterOS is ERC721ACommon, DefaultOperatorFilterer {
     function approve(address operator, uint256 tokenId)
         public
         payable
+        virtual
         override
         onlyAllowedOperatorApproval(operator)
     {
@@ -53,7 +55,7 @@ abstract contract OperatorFilterOS is ERC721ACommon, DefaultOperatorFilterer {
         address from,
         address to,
         uint256 tokenId
-    ) public payable override onlyAllowedOperator(from) {
+    ) public payable virtual override onlyAllowedOperator(from) {
         super.transferFrom(from, to, tokenId);
     }
 
@@ -61,7 +63,7 @@ abstract contract OperatorFilterOS is ERC721ACommon, DefaultOperatorFilterer {
         address from,
         address to,
         uint256 tokenId
-    ) public payable override onlyAllowedOperator(from) {
+    ) public payable virtual override onlyAllowedOperator(from) {
         super.safeTransferFrom(from, to, tokenId);
     }
 
@@ -70,7 +72,7 @@ abstract contract OperatorFilterOS is ERC721ACommon, DefaultOperatorFilterer {
         address to,
         uint256 tokenId,
         bytes memory data
-    ) public payable override onlyAllowedOperator(from) {
+    ) public payable virtual override onlyAllowedOperator(from) {
         super.safeTransferFrom(from, to, tokenId, data);
     }
 }
