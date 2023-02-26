@@ -7,7 +7,7 @@ however, are identical in their code and only their parameters change. This was
 the motivation behind [EIP-1167](https://eips.ethereum.org/EIPS/eip-1167)'s
 Minimal Proxy Contract; TL;DR deploy a single "implementation" contract and a
 series of "proxy" contracts that delegate all of their calls to the
-implementaiton.
+implementation.
 
 ### Gas savings
 
