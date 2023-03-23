@@ -9,6 +9,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func factorial(num int) int {
+	if num == 1 || num == 0 {
+		return num
+	}
+	return num * factorial(num-1)
+}
+
 func TestNextShuffler(t *testing.T) {
 	sim := ethtest.NewSimulatedBackendTB(t, 1)
 
@@ -97,6 +104,20 @@ func TestNextShuffler(t *testing.T) {
 			if diff := cmp.Diff(want, got); diff != "" {
 				t.Errorf("Permutation diff compared to regular Fisher–Yates (-want +got):\n%s", diff)
 			}
+
+			inOrder := true
+			for i, j := range gotShuffles {
+				if i != j {
+					inOrder = false
+					break
+				}
+			}
+			if inOrder {
+				n := new(big.Int).MulRange(1, int64(tt.total))
+				p := new(big.Float).Quo(big.NewFloat(1), new(big.Float).SetInt(n))
+				t.Errorf("Shuffle was in order; this is very unlikely to happen by change (p=%.2e)", p)
+			}
+
 		})
 	}
 
