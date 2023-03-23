@@ -113,7 +113,7 @@ library NextShuffler {
         internal
         returns (uint256 choice, uint256 rand)
     {
-        src.readLessThan(state.numToShuffle - state.shuffled);
+        rand = src.readLessThan(state.numToShuffle - state.shuffled);
         choice = next(state, rand);
     }
 
