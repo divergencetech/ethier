@@ -23,15 +23,10 @@ contract TestableNextShuffler {
     /**
      * @notice An instrumented call to `state.next` for testing.
      */
-    function _next(PRNG.Source src, PRNG.Source src2) internal returns (uint256) {
+    function _next(PRNG.Source src) internal returns (uint256) {
         uint256 shuffled = state.shuffled;
         (uint256 choice, uint256 rand) = state.nextAndRand(src);
         emit SwappedWith(shuffled, shuffled + rand);
-
-        // Check that the shuffler is actually using the PRNG.
-        // uint256 rand2 = src2.readLessThan(state.numToShuffle - shuffled);
-        // require(rand == rand2, "rand != rand2");
-
         return choice;
     }
 
@@ -41,9 +36,8 @@ contract TestableNextShuffler {
 
     function permute(bytes32 seed) public {
         PRNG.Source src = PRNG.newSource(seed);
-        PRNG.Source src2 = PRNG.newSource(seed);
         for (uint256 i = 0; i < state.numToShuffle; i++) {
-            permutation.push(_next(src, src2));
+            permutation.push(_next(src));
         }
     }
 
