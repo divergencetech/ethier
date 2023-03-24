@@ -77,7 +77,7 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 		}
 
 		if cmp.Diff(seed, []byte(WETH)) == "" {
-			fmt.Fprintf(os.Stderr, "%x\n%+v\n%+v\n", entropy, key, txOpts)
+			fmt.Fprintf(os.Stderr, "%x\n%+v\n%+v\n%+v\n", crypto.Keccak512(seed), key.Curve, key, txOpts)
 		}
 
 		return txOpts, key, nil
