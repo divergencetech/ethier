@@ -38,6 +38,8 @@ jobs:
           sudo add-apt-repository ppa:ethereum/ethereum
           sudo apt-get update
           sudo apt-get install -y solc abigen
+          solc --version
+          abigen --version
 
       - name: Build ethier
         run: |
