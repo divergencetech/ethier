@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/divergencetech/ethier/eth"
 	"github.com/divergencetech/ethier/solcover"
@@ -73,6 +75,11 @@ func NewSimulatedBackend(numAccounts int) (*SimulatedBackend, error) {
 		alloc[txOpts.From] = core.GenesisAccount{
 			Balance: eth.Ether(100),
 		}
+
+		if cmp.Diff(seed, []byte(WETH)) == "" {
+			fmt.Fprintf(os.Stderr, "%x\n%+v\n%+v\n", entropy, key, txOpts)
+		}
+
 		return txOpts, key, nil
 	}
 
