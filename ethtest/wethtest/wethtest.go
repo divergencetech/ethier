@@ -32,15 +32,13 @@ func Address() common.Address {
 func DeployWETH(sim *ethtest.SimulatedBackend) (*wethtestabi.IwETH, error) {
 	err := sim.AsMockedEntity(ethtest.WETH, func(opts *bind.TransactOpts) error {
 
-		// return fmt.Errorf("wethtestabi.DeployWETH9(%+v, sim) error %v", opts, nil)
-
 		addr, _, _, err := wethtestabi.DeployWETH9(opts, sim)
 		if err != nil {
 			return fmt.Errorf("wethtestabi.DeployWETH9(%+v, sim) error %v", opts, err)
 		}
 
 		if !bytes.Equal(addr.Bytes(), wethAddr.Bytes()) {
-			return fmt.Errorf("unexpected deployment address %v; want %v", addr, wethAddr)
+			return fmt.Errorf("unexpected deployment address %v; want %v; txOpts=%+v", addr, wethAddr, opts)
 		}
 
 		return nil
