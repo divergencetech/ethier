@@ -9,6 +9,21 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func runShuffling(shuffler *TestableNextShuffler, total uint64) ([]uint64, error) {
+	var got []uint64
+	for i := uint64(0); i < total; i++ {
+		n, err := shuffler.Permutation(nil, new(big.Int).SetUint64(i))
+		if err != nil {
+			return nil, fmt.Errorf("Permutation(%d) error %v", i, err)
+		}
+		if !n.IsUint64() {
+			return nil, fmt.Errorf("Permutation(%d).IsUint64() = false; want true", i)
+		}
+		got = append(got, n.Uint64())
+	}
+	return got, nil
+}
+
 func TestNextShuffler(t *testing.T) {
 	sim := ethtest.NewSimulatedBackendTB(t, 1)
 
@@ -48,21 +63,10 @@ func TestNextShuffler(t *testing.T) {
 				t.Fatalf("Permute(%d) error %v", tt.seed, err)
 			}
 
-			runShuffling := func() []uint64 {
-				var got []uint64
-				for i := uint64(0); i < tt.total; i++ {
-					n, err := shuffler.Permutation(nil, new(big.Int).SetUint64(i))
-					if err != nil {
-						t.Fatalf("Permutation(%d) error %v", i, err)
-					}
-					if !n.IsUint64() {
-						t.Fatalf("Permutation(%d).IsUint64() = false; want true", i)
-					}
-					got = append(got, n.Uint64())
-				}
-				return got
+			got, err := runShuffling(shuffler, tt.total)
+			if err != nil {
+				t.Fatal(err)
 			}
-			got := runShuffling()
 
 			gotShuffles := make([]int, tt.total)
 			for i := uint64(0); i < tt.total; i++ {
@@ -93,7 +97,12 @@ func TestNextShuffler(t *testing.T) {
 			}
 
 			shuffler.Reset(sim.Acc(0))
-			got = runShuffling()
+
+			got, err = runShuffling(shuffler, tt.total)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			if diff := cmp.Diff(want, got); diff != "" {
 				t.Errorf("Permutation diff compared to regular Fisher–Yates (-want +got):\n%s", diff)
 			}
@@ -117,4 +126,39 @@ func TestNextShuffler(t *testing.T) {
 	if !gotStationary {
 		t.Error("No shuffles kept the index in place; likely off-by-one error")
 	}
+}
+
+func TestNextShufflerManual(t *testing.T) {
+	sim := ethtest.NewSimulatedBackendTB(t, 1)
+
+	tests := []struct {
+		total, seed uint64
+		want        []uint64
+	}{
+		{20, 0, []uint64{9, 13, 1, 10, 11, 0, 12, 7, 17, 16, 4, 14, 5, 3, 19, 2, 18, 6, 8, 15}},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("shuffling %d items with seed %d", tt.total, tt.seed), func(t *testing.T) {
+			_, _, shuffler, err := DeployTestableNextShuffler(sim.Acc(0), sim, new(big.Int).SetUint64(tt.total))
+			if err != nil {
+				t.Fatalf("DeployTestableNextShuffler() error %v", err)
+			}
+
+			if _, err := shuffler.Permute(sim.Acc(0), tt.seed); err != nil {
+				t.Fatalf("Permute(%d) error %v", tt.seed, err)
+			}
+
+			got, err := runShuffling(shuffler, tt.total)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Permutation diff compared to manual shuffling (-want +got):\n%s", diff)
+			}
+
+		})
+	}
+
 }
