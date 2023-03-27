@@ -15,7 +15,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: "^1.18.0"
+          go-version: "1.18.0"
 
       - name: Setup NodeJs
         uses: actions/setup-node@v2
@@ -57,7 +57,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: "^1.18.0"
+          go-version: "1.18.0"
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
