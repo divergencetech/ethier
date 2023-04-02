@@ -1,5 +1,12 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
+load("//sol:repositories.bzl", "LATEST_VERSION", "rules_sol_dependencies", "sol_register_toolchains")
+
+rules_sol_dependencies()
+
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
+bazel_skylib_workspace()
 
 ##########
 # Protobuf
@@ -91,3 +98,32 @@ go_rules_dependencies()
 go_register_toolchains(version = "1.18")
 
 gazelle_dependencies()
+
+
+
+sol_register_toolchains(
+    name = "solc",
+    sol_version = LATEST_VERSION,
+)
+
+# Fetch our contracts dependencies directly from git repos, like Forge does it:
+# https://book.getfoundry.sh/projects/dependencies
+new_git_repository(
+    name = "openzeppelin-contracts",
+    remote = "git@github.com:OpenZeppelin/openzeppelin-contracts.git",
+    # NOTE: this version ought to match what appears in yarn.lock, or behavior
+    # between Bazel and legacy npm-based dependency management will vary.
+    commit = "8c49ad74eae76ee389d038780d407cf90b4ae1de", # v4.7.0
+    shallow_since = "1656493217 +0200",
+    build_file = "openzeppelin-contracts.BUILD",
+)
+
+new_git_repository(
+    name = "erc721a",
+    remote = "git@github.com:chiru-labs/ERC721A.git",
+    # NOTE: this version ought to match what appears in yarn.lock, or behavior
+    # between Bazel and legacy npm-based dependency management will vary.
+    commit = "9859cd2edb1a8b4c2db5e46031abbb3253e42467", # v4.2.2
+    shallow_since = "1659313679 -0700",
+    build_file = "erc721a.BUILD",
+)

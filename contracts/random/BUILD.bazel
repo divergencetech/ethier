@@ -1,0 +1,6 @@
+load("//sol:defs.bzl", "sol_binary")
+
+sol_binary(
+    name = "random",
+    srcs = glob(["*.sol"]),
+)

@@ -1,0 +1,8 @@
+load("//sol:defs.bzl", "sol_sources")
+
+sol_sources(
+    name = "utils",
+    srcs = glob(["*.sol"]),
+    visibility = ["//visibility:public"],
+    deps = ["@openzeppelin-contracts"],
+)
