@@ -31,6 +31,14 @@ There is no need to import any of the code in `./factories/`. To deploy a new
 proxy manually, use the exposed functions in the verified Etherscan contracts
 (see below). To automate deployment, use a _Deployer_ contract.
 
+#### Version
+
+The deployed payment splitter is using v4.7.0 of OpenZeppelin. As of April 2023
+the version deployed matches the interface on the [OZ docs page](https://docs.openzeppelin.com/contracts/4.x/api/finance#PaymentSplitter).
+
+Note that it is possible for a new 4.x release of OZ to add extra functionality which
+will not be included in this contract without a subsequent deploy of the factory.
+
 ### Deployers
 
 Each factory has an equivalent _Deployer_ library in `./contracts/factories/`.
@@ -59,5 +67,5 @@ contract LookMaNoAddress {
 ### Verified Factories
 
 * `PaymentSplitter`
-  * [Mainnet](https://etherscan.io/address/0xf034d6a4b1a64f0e6038632d87746ca24b79d325#code)
-  * [Goerli](https://goerli.etherscan.io/address/0x7F4Ae949da2eD37E0a4b37e0b15B22Ad5c94DE65#code)
+  * [Mainnet](https://etherscan.io/address/0x10af0996e2e289dc8f582e6510b0d251e061bfb5#code)
+  * [Goerli](https://goerli.etherscan.io/address/0x1353463A30F7A9Eb50A645F4D3950d5d5E41F1F4#code)
