@@ -53,9 +53,10 @@ abstract contract Seller is AccessControlPausable, ReentrancyGuard {
     SellerConfig public sellerConfig;
 
     /// @notice Sets the seller config.
-    function setSellerConfig(
-        SellerConfig memory config
-    ) public onlyRole(DEFAULT_STEERING_ROLE) {
+    function setSellerConfig(SellerConfig memory config)
+        public
+        onlyRole(DEFAULT_STEERING_ROLE)
+    {
         require(
             config.totalInventory >= config.freeQuota,
             "Seller: excessive free quota"
@@ -87,9 +88,10 @@ abstract contract Seller is AccessControlPausable, ReentrancyGuard {
     address payable public beneficiary;
 
     /// @notice Sets the recipient of revenues.
-    function setBeneficiary(
-        address payable _beneficiary
-    ) public onlyRole(DEFAULT_STEERING_ROLE) {
+    function setBeneficiary(address payable _beneficiary)
+        public
+        onlyRole(DEFAULT_STEERING_ROLE)
+    {
         beneficiary = _beneficiary;
     }
 
@@ -103,10 +105,11 @@ abstract contract Seller is AccessControlPausable, ReentrancyGuard {
     bytes as this allows simple passing of a set cost (see
     ArbitraryPriceSeller).
      */
-    function cost(
-        uint256 n,
-        uint256 metadata
-    ) public view virtual returns (uint256);
+    function cost(uint256 n, uint256 metadata)
+        public
+        view
+        virtual
+        returns (uint256);
 
     /**
     @dev Called by both _purchase() and purchaseFreeOfCharge() after all limits
@@ -180,10 +183,11 @@ abstract contract Seller is AccessControlPausable, ReentrancyGuard {
     @notice Allows the contract owner to purchase without payment, within the
     quota enforced by the SellerConfig.
      */
-    function purchaseFreeOfCharge(
-        address to,
-        uint256 n
-    ) public onlyRole(DEFAULT_STEERING_ROLE) whenNotPaused {
+    function purchaseFreeOfCharge(address to, uint256 n)
+        public
+        onlyRole(DEFAULT_STEERING_ROLE)
+        whenNotPaused
+    {
         /**
          * ##### CHECKS
          */

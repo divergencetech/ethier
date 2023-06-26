@@ -98,9 +98,10 @@ abstract contract LinearDutchAuction is Seller {
     @dev The auction can be toggle on and off with this function, without the
     cost of having to update the entire config.
      */
-    function setAuctionStartPoint(
-        uint256 startPoint
-    ) public onlyRole(DEFAULT_STEERING_ROLE) {
+    function setAuctionStartPoint(uint256 startPoint)
+        public
+        onlyRole(DEFAULT_STEERING_ROLE)
+    {
         dutchAuctionConfig.startPoint = startPoint;
     }
 
