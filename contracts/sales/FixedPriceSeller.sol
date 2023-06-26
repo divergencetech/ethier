@@ -22,7 +22,7 @@ abstract contract FixedPriceSeller is Seller {
     uint256 public price;
 
     /// @notice Sets the per-item price.
-    function setPrice(uint256 _price) public onlyOwner {
+    function setPrice(uint256 _price) public onlyRole(DEFAULT_STEERING_ROLE) {
         price = _price;
     }
 

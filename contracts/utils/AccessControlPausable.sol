@@ -9,12 +9,12 @@ import {AccessControlEnumerable} from "./AccessControlEnumerable.sol";
 /// STEERING role.
 contract AccessControlPausable is AccessControlEnumerable, Pausable {
     /// @notice Pauses the contract.
-    function pause() public onlyRole(DEFAULT_STEERING_ROLE) {
+    function pause() public virtual onlyRole(DEFAULT_STEERING_ROLE) {
         Pausable._pause();
     }
 
     /// @notice Unpauses the contract.
-    function unpause() public onlyRole(DEFAULT_STEERING_ROLE) {
+    function unpause() public virtual onlyRole(DEFAULT_STEERING_ROLE) {
         Pausable._unpause();
     }
 }

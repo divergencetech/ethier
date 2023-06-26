@@ -72,7 +72,7 @@ abstract contract LinearDutchAuction is Seller {
     function setAuctionConfig(
         DutchAuctionConfig memory config,
         uint256 expectedReserve
-    ) public onlyOwner {
+    ) public onlyRole(DEFAULT_STEERING_ROLE) {
         // Underflow might occur is size/num decreases is too large.
         unchecked {
             require(
@@ -98,7 +98,10 @@ abstract contract LinearDutchAuction is Seller {
     @dev The auction can be toggle on and off with this function, without the
     cost of having to update the entire config.
      */
-    function setAuctionStartPoint(uint256 startPoint) public onlyOwner {
+    function setAuctionStartPoint(uint256 startPoint)
+        public
+        onlyRole(DEFAULT_STEERING_ROLE)
+    {
         dutchAuctionConfig.startPoint = startPoint;
     }
 

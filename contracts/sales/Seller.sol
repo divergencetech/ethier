@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../utils/Monotonic.sol";
-import "../utils/OwnerPausable.sol";
+import "../utils/AccessControlPausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
@@ -15,7 +15,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  - Enforce per-wallet / per-transaction limits
  - Calculate required cost, forwarding to a beneficiary, and refunding extra
  */
-abstract contract Seller is OwnerPausable, ReentrancyGuard {
+abstract contract Seller is AccessControlPausable, ReentrancyGuard {
     using Address for address payable;
     using Monotonic for Monotonic.Increaser;
     using Strings for uint256;
@@ -53,7 +53,10 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
     SellerConfig public sellerConfig;
 
     /// @notice Sets the seller config.
-    function setSellerConfig(SellerConfig memory config) public onlyOwner {
+    function setSellerConfig(SellerConfig memory config)
+        public
+        onlyRole(DEFAULT_STEERING_ROLE)
+    {
         require(
             config.totalInventory >= config.freeQuota,
             "Seller: excessive free quota"
@@ -85,7 +88,10 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
     address payable public beneficiary;
 
     /// @notice Sets the recipient of revenues.
-    function setBeneficiary(address payable _beneficiary) public onlyOwner {
+    function setBeneficiary(address payable _beneficiary)
+        public
+        onlyRole(DEFAULT_STEERING_ROLE)
+    {
         beneficiary = _beneficiary;
     }
 
@@ -179,7 +185,7 @@ abstract contract Seller is OwnerPausable, ReentrancyGuard {
      */
     function purchaseFreeOfCharge(address to, uint256 n)
         public
-        onlyOwner
+        onlyRole(DEFAULT_STEERING_ROLE)
         whenNotPaused
     {
         /**
