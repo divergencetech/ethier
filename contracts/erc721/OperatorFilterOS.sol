@@ -3,13 +3,15 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {DefaultOperatorFilterer} from "operator-filter-registry/src/DefaultOperatorFilterer.sol";
+import {OperatorFilterer} from "operator-filter-registry/src/OperatorFilterer.sol";
 import {ERC721A, ERC721ACommon} from "./ERC721ACommon.sol";
+
+address constant BLUR_SUBSCRIPTION = 0x9dC5EE2D52d014f8b81D662FA8f4CA525F27cD6b;
 
 /**
  * @notice ERC721ACommon extension that adds Opensea's operator filtering.
  */
-abstract contract OperatorFilterOS is ERC721ACommon, DefaultOperatorFilterer {
+abstract contract OperatorFilterOS is ERC721ACommon, OperatorFilterer(BLUR_SUBSCRIPTION, true) {
     using Address for address;
 
     /**
@@ -51,28 +53,33 @@ abstract contract OperatorFilterOS is ERC721ACommon, DefaultOperatorFilterer {
         super.approve(operator, tokenId);
     }
 
-    function transferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) public payable virtual override onlyAllowedOperator(from) {
+    function transferFrom(address from, address to, uint256 tokenId)
+        public
+        payable
+        virtual
+        override
+        onlyAllowedOperator(from)
+    {
         super.transferFrom(from, to, tokenId);
     }
 
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) public payable virtual override onlyAllowedOperator(from) {
+    function safeTransferFrom(address from, address to, uint256 tokenId)
+        public
+        payable
+        virtual
+        override
+        onlyAllowedOperator(from)
+    {
         super.safeTransferFrom(from, to, tokenId);
     }
 
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 tokenId,
-        bytes memory data
-    ) public payable virtual override onlyAllowedOperator(from) {
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data)
+        public
+        payable
+        virtual
+        override
+        onlyAllowedOperator(from)
+    {
         super.safeTransferFrom(from, to, tokenId, data);
     }
 }

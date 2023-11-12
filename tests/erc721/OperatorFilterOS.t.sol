@@ -7,23 +7,19 @@ import {Test} from "../TestLib.sol";
 import {IERC721A} from "erc721a/contracts/IERC721A.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
-import {OperatorFilterRegistryErrorsAndEvents, OperatorFilterRegistry} from "operator-filter-registry/src/OperatorFilterRegistry.sol";
+import {
+    OperatorFilterRegistryErrorsAndEvents,
+    OperatorFilterRegistry
+} from "operator-filter-registry/src/OperatorFilterRegistry.sol";
 import {OperatorFilterer} from "operator-filter-registry/src/OperatorFilterer.sol";
-import {CANONICAL_OPERATOR_FILTER_REGISTRY_ADDRESS, CANONICAL_CORI_SUBSCRIPTION} from "operator-filter-registry/src/lib/Constants.sol";
+import {CANONICAL_OPERATOR_FILTER_REGISTRY_ADDRESS} from "operator-filter-registry/src/lib/Constants.sol";
 
 import {ERC721ACommon} from "../../contracts/erc721/ERC721ACommon.sol";
-import {OperatorFilterOS} from "../../contracts/erc721/OperatorFilterOS.sol";
+import {BLUR_SUBSCRIPTION, OperatorFilterOS} from "../../contracts/erc721/OperatorFilterOS.sol";
 
 contract TestableToken is OperatorFilterOS {
     constructor(address admin, address steerer)
-        ERC721ACommon(
-            admin,
-            steerer,
-            "NAME",
-            "SYM",
-            payable(address(0xFEE)),
-            750
-        )
+        ERC721ACommon(admin, steerer, "NAME", "SYM", payable(address(0xFEE)), 750)
     {} // solhint-disable-line no-empty-blocks
 
     function mint(address to, uint256 num) public {
@@ -31,10 +27,7 @@ contract TestableToken is OperatorFilterOS {
     }
 }
 
-contract ERC721ATransferRestrictedGeneralTest is
-    Test,
-    OperatorFilterRegistryErrorsAndEvents
-{
+contract ERC721ATransferRestrictedGeneralTest is Test, OperatorFilterRegistryErrorsAndEvents {
     using Address for address;
 
     TestableToken public token;
@@ -46,13 +39,10 @@ contract ERC721ATransferRestrictedGeneralTest is
         OperatorFilterRegistry(CANONICAL_OPERATOR_FILTER_REGISTRY_ADDRESS);
 
     function setUp() public virtual {
-        vm.etch(
-            CANONICAL_OPERATOR_FILTER_REGISTRY_ADDRESS,
-            address(new OperatorFilterRegistry()).code
-        );
+        vm.etch(CANONICAL_OPERATOR_FILTER_REGISTRY_ADDRESS, address(new OperatorFilterRegistry()).code);
 
-        vm.prank(CANONICAL_CORI_SUBSCRIPTION);
-        registry.register(CANONICAL_CORI_SUBSCRIPTION);
+        vm.prank(BLUR_SUBSCRIPTION);
+        registry.register(BLUR_SUBSCRIPTION);
 
         token = new TestableToken(admin, steerer);
     }
@@ -64,25 +54,16 @@ contract ERC721ATransferRestrictedGeneralTest is
 
         vm.startPrank(vandal, steerer);
 
-        vm.expectRevert(
-            missingRoleError(vandal, token.DEFAULT_STEERING_ROLE())
-        );
+        vm.expectRevert(missingRoleError(vandal, token.DEFAULT_STEERING_ROLE()));
         token.callOperatorFilterRegistry(hex"");
     }
 
     function testForwardUnsubscribe(bool copyExistingEntries) public {
-        assertEq(
-            registry.subscriptionOf(address(token)),
-            CANONICAL_CORI_SUBSCRIPTION
-        );
+        assertEq(registry.subscriptionOf(address(token)), BLUR_SUBSCRIPTION);
 
         vm.prank(steerer);
         token.callOperatorFilterRegistry(
-            abi.encodeWithSelector(
-                OperatorFilterRegistry.unsubscribe.selector,
-                address(token),
-                copyExistingEntries
-            )
+            abi.encodeWithSelector(OperatorFilterRegistry.unsubscribe.selector, address(token), copyExistingEntries)
         );
         assertEq(registry.subscriptionOf(address(token)), address(0));
     }
@@ -90,23 +71,16 @@ contract ERC721ATransferRestrictedGeneralTest is
     function testForwardSubscribe(address newSubscription) public {
         vm.assume(newSubscription != address(0));
         vm.assume(newSubscription != address(token));
-        vm.assume(newSubscription != CANONICAL_CORI_SUBSCRIPTION);
+        vm.assume(newSubscription != BLUR_SUBSCRIPTION);
 
         vm.prank(newSubscription);
         registry.register(newSubscription);
 
-        assertEq(
-            registry.subscriptionOf(address(token)),
-            CANONICAL_CORI_SUBSCRIPTION
-        );
+        assertEq(registry.subscriptionOf(address(token)), BLUR_SUBSCRIPTION);
 
         vm.prank(steerer);
         token.callOperatorFilterRegistry(
-            abi.encodeWithSelector(
-                OperatorFilterRegistry.subscribe.selector,
-                address(token),
-                newSubscription
-            )
+            abi.encodeWithSelector(OperatorFilterRegistry.subscribe.selector, address(token), newSubscription)
         );
         assertEq(registry.subscriptionOf(address(token)), newSubscription);
     }
@@ -115,11 +89,7 @@ contract ERC721ATransferRestrictedGeneralTest is
         vm.expectRevert(CannotSubscribeToZeroAddress.selector);
         vm.prank(steerer);
         token.callOperatorFilterRegistry(
-            abi.encodeWithSelector(
-                OperatorFilterRegistry.subscribe.selector,
-                address(token),
-                address(0)
-            )
+            abi.encodeWithSelector(OperatorFilterRegistry.subscribe.selector, address(token), address(0))
         );
     }
 
@@ -127,8 +97,8 @@ contract ERC721ATransferRestrictedGeneralTest is
         address[] memory list = new address[](1);
         list[0] = operator;
 
-        vm.prank(CANONICAL_CORI_SUBSCRIPTION);
-        registry.updateOperators(CANONICAL_CORI_SUBSCRIPTION, list, filtered);
+        vm.prank(BLUR_SUBSCRIPTION);
+        registry.updateOperators(BLUR_SUBSCRIPTION, list, filtered);
     }
 
     enum TransferType {
@@ -158,12 +128,8 @@ contract ERC721ATransferRestrictedGeneralTest is
         token.mint(tt.from, 1);
         _updateOperator(tt.blockedOperator, true);
 
-        bytes memory err = abi.encodeWithSelector(
-            AddressFiltered.selector,
-            tt.blockedOperator
-        );
-        bool blocked = (tt.operator == tt.blockedOperator &&
-            tt.operator != tt.from);
+        bytes memory err = abi.encodeWithSelector(AddressFiltered.selector, tt.blockedOperator);
+        bool blocked = (tt.operator == tt.blockedOperator && tt.operator != tt.from);
 
         if (tt.operator != tt.from) {
             // can't approve self
@@ -201,36 +167,15 @@ contract ERC721ATransferRestrictedGeneralTest is
         uint8 approvalType;
     }
 
-    function _toTestCase(FuzzParams memory fuzz)
-        internal
-        pure
-        returns (TransferTest memory)
-    {
-        return
-            TransferTest({
-                from: fuzz.from,
-                to: fuzz.to,
-                blockedOperator: fuzz.blockedOperator,
-                operator: fuzz.operator,
-                transferType: TransferType(
-                    uint8(
-                        _bound(
-                            fuzz.transferType,
-                            0,
-                            uint256(type(TransferType).max)
-                        )
-                    )
-                ),
-                approvalType: ApprovalType(
-                    uint8(
-                        _bound(
-                            fuzz.approvalType,
-                            0,
-                            uint256(type(ApprovalType).max)
-                        )
-                    )
-                )
-            });
+    function _toTestCase(FuzzParams memory fuzz) internal pure returns (TransferTest memory) {
+        return TransferTest({
+            from: fuzz.from,
+            to: fuzz.to,
+            blockedOperator: fuzz.blockedOperator,
+            operator: fuzz.operator,
+            transferType: TransferType(uint8(_bound(fuzz.transferType, 0, uint256(type(TransferType).max)))),
+            approvalType: ApprovalType(uint8(_bound(fuzz.approvalType, 0, uint256(type(ApprovalType).max))))
+        });
     }
 
     function testTransfer(FuzzParams memory fuzz) public {
